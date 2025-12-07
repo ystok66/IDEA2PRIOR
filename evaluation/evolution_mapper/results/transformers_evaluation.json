@@ -1,0 +1,234 @@
+{
+  "topic": "transformers",
+  "seed_paper": "Attention is All You Need",
+  "ground_truth_summary": {
+    "total_papers": 41,
+    "year_range": "1997 - 2024",
+    "key_papers_count": 13
+  },
+  "our_output_length": 19322,
+  "num_evaluations": 3,
+  "successful_evaluations": 3,
+  "evaluation": {
+    "scores": {
+      "paper_coverage": 2.33,
+      "citation_accuracy": 5.0,
+      "network_similarity": 3.33,
+      "additional_value": 7.0
+    },
+    "overall_score": 4.25,
+    "score_std_dev": {
+      "paper_coverage": 0.47,
+      "citation_accuracy": 0.0,
+      "network_similarity": 0.47,
+      "additional_value": 0.0,
+      "overall_score": 0.35
+    },
+    "detailed_comparison": {
+      "papers_in_both": [
+        "Attention is All you Need (2017)",
+        "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding (2019)",
+        "MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers (2020)",
+        "Deep Residual Learning for Image Recognition (2015)"
+      ],
+      "papers_only_in_connected_papers": [
+        "Long Short-Term Memory (1997)",
+        "ImageNet: A large-scale hierarchical image database (2009)",
+        "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer (2019)",
+        "Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification (2015)",
+        "RoBERTa: A Robustly Optimized BERT Pretraining Approach (2019)"
+      ],
+      "papers_only_in_our_tool": [
+        "Hopfield Networks is All You Need (2020)",
+        "Data Movement Is All You Need: A Case Study on Optimizing Transformers (2020)",
+        "RPT: Relational Pre-trained Transformer Is Almost All You Need towards Democratizing Data Preparation (2020)",
+        "Fake News Spreaders Detection: Sometimes Attention Is Not All You Need (2022)",
+        "Equivariant Transformer is all you need (2023)"
+      ],
+      "citation_relationships_match": false,
+      "key_differences": [
+        "Connected Papers has a more focused selection of key papers, while Evolution Mapper includes a broader range of papers with varying citation counts.",
+        "The citation relationships in Evolution Mapper do not align well with those in Connected Papers, indicating potential inaccuracies."
+      ]
+    },
+    "strengths": [
+      "Evolution Mapper provides a larger dataset with more papers and citation relationships.",
+      "The tool offers additional insights such as detailed evolution paths and technology branches.",
+      "The tool offers additional insights such as detailed abstracts and citation counts for each paper.",
+      "Our tool provides a larger dataset with more papers and citation relationships.",
+      "The visualization and additional insights (e.g., evolution paths) are more comprehensive."
+    ],
+    "weaknesses": [
+      "Limited overlap in key papers, which may indicate missing influential works.",
+      "Citation relationships are not accurately represented, leading to potential misinterpretations.",
+      "Low overlap in key papers and significant papers from Connected Papers.",
+      "Inaccurate citation relationships and network structure compared to Connected Papers.",
+      "Significant overlap in key papers is missing, indicating a lack of coverage of foundational works."
+    ],
+    "recommendations": [
+      "Enhance the citation relationship accuracy by cross-referencing with established databases.",
+      "Incorporate more key papers from Connected Papers to improve coverage and relevance.",
+      "Improve the accuracy of citation relationships to better reflect the actual connections between papers.",
+      "Incorporate more key papers from the Connected Papers dataset to enhance coverage and relevance.",
+      "Enhance the paper discovery algorithm to include more foundational and key papers from established sources."
+    ],
+    "topic": "transformers",
+    "evaluation_timestamp": "2025-12-06T23:41:20.134450",
+    "num_runs": 3
+  },
+  "individual_evaluations": [
+    {
+      "scores": {
+        "paper_coverage": 3,
+        "citation_accuracy": 5,
+        "network_similarity": 4,
+        "additional_value": 7
+      },
+      "overall_score": 4.75,
+      "detailed_comparison": {
+        "papers_in_both": [
+          "Attention is All you Need (2017)",
+          "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding (2019)",
+          "MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers (2020)",
+          "Deep Residual Learning for Image Recognition (2015)"
+        ],
+        "papers_only_in_connected_papers": [
+          "Long Short-Term Memory (1997)",
+          "ImageNet: A large-scale hierarchical image database (2009)",
+          "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer (2019)",
+          "Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification (2015)",
+          "RoBERTa: A Robustly Optimized BERT Pretraining Approach (2019)"
+        ],
+        "papers_only_in_our_tool": [
+          "Hopfield Networks is All You Need (2020)",
+          "Data Movement Is All You Need: A Case Study on Optimizing Transformers (2020)",
+          "RPT: Relational Pre-trained Transformer Is Almost All You Need towards Democratizing Data Preparation (2020)",
+          "Fake News Spreaders Detection: Sometimes Attention Is Not All You Need (2022)",
+          "Equivariant Transformer is all you need (2023)"
+        ],
+        "citation_relationships_match": false,
+        "key_differences": [
+          "Connected Papers has a more focused selection of key papers, while Evolution Mapper includes a broader range of papers with varying citation counts.",
+          "The citation relationships in Evolution Mapper do not align well with those in Connected Papers, indicating potential inaccuracies."
+        ]
+      },
+      "strengths": [
+        "Evolution Mapper provides a larger dataset with more papers and citation relationships.",
+        "The tool offers additional insights such as detailed evolution paths and technology branches."
+      ],
+      "weaknesses": [
+        "Limited overlap in key papers, which may indicate missing influential works.",
+        "Citation relationships are not accurately represented, leading to potential misinterpretations."
+      ],
+      "recommendations": [
+        "Enhance the citation relationship accuracy by cross-referencing with established databases.",
+        "Incorporate more key papers from Connected Papers to improve coverage and relevance."
+      ],
+      "topic": "transformers",
+      "evaluation_timestamp": "2025-12-06T23:40:58.297195"
+    },
+    {
+      "scores": {
+        "paper_coverage": 2,
+        "citation_accuracy": 5,
+        "network_similarity": 3,
+        "additional_value": 7
+      },
+      "overall_score": 4,
+      "detailed_comparison": {
+        "papers_in_both": [
+          "Attention is All you Need (2017)",
+          "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding (2019)",
+          "MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers (2020)",
+          "Deep Residual Learning for Image Recognition (2015)",
+          "Transformer++ (2020)"
+        ],
+        "papers_only_in_connected_papers": [
+          "Long Short-Term Memory (1997)",
+          "ImageNet: A large-scale hierarchical image database (2009)",
+          "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer (2019)",
+          "Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification (2015)",
+          "RoBERTa: A Robustly Optimized BERT Pretraining Approach (2019)"
+        ],
+        "papers_only_in_our_tool": [
+          "Hopfield Networks is All You Need (2020)",
+          "Data Movement Is All You Need: A Case Study on Optimizing Transformers (2020)",
+          "RPT: Relational Pre-trained Transformer Is Almost All You Need towards Democratizing Data Preparation (2020)",
+          "Fake News Spreaders Detection: Sometimes Attention Is Not All You Need (2022)",
+          "Equivariant Transformer is all you need (2023)"
+        ],
+        "citation_relationships_match": false,
+        "key_differences": [
+          "Connected Papers has a more focused selection of key papers, while Evolution Mapper includes a broader range of papers with varying citation counts.",
+          "The citation relationships in Evolution Mapper do not align well with those in Connected Papers, indicating potential inaccuracies."
+        ]
+      },
+      "strengths": [
+        "Evolution Mapper provides a larger dataset with more papers and citation relationships.",
+        "The tool offers additional insights such as detailed abstracts and citation counts for each paper."
+      ],
+      "weaknesses": [
+        "Low overlap in key papers and significant papers from Connected Papers.",
+        "Inaccurate citation relationships and network structure compared to Connected Papers."
+      ],
+      "recommendations": [
+        "Improve the accuracy of citation relationships to better reflect the actual connections between papers.",
+        "Incorporate more key papers from the Connected Papers dataset to enhance coverage and relevance."
+      ],
+      "topic": "transformers",
+      "evaluation_timestamp": "2025-12-06T23:41:09.749045"
+    },
+    {
+      "scores": {
+        "paper_coverage": 2,
+        "citation_accuracy": 5,
+        "network_similarity": 3,
+        "additional_value": 7
+      },
+      "overall_score": 4,
+      "detailed_comparison": {
+        "papers_in_both": [],
+        "papers_only_in_connected_papers": [
+          "Attention is All you Need (2017)",
+          "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding (2019)",
+          "MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers (2020)",
+          "Deep Residual Learning for Image Recognition (2015)",
+          "Transformer++ (2020)",
+          "Long Short-Term Memory (1997)",
+          "ImageNet: A large-scale hierarchical image database (2009)",
+          "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer (2019)",
+          "Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification (2015)",
+          "RoBERTa: A Robustly Optimized BERT Pretraining Approach (2019)"
+        ],
+        "papers_only_in_our_tool": [
+          "Hopfield Networks is All You Need (2020)",
+          "Data Movement Is All You Need: A Case Study on Optimizing Transformers (2020)",
+          "RPT: Relational Pre-trained Transformer Is Almost All You Need towards Democratizing Data Preparation (2020)",
+          "Fake News Spreaders Detection: Sometimes Attention Is Not All You Need (2022)",
+          "Recurrence and Self-attention vs the Transformer for Time-Series Classification: A Comparative Study (2022)",
+          "Equivariant Transformer is all you need (2023)"
+        ],
+        "citation_relationships_match": false,
+        "key_differences": [
+          "Connected Papers has a much smaller total number of papers (41) compared to our tool (1394).",
+          "The key papers identified in Connected Papers are not present in our tool's output."
+        ]
+      },
+      "strengths": [
+        "Our tool provides a larger dataset with more papers and citation relationships.",
+        "The visualization and additional insights (e.g., evolution paths) are more comprehensive."
+      ],
+      "weaknesses": [
+        "Significant overlap in key papers is missing, indicating a lack of coverage of foundational works.",
+        "Citation relationships do not align well with those in Connected Papers."
+      ],
+      "recommendations": [
+        "Enhance the paper discovery algorithm to include more foundational and key papers from established sources.",
+        "Improve citation relationship accuracy by cross-referencing with established citation databases."
+      ],
+      "topic": "transformers",
+      "evaluation_timestamp": "2025-12-06T23:41:20.133678"
+    }
+  ],
+  "timestamp": "2025-12-06T23:41:20.134481"
+}

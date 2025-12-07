@@ -103,7 +103,7 @@ class DatabaseSearch(Tool):
         self, conference: str, year: int
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
         """
-        Load conference data from JSON file
+        Load conference data from JSON files
 
         Args:
             conference: Conference name
@@ -112,30 +112,94 @@ class DatabaseSearch(Tool):
         Returns:
             Tuple of (paper list, error message or None)
         """
-        # Construct filename
+        # Try old format first: single file per conference
         filename = f"{conference}{year}.json"
         filepath = self.database_dir / filename
 
-        if not filepath.exists():
-            return None, f"Database file not found: {filepath}"
+        if filepath.exists():
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    papers = json.load(f)
 
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                papers = json.load(f)
+                if not isinstance(papers, list):
+                    return (
+                        None,
+                        f"Invalid database format: expected list, got {type(papers)}",
+                    )
 
-            if not isinstance(papers, list):
-                return (
-                    None,
-                    f"Invalid database format: expected list, got {type(papers)}",
+                logger.info(f"📄 Loaded {len(papers)} papers from {filename}")
+                return papers, None
+
+            except json.JSONDecodeError as e:
+                return None, f"Failed to parse JSON file: {e}"
+            except Exception as e:
+                return None, f"Failed to read database file: {e}"
+        
+        # New format: individual JSON files per paper
+        # Load all JSON files and filter by conference
+        papers = []
+        json_files = list(self.database_dir.glob("*.json"))
+        
+        if not json_files:
+            return None, f"No JSON files found in: {self.database_dir}"
+        
+        # Normalize conference name for matching
+        conference_normalized = conference.lower()
+        year_str = str(year)
+        
+        # Helper function to parse conference and year from string like "cvpr2025"
+        def parse_conference_year(conf_str: str) -> tuple[str, int | None]:
+            """Parse conference and year from string like 'cvpr2025'"""
+            import re
+            conf_str = conf_str.lower()
+            # Try to match pattern like "cvpr2025" or "icml2024"
+            match = re.match(r'([a-z]+)(\d{4})', conf_str)
+            if match:
+                return match.group(1), int(match.group(2))
+            # If no year found, return conference name and None
+            return conf_str, None
+        
+        for json_file in json_files:
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    paper_data = json.load(f)
+                
+                # Get conference field (format: "cvpr2025" or similar)
+                paper_conference_str = paper_data.get("conference", "").lower()
+                if not paper_conference_str:
+                    continue
+                
+                # Parse conference and year from paper data
+                paper_conf, paper_year = parse_conference_year(paper_conference_str)
+                
+                # Check if conference matches
+                # Support both exact match and partial match (e.g., "cvpr" matches "cvpr2025")
+                conference_matches = (
+                    paper_conf == conference_normalized or
+                    conference_normalized in paper_conf or
+                    paper_conf.startswith(conference_normalized)
                 )
-
-            logger.info(f"📄 Loaded {len(papers)} papers from {filename}")
-            return papers, None
-
-        except json.JSONDecodeError as e:
-            return None, f"Failed to parse JSON file: {e}"
-        except Exception as e:
-            return None, f"Failed to read database file: {e}"
+                
+                # Check if year matches
+                # If paper has year, use it; otherwise check if year is in conference string
+                if paper_year is not None:
+                    year_matches = paper_year == year
+                else:
+                    # Fallback: check if year string is in conference string
+                    year_matches = year_str in paper_conference_str
+                
+                if conference_matches and year_matches:
+                    papers.append(paper_data)
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load {json_file.name}: {e}")
+                continue
+        
+        if not papers:
+            return None, f"No papers found for {conference} {year} in {self.database_dir}"
+        
+        logger.info(f"📄 Loaded {len(papers)} papers for {conference} {year} from individual files")
+        return papers, None
 
     def _expand_keywords(self, keywords: str) -> tuple[List[str], Optional[str]]:
         """
