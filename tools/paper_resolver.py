@@ -26,6 +26,22 @@ class PaperResolverTool(Tool):
         self.openalex_mailto = os.getenv("OPENALEX_MAILTO")
         self.email = os.getenv("OPENALEX_MAILTO") # Use same email for Unpaywall
 
+    def _normalize_pdf_url(self, url: str) -> str:
+        """
+        Normalize known HTML URLs to direct PDF URLs.
+        
+        Handles:
+        - CVF (openaccess.thecvf.com): .html -> .pdf
+        """
+        if not url:
+            return url
+        
+        # CVF HTML pages can be converted to PDF
+        if "openaccess.thecvf.com" in url and url.endswith(".html"):
+            return url.replace(".html", ".pdf")
+        
+        return url
+
     def forward(self, doi: Optional[str] = None, arxiv_id: Optional[str] = None, 
                 s2_id: Optional[str] = None, openalex_id: Optional[str] = None, 
                 title: Optional[str] = None) -> str:
@@ -47,9 +63,10 @@ class PaperResolverTool(Tool):
         if paper:
             # Check for OA PDF
             if paper.get("openAccessPdf"):
-                logger.info("Found OA PDF in Semantic Scholar")
+                pdf_url = self._normalize_pdf_url(paper["openAccessPdf"]["url"])
+                logger.info(f"[PaperResolver] Selected PDF from S2 OA: {pdf_url[:80]}...")
                 return {
-                    "pdf_url": paper["openAccessPdf"]["url"],
+                    "pdf_url": pdf_url,
                     "metadata": self._extract_meta_from_s2(paper),
                     "source": "semanticscholar",
                 }
@@ -72,9 +89,9 @@ class PaperResolverTool(Tool):
             logger.info("Checking OpenAlex...")
             work = self._lookup_openalex(doi, openalex_id, title)
             if work:
-                pdf_url = self._openalex_pdf_url(work)
+                pdf_url = self._normalize_pdf_url(self._openalex_pdf_url(work))
                 if pdf_url:
-                    logger.info("Found PDF in OpenAlex")
+                    logger.info(f"[PaperResolver] Selected PDF from OpenAlex: {pdf_url[:80]}...")
                     return {
                         "pdf_url": pdf_url,
                         "metadata": self._extract_meta_from_openalex(work),
@@ -88,9 +105,9 @@ class PaperResolverTool(Tool):
             logger.info("Checking Unpaywall...")
             info = self._lookup_unpaywall(doi)
             if info:
-                pdf_url = self._unpaywall_pdf_url(info)
+                pdf_url = self._normalize_pdf_url(self._unpaywall_pdf_url(info))
                 if pdf_url:
-                    logger.info("Found PDF in Unpaywall")
+                    logger.info(f"[PaperResolver] Selected PDF from Unpaywall: {pdf_url[:80]}...")
                     return {
                         "pdf_url": pdf_url,
                         "metadata": self._extract_meta_from_unpaywall(info),

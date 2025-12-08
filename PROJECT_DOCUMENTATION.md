@@ -41,6 +41,15 @@
 paperarena_hub/
 ├── .env                          # 环境变量配置
 ├── demo_research_agent.py        # 主入口脚本
+├── pipelines/                    # 核心流水线模块 🆕
+│   ├── evidence.py               # 证据系统 (EvidenceSpan, FacetCoverage)
+│   ├── paper_record.py           # 论文记录 (PaperRecord, SectionRecord)
+│   ├── run_manager.py            # 运行管理 (RunManager)
+│   ├── coverage_classifier.py    # 覆盖率分类器
+│   ├── llm_config.py             # LLM 配置
+│   ├── exploration_loop.py       # 探索循环
+│   └── tasks/
+│       └── prior_art_check.py    # Prior Art Check 任务
 ├── tools/                        # 工具集合
 │   ├── openalex_search.py       # OpenAlex API 工具
 │   ├── semantic_scholar_search.py # Semantic Scholar API 工具
@@ -49,6 +58,8 @@ paperarena_hub/
 │   ├── async_web_crawler.py     # 核心爬虫类
 │   ├── pdf_extractor.py         # PDF 提取工具
 │   └── ...
+├── runs/                         # 运行产物目录 🆕
+│   └── <timestamp>_<topic>/      # 单次运行目录
 ├── rag/                          # RAG 系统
 │   ├── embeddings/              # Embedding 模型
 │   │   ├── openai_embedding.py
@@ -765,11 +776,121 @@ keywords = generate_keywords(light_model, query)
 - **使用示例**: `demo_research_agent.py` (Heavy 角色)
 - **使用示例**: `pipelines/tasks/prior_art_check.py` (Light 角色，关键词生成)
 
+### LLM 职责分配表 (2025-12-07 更新)
+
+以下是 `prior_art_check.py` 任务中各个 LLM 角色的具体职责分配：
+
+| 函数名                                      | 用途                          | 角色       | 说明                                   |
+| :------------------------------------------ | :---------------------------- | :--------- | :------------------------------------- |
+| **`seed_papers_from_llm`**                  | 凭知识生成种子论文            | **Expert** | 利用 Expert 模型的广博知识回召         |
+| **`generate_search_queries_from_idea`**     | 生成初始检索 Query            | **Expert** | 需要 Expert 模型对领域术语的精准把握   |
+| **`generate_seed_queries_llm`**             | Block 1 增强检索 Query        | **Expert** | 确保生成高质量的检索关键词             |
+| **`generate_relevance_keywords_from_idea`** | 相关性关键词生成              | **Expert** | 用于 Lexical Filter，需高召回率        |
+| **`generate_evidence_keywords_from_idea`**  | Evidence 检索关键词           | **Expert** | 生成用于全文检索的技术关键词           |
+| **`refine_queries_llm`**                    | Top Paper 精炼 Query          | **Heavy**  | 基于已有论文上下文进行深层推理         |
+| **`decompose_idea_into_facets`**            | Idea → 3-7 Facet              | **Light**  | 结构化任务，Light 模型足够胜任         |
+| **`extract_idea_features`**                 | Idea → Dataset/Metric/Methods | **Light**  | 简单的实体抽取任务                     |
+| **`extract_high_level_facets_from_idea`**   | Idea → 4 类高层结构           | **Light**  | 相对固定的 Schema 抽取                 |
+| **`extract_high_level_facets_from_paper`**  | Paper → 4 类高层结构          | **Light**  | 高频调用，从 Paper 文本抽取            |
+| **`score_papers_with_abstract_only`**       | 摘要评分                      | **Light**  | 核心评分循环，Light 模型平衡速度与成本 |
+| **`refine_top_papers_with_fulltext`**       | 全文精炼评分                  | **Light**  | 二次确认与 Role 标记                   |
+| **`llm_relevance_prefilter`**               | 相关性预筛选                  | **Light**  | 简单的 True/False 判断                 |
+
 ---
 
 ## 更新历史
 
-### 最新更新（2025-11-30）
+### 最新更新（2025-12-07）
+
+#### 1. 结构化覆盖率分析 (Block 3 & Phase 6) 🏗️
+
+**文件**: `pipelines/evidence.py`, `pipelines/coverage_classifier.py`, `pipelines/tasks/prior_art_check.py`
+
+本次更新实现了基于证据的统一覆盖率分析系统，解决了报告中统计数据矛盾的问题，并引入了更严格的领域过滤。
+
+##### ✅ 1. 统一的证据系统 (Unified Evidence System)
+
+- **EvidenceSpan**: 定义了覆盖率的原子单位，包含 `(paper_id, facet, section_role, sentence_role, strength)`。
+- **FacetCoverageStats**: 唯一的覆盖率统计来源，不再依赖旧的正则表达式计数。
+- **FacetReportView**: 用于报告生成的纯视图层，确保展示数据与底层统计完全一致。
+
+##### ✅ 2. 智能覆盖率分类 (Coverage Classification)
+
+引入了确定性分类器 `pipelines/coverage_classifier.py`，将论文分为四个等级：
+
+- **Level 3 (High Overlap)**: 包含 >=2 个关键 Facet 的强证据（通常在 Method/Intro 中提及 Own Method）。
+- **Level 2 (Partial Overlap)**: 包含 >=1 个关键 Facet 的强证据，或 >=2 个 Facet 的任意证据。
+- **Level 1 (Adjacent Work)**: 属于相关领域，但仅有背景提及或弱证据。
+- **Level 0 (Ignore)**: 领域外或无证据。
+
+##### ✅ 3. 严格的领域过滤 (Strict Domain Filtering)
+
+- **全局硬过滤**: 在 `PaperRecord` 层面实现 `is_in_domain_for_topic`。
+- **排除无关领域**: 自动剔除 Medical, Agriculture, NLP 等非目标领域的论文，即使它们包含通用关键词（如 "3D detection"）。
+- **一致性**: 确保 Adjacent Work 列表不再包含明显的领域外论文（如 MRI 分析、作物检测）。
+
+##### ✅ 4. Run-Oriented 架构
+
+- **RunManager**: 为每次执行创建独立的 `runs/<timestamp>_<topic>/` 目录。
+- **Artifacts 保存**: 自动保存 `config.json`, `search_log.jsonl`, `md_reports/` 到运行目录，便于回溯。
+
+---
+
+### 之前更新（2025-12-06）
+
+#### 1. Prior Art Check Round 3 全面升级 🔄
+
+**文件**: `pipelines/tasks/prior_art_check.py`
+
+本次更新对 Prior Art Check 管道进行了第三轮全面重构，重点提升了跨领域通用性、结果准确性和报告的专业性。
+
+##### ✅ 1. 双阶段预过滤 (Two-Stage Pre-filtering)
+
+引入了更高效的漏斗式过滤机制，大幅提升性能并减少 LLM 幻觉：
+
+- **Stage 1 (Lexical)**: 引入 `simple_relevance_score` 增强版
+  - 自动降权通用术语（如 "survey", "review", "deep learning"），避免被宽泛的综述论文淹没。
+  - 使用 `GENERIC_STOPWORDS` 常量列表进行过滤。
+- **Stage 2 (Light LLM)**: 新增 `llm_relevance_prefilter`
+  - 使用 Light 模型对 Stage 1 筛选出的 Top-K 论文进行快速 True/False 相关性判断。
+  - 在昂贵的详细评分之前，剔除明显不相关的论文。
+
+##### ✅ 2. 领域无关的证据生成 (Domain-Agnostic Evidence)
+
+彻底移除了代码中硬编码的 3D 视觉特定关键词，实现了真正的领域通用性：
+
+- **移除硬编码**: 删除了 `["camera space", "optical center", ...]` 等特定领域词汇。
+- **动态生成**: 新增 `generate_evidence_keywords_from_idea` 函数。
+  - 使用 Light LLM 根据具体 Idea 和 Topic 动态生成证据检索关键词。
+  - 结合结构化特征（Datasets, Metrics）增强检索精度。
+- **通用混入**: `make_keywords_for_evidence` 现在只负责合并各来源的关键词，不再掺杂偏见。
+
+##### ✅ 3. 相似度排序与 Adjacent Work 优化
+
+改进了论文排序和展示逻辑，使真正相关的 Prior Art 更容易被发现：
+
+- **相似度评分**: 打分 Prompt 新增 `task_similarity` 和 `method_similarity` (0.0-1.0) 维度。
+- **智能排序**: `PriorArtMatch` 排序逻辑调整为优先考虑相似度，其次才是引用数。
+  - 引用数权重被设置上限 (capped at 200)，防止高引用的通用论文霸榜。
+- **Survey 限制**: 在报告的 Adjacent Work 章节，限制 Survey/Review 类论文最多显示 3 篇，避免挤占具体方法论文的版面。
+
+##### ✅ 4. 防御性报告措辞 (Defensive Wording)
+
+增强了报告的客观性和严谨性：
+
+- **Gap Analysis**: 将 "Found 0 papers" 的表述改为更客观的 "⚠ Not found in retrieved corpus"。
+- **免责声明**: 报告底部新增详细 Disclaimer，明确指出结果可能受限于检索召回率和 LLM 幻觉。
+- **标签级计数**: 修复了 Facet 覆盖率计数逻辑，引入 `classes PriorArtMatch.covered_facet_labels`，避免因文本 Paraphrase 导致的计数偏差。
+
+##### ✅ 5. 开发体验优化
+
+- **Debug 文件输出**: 在 Debug 模式下，自动将 Markdown 报告保存为本地文件（如 `prior_art_debug_topic_timestamp.md`），便于回溯和对比。
+
+---
+
+---
+
+### 之前更新（2025-11-30）
 
 #### 1. LLM 配置系统重构 🎯
 
