@@ -17,6 +17,11 @@ __pycache__/
 *.pyo
 *.pyd
 *.log
+*.pdf
+*.json
+*.txt
+*.jsonl
+*_[0-9][0-9][0-9][0-9][0-9][0-9].md
 
 # 如果你希望这些运行输出不进仓库：
 report_output*.txt
