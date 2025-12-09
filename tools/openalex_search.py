@@ -3,6 +3,8 @@ import requests
 from typing import Optional, List, Dict, Any
 from smolagents import Tool
 
+from pipelines.rate_limiter import openalex_rate_limiter
+
 class OpenAlexWorksSearchTool(Tool):
     name = "openalex_works_search"
     description = """
@@ -83,6 +85,9 @@ class OpenAlexWorksSearchTool(Tool):
             params["search"] = query
             
         try:
+            # Per-request rate limiting (sliding window, not batch + sleep)
+            openalex_rate_limiter.wait_for_slot()
+            
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()

@@ -57,6 +57,11 @@ class Paper(BaseModel):
     pdf_url: Optional[str] = None
     local_pdf_path: Optional[str] = None
     gemini_file_uri: Optional[str] = None  # for Gemini File API
+    pdf_resolve_failed: bool = False  # True if PDF URL resolution already attempted and failed
+    has_fulltext: bool = False  # True if fulltext was successfully parsed (PDF sections available)
+    
+    # Retrieval metadata
+    retrieval_source: Optional[str] = None  # e.g., "block1_main_q0", "citation_graph"
     
     # Content
     chunks: List[Chunk] = []

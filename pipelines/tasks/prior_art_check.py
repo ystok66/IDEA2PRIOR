@@ -109,6 +109,7 @@ from pipelines.tasks.prior_art_fulltext import (
     build_method_experiment_snippets,
     select_key_papers_and_dump_intro_rw_full,
 )
+from pipelines.tasks.prior_art_synthesis import build_synthesis_input
 
 # Standard library
 import requests
@@ -213,11 +214,9 @@ def run_prior_art_check(
     state = PipelineState(intent=intent)
     cfg = PriorArtConfig(debug_mode=debug_mode)
     
-    # Apply debug mode overrides for concurrency
-    if debug_mode:
-        cfg.max_workers_openalex = 1
-        cfg.max_workers_s2 = 1
-        cfg.max_workers_pdf = 1
+    # NOTE: debug_mode no longer forces workers=1
+    # It only reduces data scale (top_n, paragraphs, etc.) while keeping concurrency
+    # This allows testing concurrent code paths even in debug mode
     
     # Determine fulltext refine top_k logic
     fulltext_top_k = cfg.debug_top_k_fulltext_refine if debug_mode else cfg.top_k_fulltext_refine
@@ -515,6 +514,23 @@ def run_prior_art_check(
             )
         except Exception as e:
             logger.warning(f"[PriorArtCheck] Key papers selection failed: {e}")
+
+    # ========== 2.1: Synthesis JSON Builder ==========
+    if run_mgr and cfg.enable_synthesis_json:
+        try:
+            build_synthesis_input(
+                state=state,
+                config=cfg,
+                run_dir=Path(run_mgr.run_dir),
+                facets=[{"id": f"F{i+1}", "label": f, "category": "core"} for i, f in enumerate(facets)],
+                user_query=idea_description,
+                retrieval_queries=search_queries,
+                # 新增: 传递 coverage 和 match 数据
+                coverage_levels=block3_coverage_levels,
+                scored_matches=matches,
+            )
+        except Exception as e:
+            logger.warning(f"[PriorArtCheck] Synthesis JSON failed: {e}")
 
     report = render_prior_art_report(
         idea_description=idea_description,

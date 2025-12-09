@@ -11,6 +11,8 @@ from typing import Dict, List, Any, Optional
 import requests
 from loguru import logger
 
+from pipelines.rate_limiter import s2_rate_limiter
+
 
 class SemanticScholarClient:
     """
@@ -42,6 +44,9 @@ class SemanticScholarClient:
         params = {"fields": fields}
         
         try:
+            # Per-request rate limiting (sliding window, not batch + sleep)
+            s2_rate_limiter.wait_for_slot()
+            
             response = requests.get(url, params=params, headers=self._headers(), timeout=10)
             response.raise_for_status()
             return response.json()
@@ -71,6 +76,9 @@ class SemanticScholarClient:
         params = {"fields": fields, "limit": limit}
         
         try:
+            # Per-request rate limiting (sliding window, not batch + sleep)
+            s2_rate_limiter.wait_for_slot()
+            
             response = requests.get(url, params=params, headers=self._headers(), timeout=10)
             response.raise_for_status()
             data = response.json()
@@ -109,6 +117,9 @@ class SemanticScholarClient:
         params = {"fields": fields, "limit": limit}
         
         try:
+            # Per-request rate limiting (sliding window, not batch + sleep)
+            s2_rate_limiter.wait_for_slot()
+            
             response = requests.get(url, params=params, headers=self._headers(), timeout=10)
             response.raise_for_status()
             data = response.json()

@@ -100,11 +100,48 @@ pipelines/tasks/
 ```python
 @dataclass
 class PriorArtConfig:
+    # Display
     top_k_display: int = 20           # Papers to show in report
     fulltext_top_k: int = 10          # Papers to download PDFs for
-    use_citation_graph: bool = True   # Enable citation expansion
-    citation_depth: int = 1           # How deep to expand
-    debug_mode: bool = False          # Limit LLM calls
+    debug_mode: bool = False          # Limit data scale (not workers)
+
+    # Concurrency (local workers, NOT API rate)
+    max_workers_openalex: int = 4     # OpenAlex seed validation
+    max_workers_s2: int = 4           # Semantic Scholar citation graph
+    max_workers_pdf: int = 5          # PDF download/parse
+    max_workers_llm_scoring: int = 20 # LLM scoring parallelism
+    max_workers_llm_prefilter: int = 4
+
+    # Dual-bucket retrieval (citation vs recency balance)
+    recent_year_threshold: int = 2024     # "Recent bucket" = 2024+
+    recent_min_quota_ratio: float = 0.3   # At least 30% from recent
+    recent_max_quota_ratio: float = 0.6   # At most 60% from recent
+
+    # Scoring weights for ranking
+    weight_relevance: float = 0.6   # Relevance score weight
+    weight_citation: float = 0.25   # Citation count weight
+    weight_recency: float = 0.15    # Recency weight
+```
+
+### Rate Limiting (Dec 2024) 🆕
+
+API throttling is handled at the **client layer** via sliding-window rate limiters, not batch-level sleeps:
+
+| Service              | Location                                       | Max Calls | Period | Notes              |
+| -------------------- | ---------------------------------------------- | --------- | ------ | ------------------ |
+| **OpenAlex**         | `tools/openalex_search.py`                     | 8         | 1.0s   | Polite rate        |
+| **Semantic Scholar** | `pipelines/clients/semantic_scholar_client.py` | 1         | 2.0s   | Conservative       |
+| **LLM**              | `pipelines/tasks/prior_art_scoring.py`         | 20        | 1.0s   | Safety net         |
+| **PDF Download**     | `pipelines/tasks/prior_art_scoring.py`         | 5         | 1.0s   | Avoid server block |
+
+**Implementation**: `pipelines/rate_limiter.py` - Thread-safe `SimpleRateLimiter` class with sliding-window logic.
+
+**Pattern**:
+
+```python
+# Each task calls wait_for_slot() before making API request
+rate_limiter.wait_for_slot()  # Blocks if rate exceeded
+response = requests.get(...)  # Then make request
 ```
 
 ### PipelineState (from pipelines/pipeline_state.py)
@@ -256,8 +293,23 @@ select_key_papers_and_dump_intro_rw_full(agent, state, task_root, config)
 Consolidates all Block 1-3 results into a single self-contained JSON:
 
 ```python
-build_synthesis_input(state, config, run_dir, facets, user_query, retrieval_queries)
+build_synthesis_input(
+    state,
+    config,
+    run_dir,
+    facets,
+    user_query,
+    retrieval_queries,
+    coverage_levels,    # Dict[str, int] from coverage_classifier
+    scored_matches,     # List[PriorArtMatch] from LLM scoring
+)
 ```
+
+**Key Data Flow (Dec 2024 Fix)**:
+
+- `coverage_levels` from `classify_all_papers()` is the **single source of truth** for bucket assignment
+- `scored_matches` provides `facet_labels`, `task_similarity`, `method_similarity`
+- `facet_coverage` uses fuzzy keyword matching (2+ word overlap) to map LLM-generated labels to facet IDs
 
 **Output**: `synthesis/synthesis_input.json`
 
@@ -273,11 +325,30 @@ build_synthesis_input(state, config, run_dir, facets, user_query, retrieval_quer
     "audience": "expert_researcher",
     "usage_context": ["paper_introduction", "related_work_section"]
   },
-  "global_stats": {"num_candidates": 86, "coverage_by_level": {...}, "facet_coverage": [...]},
+  "global_stats": {
+    "num_candidates": 86,
+    "num_block3": 5,
+    "coverage_by_level": {"3": 0, "2": 2, "1": 3, "0": 81},
+    "facet_coverage": [
+      {"facet_id": "F1", "facet_label": "...", "strong_papers": 2, "total_papers": 4}
+    ]
+  },
   "retrieval_summary": {"query_seeds": [...], "facet_queries": {...}, "sources": [...], "exploration_notes": {...}},
   "limitations": {"retrieval_coverage": "not_exhaustive", "llm_noise": true, "notes": [...]},
   "buckets": {"high_overlap": [...], "partial_overlap": [...], "adjacent": [...], "ignored": [...]},
-  "papers": [...],
+  "papers": [
+    {
+      "paper_id": "...",
+      "title": "...",
+      "overlap_level": 2,
+      "overlap_bucket": "partial_overlap",
+      "facet_labels": ["F1", "F3"],
+      "task_similarity": 0.8,
+      "method_similarity": 0.7,
+      "intro_rw_full": {...},
+      "method_exp_snippets": [...]
+    }
+  ],
   "prompt_templates": {"full_markdown_report": "...", "short_related_work_section": "..."}
 }
 ```
@@ -313,7 +384,24 @@ runs/<run_id>/
 
 When `--debug` is passed:
 
-- Limits to 10 papers for LLM scoring
-- Uses single worker for PDF downloads
-- More verbose logging
-- Faster iteration for development
+- Limits to 10 papers for LLM scoring (via `get_max_abstract_to_score()`)
+- Reduces fulltext refinement to top 5 papers
+- Uses fewer seed queries (3 instead of 6)
+- **Does NOT reduce worker counts** - concurrency is maintained for testing
+- More verbose logging for troubleshooting
+
+**Note**: Rate limiting is always active via `SimpleRateLimiter`, regardless of debug mode.
+
+---
+
+## Concurrency & Rate Limiting Summary
+
+| Stage           | Workers | Rate Limiter   |
+| --------------- | ------- | -------------- |
+| Seed Validation | 4       | openalex: 8/1s |
+| Citation Graph  | 4       | s2: 1/2s       |
+| PDF Download    | 5       | pdf: 5/1s      |
+| LLM Scoring     | 20      | llm: 20/1s     |
+| LLM Prefilter   | 4       | llm: 20/1s     |
+
+**Pattern**: Single `ThreadPoolExecutor` per stage, each task calls `rate_limiter.wait_for_slot()` before API request.

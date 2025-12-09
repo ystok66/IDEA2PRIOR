@@ -194,6 +194,10 @@ def build_synthesis_input(
     facets: Optional[List[Dict[str, Any]]] = None,
     user_query: Optional[str] = None,
     retrieval_queries: Optional[List[str]] = None,
+    # 新增: 来自 coverage_classifier 的真值
+    coverage_levels: Optional[Dict[str, int]] = None,
+    # 新增: 来自 LLM scoring 的 match 信息 (包含 facet_labels)
+    scored_matches: Optional[List[PriorArtMatch]] = None,
 ) -> Dict[str, Any]:
     """
     Consolidate all Block 1-3 results into a single synthesis_input.json.
@@ -269,21 +273,34 @@ def build_synthesis_input(
     # -------------------------------------------------------------------------
     # 2. Build global_stats
     # -------------------------------------------------------------------------
+    # 优先使用传入的 coverage_levels (来自 coverage_classifier)
     coverage_by_level = defaultdict(int)
-    for paper in state.papers.values():
-        level = getattr(paper, 'coverage_level', 0) or 0
-        coverage_by_level[level] += 1
+    if coverage_levels:
+        for pid, level in coverage_levels.items():
+            coverage_by_level[level] += 1
+    else:
+        # Fallback: 尝试从 paper 对象读取 (向后兼容)
+        for paper in state.papers.values():
+            level = getattr(paper, 'coverage_level', 0) or 0
+            coverage_by_level[level] += 1
+    
+    # 构建 scored_matches 映射 (用于获取 facet_labels 等)
+    # 需要在 global_stats 之前构建，以便 facet_coverage 使用
+    match_by_pid: Dict[str, PriorArtMatch] = {}
+    if scored_matches:
+        for m in scored_matches:
+            match_by_pid[m.paper_id] = m
     
     global_stats = {
         "num_candidates": len(state.papers),
-        "num_block3": sum(1 for p in state.papers.values() if p.chunks),
+        "num_block3": sum(1 for p in state.papers.values() if p.chunks or getattr(p, 'has_fulltext', False)),
         "coverage_by_level": {
             "3": coverage_by_level.get(3, 0),
             "2": coverage_by_level.get(2, 0),
             "1": coverage_by_level.get(1, 0),
             "0": coverage_by_level.get(0, 0),
         },
-        "facet_coverage": _build_facet_coverage_stats(state, facets_list),
+        "facet_coverage": _build_facet_coverage_stats(facets_list, match_by_pid, coverage_levels),
     }
     
     # -------------------------------------------------------------------------
@@ -296,16 +313,30 @@ def build_synthesis_input(
         "ignored": [],
     }
     
-    for pid, paper in state.papers.items():
-        level = getattr(paper, 'coverage_level', 0) or 0
-        if level >= 3:
-            buckets["high_overlap"].append(pid)
-        elif level == 2:
-            buckets["partial_overlap"].append(pid)
-        elif level == 1:
-            buckets["adjacent"].append(pid)
-        else:
-            buckets["ignored"].append(pid)
+    # 优先使用传入的 coverage_levels
+    if coverage_levels:
+        for pid in state.papers.keys():
+            level = coverage_levels.get(pid, 0)
+            if level >= 3:
+                buckets["high_overlap"].append(pid)
+            elif level == 2:
+                buckets["partial_overlap"].append(pid)
+            elif level == 1:
+                buckets["adjacent"].append(pid)
+            else:
+                buckets["ignored"].append(pid)
+    else:
+        # Fallback
+        for pid, paper in state.papers.items():
+            level = getattr(paper, 'coverage_level', 0) or 0
+            if level >= 3:
+                buckets["high_overlap"].append(pid)
+            elif level == 2:
+                buckets["partial_overlap"].append(pid)
+            elif level == 1:
+                buckets["adjacent"].append(pid)
+            else:
+                buckets["ignored"].append(pid)
     
     # -------------------------------------------------------------------------
     # 3b. Build retrieval_summary
@@ -375,6 +406,8 @@ def build_synthesis_input(
     # -------------------------------------------------------------------------
     papers_list = []
     
+    # match_by_pid 已在 global_stats 之前构建
+    
     # Only include papers with some meaningful data (scored or fulltext)
     included_pids = set(buckets["high_overlap"] + buckets["partial_overlap"] + buckets["adjacent"])
     # Also include any paper with summaries or snippets
@@ -387,7 +420,8 @@ def build_synthesis_input(
         if not paper:
             continue
         
-        level = getattr(paper, 'coverage_level', 0) or 0
+        # 使用传入的 coverage_levels 获取 level
+        level = coverage_levels.get(pid, 0) if coverage_levels else getattr(paper, 'coverage_level', 0) or 0
         
         # Determine overlap_bucket
         if level >= 3:
@@ -404,6 +438,9 @@ def build_synthesis_input(
         has_full_intro_rw = pid in intro_rw_full_by_pid
         intro_rw_policy = "full" if has_full_intro_rw else "summary_only"
         
+        # 从 scored_matches 获取评分信息
+        match = match_by_pid.get(pid)
+        
         # Build paper entry
         paper_entry = {
             "paper_id": pid,
@@ -413,9 +450,11 @@ def build_synthesis_input(
             "citation_count": paper.citation_count or 0,
             "overlap_level": level,
             "overlap_bucket": overlap_bucket,
-            "facet_labels": getattr(paper, 'covered_facet_labels', []) or [],
-            "task_similarity": getattr(paper, 'task_similarity', 0.0) or 0.0,
-            "method_similarity": getattr(paper, 'method_similarity', 0.0) or 0.0,
+            # 从 match 获取 facet_labels
+            "facet_labels": match.covered_facet_labels if match and match.covered_facet_labels else [],
+            # 从 match 获取相似度分数
+            "task_similarity": match.task_similarity if match else 0.0,
+            "method_similarity": match.method_similarity if match else 0.0,
             "key_roles": key_roles,
             "intro_rw_policy": intro_rw_policy,
         }
@@ -501,10 +540,11 @@ def _extract_year_range(state: PipelineState) -> str:
 
 
 def _build_facet_coverage_stats(
-    state: PipelineState,
     facets: List[Dict[str, Any]],
+    match_by_pid: Dict[str, PriorArtMatch],
+    coverage_levels: Optional[Dict[str, int]] = None,
 ) -> List[Dict[str, Any]]:
-    """Build facet coverage statistics."""
+    """Build facet coverage statistics from scored_matches."""
     facet_stats = []
     
     # Count papers covering each facet
@@ -515,11 +555,29 @@ def _build_facet_coverage_stats(
         strong_papers = 0
         total_papers = 0
         
-        for paper in state.papers.values():
-            covered_labels = getattr(paper, 'covered_facet_labels', []) or []
-            if facet_id in covered_labels or facet_label in covered_labels:
+        for pid, match in match_by_pid.items():
+            covered_labels = match.covered_facet_labels or []
+            
+            # 模糊匹配: 检查 facet_id、facet_label、或标签中是否包含关键词
+            matched = False
+            if facet_id in covered_labels:
+                matched = True
+            elif facet_label.lower() in [l.lower() for l in covered_labels]:
+                matched = True
+            else:
+                # 关键词模糊匹配
+                facet_keywords = set(facet_label.lower().split())
+                for label in covered_labels:
+                    label_words = set(label.lower().split())
+                    # 如果有 2+ 个词重叠，认为匹配
+                    if len(facet_keywords & label_words) >= 2:
+                        matched = True
+                        break
+            
+            if matched:
                 total_papers += 1
-                level = getattr(paper, 'coverage_level', 0) or 0
+                # 使用 coverage_levels 确定 strong
+                level = coverage_levels.get(pid, 0) if coverage_levels else match.coverage_level
                 if level >= 2:
                     strong_papers += 1
         

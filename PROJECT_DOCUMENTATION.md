@@ -808,9 +808,101 @@ keywords = generate_keywords(light_model, query)
 
 ---
 
+## Rate Limiting & Concurrency (2025-12-09 新增) 🆕
+
+### 概述
+
+系统使用 **滑动窗口 Rate Limiter** 在客户端层控制 API 请求速率，替代了之前的 "batch + sleep" 模式。
+
+### 实现
+
+**核心文件**: `pipelines/rate_limiter.py`
+
+```python
+class SimpleRateLimiter:
+    """Thread-safe sliding-window rate limiter."""
+    def __init__(self, max_calls: int, period: float):
+        self.max_calls = max_calls
+        self.period = period
+        self._timestamps = deque()
+        self._lock = threading.Lock()
+
+    def wait_for_slot(self):
+        """Block until a slot is available."""
+        # Sliding window logic...
+```
+
+### Rate Limiter 配置
+
+| 服务                 | 实例名                  | 位置                                           | Max Calls | Period |
+| -------------------- | ----------------------- | ---------------------------------------------- | --------- | ------ |
+| **OpenAlex**         | `openalex_rate_limiter` | `tools/openalex_search.py`                     | 8         | 1.0s   |
+| **Semantic Scholar** | `s2_rate_limiter`       | `pipelines/clients/semantic_scholar_client.py` | 1         | 2.0s   |
+| **LLM**              | `llm_rate_limiter`      | `pipelines/tasks/prior_art_scoring.py`         | 20        | 1.0s   |
+| **PDF Download**     | `pdf_rate_limiter`      | `pipelines/tasks/prior_art_scoring.py`         | 5         | 1.0s   |
+
+### 并发配置 (PriorArtConfig)
+
+```python
+# 并发 worker 数量（控制本地线程，非 API 速率）
+max_workers_openalex: int = 4     # 种子验证
+max_workers_s2: int = 4            # 引用图扩展
+max_workers_pdf: int = 5           # PDF 下载/解析
+max_workers_llm_scoring: int = 20  # LLM 评分
+max_workers_llm_prefilter: int = 4 # LLM 预过滤
+```
+
+### 双桶检索策略 (Citation vs Recency)
+
+```python
+# Dual-bucket retrieval
+recent_year_threshold: int = 2024     # 2024+ 属于 "recent bucket"
+recent_min_quota_ratio: float = 0.3   # 至少 30% 来自 recent
+recent_max_quota_ratio: float = 0.6   # 最多 60% 来自 recent
+
+# 排序权重
+weight_relevance: float = 0.6   # 相关性 60%
+weight_citation: float = 0.25   # 引用数 25%
+weight_recency: float = 0.15    # 时效性 15%
+```
+
+### 使用模式
+
+```python
+# 每个任务在发起 API 请求前调用 wait_for_slot()
+with ThreadPoolExecutor(max_workers=cfg.max_workers_openalex) as executor:
+    for item in items:
+        executor.submit(process_func, item)
+
+def process_func(item):
+    openalex_rate_limiter.wait_for_slot()  # 阻塞直到有 slot
+    response = requests.get(...)            # 发起请求
+```
+
+---
+
 ## 更新历史
 
-### 最新更新（2025-12-08）🆕
+### 最新更新（2025-12-09）🆕
+
+#### Rate Limiting 重构
+
+**文件**: `pipelines/rate_limiter.py` (新增)
+
+- 创建 `SimpleRateLimiter` 类，实现线程安全的滑动窗口限速
+- 定义全局限速器实例: `openalex_rate_limiter`, `s2_rate_limiter`, `llm_rate_limiter`, `pdf_rate_limiter`
+- 移除了所有 "batch + sleep" 模式，改为 per-request 限速
+- 更新 `prior_art_utils.py`: `run_with_batch_throttling()` 替换为 `run_parallel()`
+- 从 `PriorArtConfig` 移除 `batch_*` 配置项
+
+#### Debug Mode 行为变更
+
+- `debug_mode` 现在仅减少数据规模，**不再**强制 `max_workers=1`
+- 这允许在 debug 模式下测试并发代码路径
+
+---
+
+### 更新（2025-12-08）
 
 #### 1. Block 3 全文处理增强 (1.3/1.4)
 

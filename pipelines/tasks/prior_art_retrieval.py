@@ -127,7 +127,7 @@ JSON:
 
 def validate_llm_seeds_via_openalex(
     seeds: List[Dict[str, str]],
-    max_workers: int = 1,
+    max_workers: int = 4,
 ) -> List[Paper]:
     """
     For each LLM-proposed seed (title-based), use OpenAlex's "title.search"
@@ -136,11 +136,14 @@ def validate_llm_seeds_via_openalex(
 
     This function is responsible for removing hallucinated papers.
     
+    NOTE: Rate limiting is handled at the client layer via openalex_rate_limiter.
+    No batch-level sleeps are used here.
+    
     Args:
         seeds: List of seed paper dicts from LLM (with 'title' key)
-        max_workers: Number of parallel threads (1 = serial, >1 = parallel)
+        max_workers: Number of parallel threads
     """
-    validated_papers: List[Paper] = []
+    from pipelines.tasks.prior_art_utils import run_parallel
 
     def _validate_single_seed(seed: Dict[str, str]) -> Optional[Paper]:
         """Validate a single seed paper via OpenAlex. Returns Paper or None."""
@@ -184,24 +187,13 @@ def validate_llm_seeds_via_openalex(
             logger.warning(f"Failed to validate seed '{title}': {e}")
             return None
 
-    # Serial execution (default, for debug mode)
-    if max_workers <= 1:
-        for seed in seeds:
-            paper = _validate_single_seed(seed)
-            if paper:
-                validated_papers.append(paper)
-    else:
-        # Parallel execution
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_seed = {executor.submit(_validate_single_seed, s): s for s in seeds}
-            for fut in as_completed(future_to_seed):
-                seed = future_to_seed[fut]
-                try:
-                    paper = fut.result()
-                    if paper:
-                        validated_papers.append(paper)
-                except Exception as e:
-                    logger.warning(f"[Parallel] Error validating seed '{seed.get('title', 'unknown')}': {e}")
+    # Use single executor with per-request rate limiting at client layer
+    validated_papers = run_parallel(
+        items=seeds,
+        process_func=_validate_single_seed,
+        max_workers=max_workers,
+        desc="ValidateSeeds",
+    )
             
     logger.info(f"[PriorArt] Validated {len(validated_papers)}/{len(seeds)} seed papers.")
     return validated_papers
@@ -662,7 +654,7 @@ def expand_corpus_via_citation_graph(
     matches: List[PriorArtMatch],
     max_seed_papers: int = 10,
     max_neighbors_per_seed: int = 50,
-    max_workers: int = 1,
+    max_workers: int = 4,
 ) -> None:
     """
     Expand the candidate corpus by traversing the citation graph.
@@ -678,9 +670,14 @@ def expand_corpus_via_citation_graph(
 
     This function should NOT do any scoring; it only enriches the corpus.
     
+    NOTE: Rate limiting is handled at the client layer via s2_rate_limiter.
+    No batch-level sleeps are used here.
+    
     Args:
-        max_workers: Number of parallel threads (1 = serial, >1 = parallel)
+        max_workers: Number of parallel threads
     """
+    from pipelines.tasks.prior_art_utils import run_parallel
+    
     logger.info(f"[CitationGraph] Expanding corpus via citation graph...")
 
     # 1. Pick seed papers (partial or high overlap, sorted by citations)
@@ -702,13 +699,11 @@ def expand_corpus_via_citation_graph(
 
     # Thread lock for safe writes to state.papers
     state_lock = threading.Lock()
-    new_paper_count = 0
 
     def _expand_single_seed(match: PriorArtMatch) -> int:
         """Expand citations/references for a single seed paper. Returns count of new papers added."""
         # Instantiate client locally for thread safety
         local_s2_client = SemanticScholarClient()
-        nonlocal state_lock
         count = 0
         paper = state.papers[match.paper_id]
         logger.info(f"[CitationGraph] Expanding from seed: {paper.title[:60]}...")
@@ -744,21 +739,15 @@ def expand_corpus_via_citation_graph(
         
         return count
 
-    # Serial execution (default, for debug mode)
-    if max_workers <= 1:
-        for match in seeds:
-            new_paper_count += _expand_single_seed(match)
-    else:
-        # Parallel execution
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_match = {executor.submit(_expand_single_seed, m): m for m in seeds}
-            for fut in as_completed(future_to_match):
-                match = future_to_match[fut]
-                try:
-                    new_paper_count += fut.result()
-                except Exception as e:
-                    logger.warning(f"[Parallel] Expansion error for paper_id={match.paper_id}: {e}")
-
+    # Use single executor with per-request rate limiting at client layer
+    results = run_parallel(
+        items=seeds,
+        process_func=_expand_single_seed,
+        max_workers=max_workers,
+        desc="CitationGraph",
+    )
+    
+    new_paper_count = sum(r for r in results if isinstance(r, int))
     logger.info(f"[CitationGraph] Added {new_paper_count} new papers from citation graph.")
 def _add_s2_paper_to_state(s2_paper: Dict[str, Any], state: PipelineState) -> bool:
     """

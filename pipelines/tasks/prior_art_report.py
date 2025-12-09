@@ -23,10 +23,91 @@ from pipelines.evidence import FacetCoverageStats, FacetReportView, coverage_lab
 if TYPE_CHECKING:
     from pipelines.paper_record import PaperRecord
 
+from pipelines.paper_record import is_in_domain_for_topic
+
 
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+def get_papers_by_coverage_bucket(
+    coverage_levels: Dict[str, int],
+    paper_records: Dict[str, "PaperRecord"],
+    topic: str = "monocular_3d_detection",
+) -> Dict[str, List["PaperRecord"]]:
+    """
+    Get papers grouped by coverage bucket using coverage_classifier output.
+    
+    This is the SINGLE SOURCE OF TRUTH for paper bucketing.
+    All bucket-related logic in the report should use this function.
+    
+    Args:
+        coverage_levels: Dict of paper_id -> coverage_level (0-3) from coverage_classifier
+        paper_records: Dict of paper_id -> PaperRecord
+        topic: Topic for domain filtering (papers must be in-domain for level 1+)
+        
+    Returns:
+        Dict with keys "high", "partial", "adjacent", each containing list of PaperRecords
+    """
+    buckets: Dict[str, List["PaperRecord"]] = {
+        "high": [],
+        "partial": [],
+        "adjacent": [],
+    }
+    
+    for paper_id, level in coverage_levels.items():
+        if paper_id not in paper_records:
+            continue
+        
+        record = paper_records[paper_id]
+        
+        # In-domain filtering: Adjacent (level=1) must pass domain filter
+        # Levels 2-3 have stricter evidence requirements that imply in-domain
+        if level == 1:
+            if not is_in_domain_for_topic(record, topic):
+                continue  # Skip out-of-domain papers for Adjacent
+        
+        if level == 3:
+            buckets["high"].append(record)
+        elif level == 2:
+            buckets["partial"].append(record)
+        elif level == 1:
+            buckets["adjacent"].append(record)
+    
+    return buckets
+
+
+def sort_bucket_with_scores(
+    bucket: List["PaperRecord"],
+    scored_papers: List["PriorArtMatch"],
+    fallback_sort_key: str = "citation_count",
+) -> List["PaperRecord"]:
+    """
+    Sort papers within a bucket using LLM scores, with fallback to citation count.
+    
+    scored_papers is used for optional decoration (sorting), NOT for bucket membership.
+    
+    Args:
+        bucket: List of PaperRecords to sort
+        scored_papers: Optional list of PriorArtMatch with scores
+        fallback_sort_key: Field name for fallback sorting (default: citation_count)
+    """
+    # Build score map from paper_id -> score
+    score_map = {}
+    if scored_papers:
+        for m in scored_papers:
+            # Use task_similarity as the score, or combined score if available
+            score = getattr(m, "task_similarity", 0.0) or 0.0
+            score_map[m.paper_id] = score
+    
+    def sort_key(record: "PaperRecord"):
+        # Primary: LLM score (if available)
+        llm_score = score_map.get(record.paper_id, 0.0)
+        # Secondary: citation count
+        citations = getattr(record, fallback_sort_key, 0) or 0
+        return (-llm_score, -citations)  # Descending order
+    
+    return sorted(bucket, key=sort_key)
 
 def normalize_facet_phrase(s: str) -> str:
     """
@@ -299,34 +380,70 @@ def render_prior_art_report(
     lines.append("⚠️ These papers may present potential conflicts or very similar approaches:")
     lines.append("")
     
-    # Issue 6: Use Block 3 coverage_levels when available
-    if coverage_levels:
-        high_paper_ids = {pid for pid, lvl in coverage_levels.items() if lvl == 3}
-        high_matches = [m for m in scored_papers if m.paper_id in high_paper_ids]
+    # Build buckets using single source of truth: coverage_classifier output
+    # scored_papers is ONLY used for sorting and optional notes (not for bucket membership)
+    buckets = {"high": [], "partial": [], "adjacent": []}
+    if coverage_levels and paper_records:
+        buckets = get_papers_by_coverage_bucket(
+            coverage_levels=coverage_levels,
+            paper_records=paper_records,
+            topic=state.intent.topic if hasattr(state.intent, "topic") else "monocular_3d_detection",
+        )
+        # Sort each bucket by LLM score
+        for bucket_name in buckets:
+            buckets[bucket_name] = sort_bucket_with_scores(buckets[bucket_name], scored_papers)
     else:
-        # Fallback to LLM-assigned levels
-        high_matches = [m for m in scored_papers if m.coverage_level == 3]
+        # Fallback to old logic if coverage_levels not available
+        # This maintains backward compatibility
+        match_map = {m.paper_id: m for m in scored_papers}
+        for m in scored_papers:
+            if m.coverage_level == 3:
+                if m.paper_id in paper_records:
+                    buckets["high"].append(paper_records[m.paper_id])
+            elif m.coverage_level == 2:
+                if m.paper_id in paper_records:
+                    buckets["partial"].append(paper_records[m.paper_id])
+            elif m.coverage_level == 1:
+                if m.paper_id in paper_records:
+                    buckets["adjacent"].append(paper_records[m.paper_id])
+    
+    # Build match map for notes lookup (scored_papers = optional decoration)
+    match_map = {m.paper_id: m for m in scored_papers} if scored_papers else {}
     
     # Generate keywords for evidence search
     evidence_keywords = []
     if make_keywords_fn:
         evidence_keywords = make_keywords_fn(idea_features)
     
-    if high_matches:
-        for match in high_matches:
-            paper = state.papers[match.paper_id]
-            lines.append(f"### {paper.title}")
-            lines.append(f"- **Venue**: {paper.venue or 'Unknown'}, {paper.year or 'Unknown'}")
-            lines.append(f"- **Citations**: {paper.citation_count or 'N/A'}")
-            lines.append(f"- **Covered Facets**: {', '.join(match.covered_facets) if match.covered_facets else 'N/A'}")
-            if match.structural_score > 0:
-                lines.append(f"- **Structural Overlap**: {', '.join(match.structural_overlap)}")
-            lines.append(f"- **Notes**: {_clean_note_for_report(match.notes)}")
-            if paper.doi:
-                lines.append(f"- **DOI**: [{paper.doi}](https://doi.org/{paper.doi})")
+    # Render High Overlap section
+    high_papers = buckets.get("high", [])
+    if high_papers:
+        for record in high_papers:
+            paper = state.papers.get(record.paper_id)
+            if not paper:
+                # Fallback: use PaperRecord fields directly
+                lines.append(f"### {record.title}")
+                lines.append(f"- **Venue**: {record.venue or 'Unknown'}, {record.year or 'Unknown'}")
+                lines.append(f"- **Citations**: {record.citation_count or 'N/A'}")
+            else:
+                lines.append(f"### {paper.title}")
+                lines.append(f"- **Venue**: {paper.venue or 'Unknown'}, {paper.year or 'Unknown'}")
+                lines.append(f"- **Citations**: {paper.citation_count or 'N/A'}")
+                if paper.doi:
+                    lines.append(f"- **DOI**: [{paper.doi}](https://doi.org/{paper.doi})")
+            
+            # Get notes from scored_papers if available
+            match = match_map.get(record.paper_id)
+            if match:
+                if match.covered_facets:
+                    lines.append(f"- **Covered Facets**: {', '.join(match.covered_facets)}")
+                if match.structural_score and match.structural_score > 0:
+                    lines.append(f"- **Structural Overlap**: {', '.join(match.structural_overlap)}")
+                if match.notes:
+                    lines.append(f"- **Notes**: {_clean_note_for_report(match.notes)}")
             
             # Evidence Snippets
-            if find_snippets_fn and evidence_keywords:
+            if find_snippets_fn and evidence_keywords and paper:
                 snippets = find_snippets_fn(paper, evidence_keywords, max_snippets=3)
                 if snippets:
                     lines.append("")
@@ -344,66 +461,75 @@ def render_prior_art_report(
     lines.append("These papers cover some aspects of the idea:")
     lines.append("")
     
-    # Issue 6: Use Block 3 coverage_levels when available
-    if coverage_levels:
-        partial_paper_ids = {pid for pid, lvl in coverage_levels.items() if lvl == 2}
-        partial_matches = [m for m in scored_papers if m.paper_id in partial_paper_ids]
-    else:
-        partial_matches = [m for m in scored_papers if m.coverage_level == 2]
-    if partial_matches:
-        for match in partial_matches:
-            paper = state.papers[match.paper_id]
-            lines.append(f"### {paper.title}")
-            lines.append(f"- **Venue**: {paper.venue or 'Unknown'}, {paper.year or 'Unknown'}")
-            lines.append(f"- **Citations**: {paper.citation_count or 'N/A'}")
-            lines.append(f"- **Covered Facets**: {', '.join(match.covered_facets) if match.covered_facets else 'N/A'}")
-            if match.structural_score > 0:
-                lines.append(f"- **Structural Overlap**: {', '.join(match.structural_overlap)}")
-            lines.append(f"- **Notes**: {_clean_note_for_report(match.notes)}")
+    partial_papers = buckets.get("partial", [])
+    if partial_papers:
+        for record in partial_papers:
+            paper = state.papers.get(record.paper_id)
+            if not paper:
+                lines.append(f"### {record.title}")
+                lines.append(f"- **Venue**: {record.venue or 'Unknown'}, {record.year or 'Unknown'}")
+                lines.append(f"- **Citations**: {record.citation_count or 'N/A'}")
+            else:
+                lines.append(f"### {paper.title}")
+                lines.append(f"- **Venue**: {paper.venue or 'Unknown'}, {paper.year or 'Unknown'}")
+                lines.append(f"- **Citations**: {paper.citation_count or 'N/A'}")
+            
+            # Get notes from scored_papers if available
+            match = match_map.get(record.paper_id)
+            if match:
+                if match.covered_facets:
+                    lines.append(f"- **Covered Facets**: {', '.join(match.covered_facets)}")
+                if match.structural_score and match.structural_score > 0:
+                    lines.append(f"- **Structural Overlap**: {', '.join(match.structural_overlap)}")
+                if match.notes:
+                    lines.append(f"- **Notes**: {_clean_note_for_report(match.notes)}")
             lines.append("")
     else:
         lines.append("- None found.")
         lines.append("")
     
-    # 5. Adjacent Work
+    # 5. Adjacent Work (level 1)
     lines.append("## 4. Adjacent Work (Coverage Level = 1)")
     lines.append("Related work in the same domain but with different approaches:")
     lines.append("")
     
-    # Issue 1: Use Block 3 coverage_levels (in_domain + level=1)
-    if coverage_levels:
-        adjacent_paper_ids = {pid for pid, lvl in coverage_levels.items() if lvl == 1}
-        adjacent_matches = [m for m in scored_papers if m.paper_id in adjacent_paper_ids]
-    else:
-        adjacent_matches = [m for m in scored_papers if m.coverage_level == 1]
-    if adjacent_matches:
+    adjacent_papers = buckets.get("adjacent", [])
+    if adjacent_papers:
         # Separate surveys from non-surveys, limit surveys to 3
         survey_keywords = ["survey", "review", "overview", "tutorial"]
         surveys = []
         non_surveys = []
         
-        for match in adjacent_matches:
-            paper = state.papers[match.paper_id]
-            title_lower = paper.title.lower()
+        for record in adjacent_papers:
+            title_lower = record.title.lower()
             if any(kw in title_lower for kw in survey_keywords):
-                surveys.append(match)
+                surveys.append(record)
             else:
-                non_surveys.append(match)
+                non_surveys.append(record)
         
         # Show non-surveys first (up to 7), then surveys (up to 3)
-        shown = 0
-        for match in non_surveys[:7]:
-            paper = state.papers[match.paper_id]
-            lines.append(f"- **{paper.title}** ({paper.venue or 'Unknown'}, {paper.year or 'Unknown'})")
-            lines.append(f"  - {_clean_note_for_report(match.notes)}")
-            shown += 1
+        for record in non_surveys[:7]:
+            paper = state.papers.get(record.paper_id)
+            title = paper.title if paper else record.title
+            venue = (paper.venue if paper else record.venue) or "Unknown"
+            year = (paper.year if paper else record.year) or "Unknown"
+            lines.append(f"- **{title}** ({venue}, {year})")
+            
+            # Get notes from scored_papers if available
+            match = match_map.get(record.paper_id)
+            if match and match.notes:
+                lines.append(f"  - {_clean_note_for_report(match.notes)}")
         
-        surveys_shown = 0
-        for match in surveys[:3]:
-            paper = state.papers[match.paper_id]
-            lines.append(f"- **{paper.title}** ({paper.venue or 'Unknown'}, {paper.year or 'Unknown'})")
-            lines.append(f"  - {_clean_note_for_report(match.notes)}")
-            surveys_shown += 1
+        for record in surveys[:3]:
+            paper = state.papers.get(record.paper_id)
+            title = paper.title if paper else record.title
+            venue = (paper.venue if paper else record.venue) or "Unknown"
+            year = (paper.year if paper else record.year) or "Unknown"
+            lines.append(f"- **{title}** ({venue}, {year})")
+            
+            match = match_map.get(record.paper_id)
+            if match and match.notes:
+                lines.append(f"  - {_clean_note_for_report(match.notes)}")
         
         if len(surveys) > 3:
             lines.append(f"- *(+ {len(surveys) - 3} additional survey/review papers omitted)*")

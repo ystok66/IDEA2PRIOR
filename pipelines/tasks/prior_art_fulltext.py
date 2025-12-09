@@ -706,12 +706,23 @@ def _build_key_paper_candidates(
     state: PipelineState,
     config: PriorArtConfig,
 ) -> List[Dict[str, Any]]:
-    """Build candidate list for key paper selection."""
+    """Build candidate list for key paper selection.
+    
+    IMPORTANT: Only includes papers with has_fulltext=True so intro_rw_full can be exported.
+    Papers without fulltext would result in empty exports.
+    """
     candidates = []
+    skipped_no_fulltext = 0
     
     for pid, paper in state.papers.items():
-        # Only consider papers with some scoring/chunks
+        # Only consider papers with some content for ranking
         if not paper.chunks and not paper.abstract:
+            continue
+        
+        # CRITICAL: Only include papers with successful fulltext parsing
+        # This ensures intro_rw_full export will have actual content
+        if not getattr(paper, "has_fulltext", False):
+            skipped_no_fulltext += 1
             continue
         
         candidates.append({
@@ -722,7 +733,11 @@ def _build_key_paper_candidates(
             "citation_count": paper.citation_count or 0,
             "is_survey": getattr(paper, "is_survey", False),
             "abstract": (paper.abstract or "")[:500],
+            "has_fulltext": True,  # Track for debugging
         })
+    
+    if skipped_no_fulltext > 0:
+        logger.debug(f"[1.4] Skipped {skipped_no_fulltext} papers without fulltext")
     
     return candidates
 

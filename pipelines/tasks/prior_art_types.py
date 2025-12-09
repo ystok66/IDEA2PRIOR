@@ -126,10 +126,19 @@ class PriorArtConfig:
     # ========== Logging ==========
     progress_log_interval: int = 5
     
-    # ========== Parallelization ==========
-    max_workers_openalex: int = 4
-    max_workers_s2: int = 4
-    max_workers_pdf: int = 3
+    # ========== Parallelization (worker counts) ==========
+    # NOTE: Rate limiting is handled at client layer via SimpleRateLimiter.
+    # These max_workers_* control local CPU/IO concurrency, not API request rate.
+    max_workers_openalex: int = 4      # OpenAlex seed validation
+    max_workers_s2: int = 4            # Semantic Scholar citation graph
+    max_workers_pdf: int = 5           # PDF download/parse
+    
+    # ========== LLM Scoring Parallelization ==========
+    max_workers_llm_scoring: int = 20  # Parallel workers for score_papers_with_abstract_only
+    max_workers_llm_prefilter: int = 4 # Parallel workers for llm_relevance_prefilter
+    
+    # ========== Merged LLM Calls ==========
+    enable_merged_llm_calls: bool = True  # If True, merge facet extraction + scoring into one LLM call
     
     # ========== Fulltext Refinement (Block 3) ==========
     top_k_fulltext_refine: int = 20

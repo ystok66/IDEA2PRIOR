@@ -4,6 +4,8 @@ from typing import Optional, Dict, Any
 from smolagents import Tool
 from loguru import logger
 
+from pipelines.rate_limiter import s2_rate_limiter, openalex_rate_limiter
+
 class PaperResolverTool(Tool):
     name = "paper_resolver"
     description = """
@@ -138,6 +140,8 @@ class PaperResolverTool(Tool):
                 # Search by title
                 search_url = f"{base_url}/search"
                 search_params = {**params, "query": title, "limit": 1}
+                # Per-request rate limiting for S2
+                s2_rate_limiter.wait_for_slot()
                 resp = requests.get(search_url, params=search_params, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
@@ -147,6 +151,8 @@ class PaperResolverTool(Tool):
             else:
                 return None
 
+            # Per-request rate limiting for S2
+            s2_rate_limiter.wait_for_slot()
             resp = requests.get(url, params=params, headers=headers)
             if resp.status_code == 404:
                 return None
@@ -165,13 +171,19 @@ class PaperResolverTool(Tool):
         try:
             if openalex_id:
                 url = f"{base_url}/{openalex_id}"
+                # Per-request rate limiting for OpenAlex
+                openalex_rate_limiter.wait_for_slot()
                 resp = requests.get(url, params=params)
             elif doi:
                 url = f"{base_url}/doi:{doi}"
+                # Per-request rate limiting for OpenAlex
+                openalex_rate_limiter.wait_for_slot()
                 resp = requests.get(url, params=params)
             elif title:
                 params["search"] = title
                 params["per_page"] = 1
+                # Per-request rate limiting for OpenAlex
+                openalex_rate_limiter.wait_for_slot()
                 resp = requests.get(base_url, params=params)
                 data = resp.json()
                 if data.get("results"):

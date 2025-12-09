@@ -32,6 +32,7 @@ from pipelines.state import PipelineState, Paper, Chunk
 from pipelines.run_manager import RunManager
 from pipelines.sections import save_paper_sections
 from pipelines.llm_config import get_litellm_config
+from pipelines.rate_limiter import llm_rate_limiter, pdf_rate_limiter
 from tools.paper_resolver import PaperResolverTool
 from tools.pdf_parser import PdfParserTool
 
@@ -668,13 +669,17 @@ def llm_relevance_prefilter(
     
     logger.info(f"[PreFilter-LLM] Checking {len(papers)} papers for topic relevance...")
     
-    # Instantiate light model
-    model_id, api_base, api_key = get_litellm_config(role="light")
-    light_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
-    
     def _check_single_paper(pid_paper: Tuple[str, Paper]) -> Tuple[str, Paper, bool]:
         """Check if a single paper is potentially relevant."""
         pid, paper = pid_paper
+        
+        # Per-request rate limiting for LLM
+        llm_rate_limiter.wait_for_slot()
+        
+        # Create thread-local LLM instance (each thread must have its own)
+        model_id, api_base, api_key = get_litellm_config(role="light")
+        local_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
+        
         prompt = f"""You are an academic research assistant. Quickly determine if this paper might be relevant to the research topic below.
 
 Research Topic: {topic}
@@ -689,7 +694,7 @@ Only output valid JSON, no explanation:
 """
         try:
             messages = [{"role": "user", "content": prompt}]
-            resp = light_model(messages)
+            resp = local_model(messages)
             text = extract_text_from_llm_response(resp)
             result = json.loads(text)
             is_relevant = result.get("is_relevant", True)  # Default to true if parse fails
@@ -800,7 +805,7 @@ def score_papers_with_abstract_only(
             logger.info(
                 f"[PriorArt] Stage 2: Applying LLM relevance filter to top {len(papers_for_llm_filter)} papers."
             )
-            max_workers = 1 if cfg.debug_mode else 4
+            max_workers = cfg.max_workers_llm_prefilter  # Use config instead of hardcoded 4 or forced 1
             filtered_papers = llm_relevance_prefilter(
                 papers=papers_for_llm_filter,
                 topic=state.intent.topic,
@@ -817,20 +822,26 @@ def score_papers_with_abstract_only(
     
     facets_str = "\n".join([f"F{i+1}. {facet}" for i, facet in enumerate(facets)])
     
-    total_to_score = len(papers_to_score)
-    log_interval = cfg.progress_log_interval if cfg else 5
-
-    for idx, (paper_id, paper) in enumerate(papers_to_score, start=1):
-        # Progress logging
-        if idx == 1 or idx % log_interval == 0 or idx == total_to_score:
-            logger.info(f"[PriorArt] Abstract scoring progress: {idx}/{total_to_score} papers processed.")
-
+    # =========================================================================
+    # Define per-paper scoring function for parallelization
+    # =========================================================================
+    def _score_single_paper(paper_tuple: tuple) -> PriorArtMatch:
+        """
+        Score a single paper with merged LLM call (facet extraction + scoring).
+        Creates its own LiteLLMModel instance for thread safety.
+        Returns PriorArtMatch object.
+        """
+        paper_id, paper = paper_tuple
+        
+        # Per-request rate limiting for LLM (sliding window, not batch + sleep)
+        llm_rate_limiter.wait_for_slot()
+        
+        # Create thread-local LLM instance (each thread must have its own)
+        _model_id, _api_base, _api_key = get_litellm_config(role="light")
+        local_model = LiteLLMModel(model_id=_model_id, api_base=_api_base, api_key=_api_key)
+        
         logger.debug(f"[PriorArt] Scoring paper: {paper.title} (id={paper_id})")
         
-        # Extract high-level facets for paper (lazy extraction for top papers)
-        if not paper.high_level_facets:
-            paper.high_level_facets = extract_high_level_facets_from_paper(agent, paper)
-            
         # Build paper context (Abstract Only)
         paper_context = f"""Title: {paper.title}
 Venue: {paper.venue or 'Unknown'}
@@ -839,10 +850,125 @@ Citation Count: {paper.citation_count or 0}"""
         
         # Add abstract if available
         if hasattr(paper, 'abstract') and paper.abstract:
-            paper_context += f"\nAbstract: {paper.abstract[:1000]}"  # Increased limit for abstract
+            paper_context += f"\nAbstract: {paper.abstract[:1000]}"
         else:
             paper_context += "\nAbstract: N/A"
         
+        # Check if we should use merged LLM call
+        use_merged = cfg.enable_merged_llm_calls if cfg else True
+        
+        if use_merged:
+            # ===== MERGED LLM CALL: Scoring + Facet Extraction in One =====
+            merged_prompt = f"""You are a JSON generator. **Do NOT call any tools or write/run any code.**
+Think silently and then output the final answer as JSON only.
+Return raw JSON only, without backticks or any surrounding text.
+
+Given the following research idea facets and a paper, do TWO tasks:
+1. Rate how much this paper overlaps with the idea (scoring)
+2. Extract the paper's own high-level facets
+
+Idea Facets:
+{facets_str}
+
+Paper:
+{paper_context}
+
+Please output a SINGLE JSON object with ALL of the following fields:
+- "coverage_level": integer 0-3 where:
+  0 = no overlap
+  1 = adjacent work (same domain but different approach)
+  2 = partial overlap (covers some facets)
+  3 = high overlap (covers most/all facets, potential conflict)
+- "covered_facets": list of facet labels (e.g., ["F1", "F3"]) that this paper covers
+- "task_similarity": float 0.0-1.0 how similar the task/problem addressed is
+- "method_similarity": float 0.0-1.0 how similar the method/approach is
+- "notes": brief justification (1-2 sentences)
+- "high_level_facets": object with these keys (each is a list of short phrases):
+  - "problem_facets": What specific problem/task is this paper solving?
+  - "setting_facets": What is the setting, modality, or protocol?
+  - "mechanism_facets": What are the key mechanisms or frameworks?
+  - "assumption_facets": What are the key assumptions?
+
+JSON output:"""
+            
+            try:
+                messages = [{"role": "user", "content": merged_prompt}]
+                resp = local_model(messages)
+                result_str = extract_text_from_llm_response(resp)
+                logger.debug(f"[PriorArt] Raw merged output for {paper.title[:30]}...: {result_str[:500]!r}")
+                
+                score_data = None
+                try:
+                    score_data = json.loads(result_str)
+                except Exception:
+                    try:
+                        score_data = ast.literal_eval(result_str)
+                    except Exception:
+                        pass
+                
+                if isinstance(score_data, dict):
+                    # Extract scoring fields
+                    coverage_level = int(score_data.get("coverage_level", 0))
+                    covered_facet_labels = score_data.get("covered_facets", []) or []
+                    notes = score_data.get("notes", "")
+                    task_sim = float(score_data.get("task_similarity", 0.0))
+                    method_sim = float(score_data.get("method_similarity", 0.0))
+                    
+                    # Extract high_level_facets if present
+                    hl_facets = score_data.get("high_level_facets", {})
+                    if isinstance(hl_facets, dict) and hl_facets:
+                        # Populate paper's high_level_facets from merged response
+                        paper.high_level_facets = {
+                            ftype: [str(v).strip() for v in hl_facets.get(ftype, []) if v]
+                            for ftype in HIGH_LEVEL_FACET_TYPES
+                        }
+                    elif not paper.high_level_facets:
+                        # Fallback: use separate call if merged didn't include facets
+                        paper.high_level_facets = extract_high_level_facets_from_paper(None, paper)
+                    
+                    # Map facet labels to readable text
+                    covered_facets: List[str] = []
+                    for label in covered_facet_labels:
+                        if isinstance(label, str) and label.startswith("F"):
+                            try:
+                                idx = int(label[1:]) - 1
+                                if 0 <= idx < len(facets):
+                                    covered_facets.append(facets[idx])
+                            except ValueError:
+                                continue
+                    
+                    match = PriorArtMatch(
+                        paper_id=paper_id,
+                        coverage_level=coverage_level,
+                        covered_facet_labels=[str(l).strip() for l in covered_facet_labels],
+                        covered_facets=covered_facets,
+                        notes=notes,
+                        task_similarity=task_sim,
+                        method_similarity=method_sim,
+                    )
+                    
+                    # Compute structural score
+                    struct_score, struct_details = compute_structural_overlap(idea_features, paper)
+                    match.structural_score = struct_score
+                    match.structural_overlap = struct_details
+                    
+                    # Compute high-level facet score
+                    hl_score, hl_details = compute_high_level_facet_overlap(idea_high_level_facets, paper.high_level_facets)
+                    match.high_level_facet_score = hl_score
+                    match.high_level_facet_matches = hl_details
+                    
+                    logger.info(f"[PriorArt] Scored {paper.title[:40]}...: level={coverage_level}, task_sim={task_sim:.2f}")
+                    return match
+                
+            except Exception as e:
+                logger.warning(f"[PriorArt] Merged LLM call failed for {paper.title[:40]}...: {e}")
+        
+        # ===== FALLBACK: Separate calls (original behavior) =====
+        # Extract facets if not present
+        if not paper.high_level_facets:
+            paper.high_level_facets = extract_high_level_facets_from_paper(None, paper)
+        
+        # Scoring-only prompt
         prompt = f"""You are a JSON generator. **Do NOT call any tools or write/run any code.**
 Think silently and then output the final answer as JSON only.
 Return raw JSON only, without backticks or any surrounding text.
@@ -870,9 +996,8 @@ JSON output:"""
 
         try:
             messages = [{"role": "user", "content": prompt}]
-            resp = light_model(messages)
+            resp = local_model(messages)
             result_str = extract_text_from_llm_response(resp)
-            logger.debug(f"[PriorArt] Raw scoring output for {paper.title[:30]}... (cleaned): {result_str[:500]!r}")
             
             score_data = None
             try:
@@ -881,20 +1006,15 @@ JSON output:"""
                 try:
                     score_data = ast.literal_eval(result_str)
                 except Exception:
-                    logger.warning(f"[PriorArt] Failed to parse scoring JSON for {paper.title}, fallback to 0.")
-                    score_data = None
+                    pass
             
             if isinstance(score_data, dict):
                 coverage_level = int(score_data.get("coverage_level", 0))
-                # Raw labels from LLM, e.g. ["F1", "F3"]
                 covered_facet_labels = score_data.get("covered_facets", []) or []
                 notes = score_data.get("notes", "")
-                
-                # Extract similarity scores
                 task_sim = float(score_data.get("task_similarity", 0.0))
                 method_sim = float(score_data.get("method_similarity", 0.0))
                 
-                # Map facet labels (F1, F2, ...) to human-readable facet text
                 covered_facets: List[str] = []
                 for label in covered_facet_labels:
                     if isinstance(label, str) and label.startswith("F"):
@@ -905,7 +1025,7 @@ JSON output:"""
                         except ValueError:
                             continue
                 
-                matches.append(PriorArtMatch(
+                match = PriorArtMatch(
                     paper_id=paper_id,
                     coverage_level=coverage_level,
                     covered_facet_labels=[str(l).strip() for l in covered_facet_labels],
@@ -913,39 +1033,46 @@ JSON output:"""
                     notes=notes,
                     task_similarity=task_sim,
                     method_similarity=method_sim,
-                ))
+                )
                 
-                # Compute structural score
                 struct_score, struct_details = compute_structural_overlap(idea_features, paper)
-                matches[-1].structural_score = struct_score
-                matches[-1].structural_overlap = struct_details
+                match.structural_score = struct_score
+                match.structural_overlap = struct_details
                 
-                # Compute high-level facet score
                 hl_score, hl_details = compute_high_level_facet_overlap(idea_high_level_facets, paper.high_level_facets)
-                matches[-1].high_level_facet_score = hl_score
-                matches[-1].high_level_facet_matches = hl_details
+                match.high_level_facet_score = hl_score
+                match.high_level_facet_matches = hl_details
                 
-                logger.info(f"[PriorArt] Finished scoring {paper.title}: level={coverage_level}, task_sim={task_sim:.2f}")
-            else:
-                # Fallback
-                logger.warning(f"[PriorArt] Failed to parse scoring JSON for {paper.title}, fallback to 0.")
-                matches.append(PriorArtMatch(
-                    paper_id=paper_id,
-                    coverage_level=0,
-                    covered_facet_labels=[],
-                    covered_facets=[],
-                    notes="Failed to parse LLM output.",
-                ))
+                logger.info(f"[PriorArt] Scored {paper.title[:40]}...: level={coverage_level}")
+                return match
                 
         except Exception as e:
-            logger.warning(f"Failed to score paper {paper.title}: {e}")
-            matches.append(PriorArtMatch(
-                paper_id=paper_id,
-                coverage_level=0,
-                covered_facet_labels=[],
-                covered_facets=[],
-                notes=f"Scoring error: {str(e)[:50]}",
-            ))
+            logger.warning(f"Failed to score paper {paper.title[:40]}...: {e}")
+        
+        # Return fallback match
+        return PriorArtMatch(
+            paper_id=paper_id,
+            coverage_level=0,
+            covered_facet_labels=[],
+            covered_facets=[],
+            notes="Scoring failed.",
+        )
+    
+    # =========================================================================
+    # Execute scoring with parallel workers (rate limiting at client layer)
+    # =========================================================================
+    from pipelines.tasks.prior_art_utils import run_parallel
+    
+    max_workers = cfg.max_workers_llm_scoring if cfg else 20
+    
+    logger.info(f"[PriorArt] Scoring {len(papers_to_score)} papers with parallel workers (workers={max_workers})")
+    
+    matches = run_parallel(
+        items=papers_to_score,
+        process_func=_score_single_paper,
+        max_workers=max_workers,
+        desc="LLMScoring",
+    )
     
     # Sort by coverage_level (desc), then similarity, then citation_count
     # This prioritizes papers with similar tasks/methods over high-citation surveys
@@ -967,19 +1094,24 @@ JSON output:"""
 def enrich_papers_with_fulltext(
     state: PipelineState,
     paper_ids: List[str],
-    max_workers: int = 1,
+    max_workers: int = 5,
     run_mgr: Optional["RunManager"] = None,
 ) -> None:
     """
     Ensure fulltext chunks exist for the specified papers.
     Downloads PDF/HTML if needed and parses it.
     
+    NOTE: Rate limiting for PDF downloads is handled via pdf_rate_limiter.
+    Uses ensure_pdf_url() for unified URL resolution with caching.
+    
     Args:
         state: Pipeline state containing papers dict
         paper_ids: List of paper IDs to enrich
-        max_workers: Number of parallel threads (1 = serial, >1 = parallel)
+        max_workers: Number of parallel threads
         run_mgr: Optional RunManager for linking PDFs to run directory
     """
+    from pipelines.tasks.prior_art_utils import ensure_pdf_url, run_parallel
+    
     # Use RunManager's pdf_cache if available, else fallback to cwd
     if run_mgr:
         pdf_cache_dir = str(run_mgr.pdf_cache_dir)
@@ -991,41 +1123,27 @@ def enrich_papers_with_fulltext(
     except Exception:
         pass
 
-    def _process_one_paper(pid: str) -> None:
-        """Process a single paper: resolve URL, download PDF, parse chunks."""
-        # Instantiate tools locally for thread safety
-        resolver = PaperResolverTool()
+    def _process_one_paper(pid: str) -> Optional[str]:
+        """Process a single paper: resolve URL, download PDF, parse chunks. Returns pid if success."""
+        # PdfParserTool instantiated locally for thread safety
         parser = PdfParserTool()
         
         paper = state.papers.get(pid)
         if not paper:
-            return
+            return None
         
         if paper.chunks:  # Already parsed
-            return
+            return pid
             
         logger.info(f"[Fulltext] Enriching paper: {paper.title[:50]}...")
         
-        # Resolve PDF URL if missing
-        if not paper.pdf_url:
-            try:
-                result_str = resolver.forward(
-                    doi=paper.doi,
-                    arxiv_id=paper.arxiv_id,
-                    title=paper.title if not paper.doi and not paper.arxiv_id else None,
-                )
-                res_data = json.loads(result_str)
-                if res_data.get("pdf_url"):
-                    paper.pdf_url = res_data["pdf_url"]
-            except Exception as e:
-                logger.warning(f"Failed to resolve PDF for {paper.title}: {e}")
-
-        if not paper.pdf_url:
+        # Resolve PDF URL using unified helper with caching
+        pdf_url = ensure_pdf_url(paper)
+        if not pdf_url:
             logger.warning(f"[Fulltext] No PDF URL found for paper: {paper.title[:50]}")
-            return
+            return None
 
         # Download PDF to local cache
-        # Ensure unique filename
         # Sanitize paper_id for use as filename (DOIs contain /, S2: contains :)
         safe_name = pid.replace('/', '_').replace('\\', '_').replace(':', '_')
         if paper.doi:
@@ -1038,6 +1156,9 @@ def enrich_papers_with_fulltext(
         
         if not os.path.exists(local_pdf_path):
             try:
+                # Per-request rate limiting for PDF downloads
+                pdf_rate_limiter.wait_for_slot()
+                
                 logger.info(f"Downloading PDF from {paper.pdf_url}...")
                 response = requests.get(paper.pdf_url, timeout=30)
                 response.raise_for_status()
@@ -1045,7 +1166,7 @@ def enrich_papers_with_fulltext(
                     f.write(response.content)
             except Exception as e:
                 logger.warning(f"[Fulltext] Failed to download PDF for paper: {paper.title[:50]} - {e}")
-                return
+                return None
         
         paper.local_pdf_path = local_pdf_path
         
@@ -1086,26 +1207,23 @@ def enrich_papers_with_fulltext(
                 if run_mgr:
                     sections_path = save_paper_sections(run_mgr.run_dir, paper_sections)
                     logger.info(f"[Fulltext] Saved sections to {sections_path}")
+                    # Mark paper as having fulltext for downstream processing
+                    paper.has_fulltext = True
             except Exception as e:
                 logger.warning(f"[Fulltext] Failed to parse sections for {paper.title[:50]}: {e}")
             
+            return pid
         except Exception as e:
             logger.warning(f"Failed to parse PDF {local_pdf_path}: {e}")
+            return None
 
-    # Serial execution (default, for debug mode)
-    if max_workers <= 1:
-        for pid in paper_ids:
-            _process_one_paper(pid)
-    else:
-        # Parallel execution
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_pid = {executor.submit(_process_one_paper, pid): pid for pid in paper_ids}
-            for fut in as_completed(future_to_pid):
-                pid = future_to_pid[fut]
-                try:
-                    fut.result()
-                except Exception as e:
-                    logger.warning(f"[Parallel] Error enriching paper {pid}: {e}")
+    # Use single executor with per-request rate limiting (pdf_rate_limiter)
+    run_parallel(
+        items=paper_ids,
+        process_func=_process_one_paper,
+        max_workers=max_workers,
+        desc="EnrichFulltext",
+    )
 
 
 def generate_evidence_keywords_from_idea(
