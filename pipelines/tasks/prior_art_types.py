@@ -156,6 +156,59 @@ class PriorArtConfig:
     
     # ========== Feature Flags ==========
     enable_dataset_metric_stats: bool = False  # Disabled until reliable
+    
+    # ========== 1.3 Method/Experiment Snippets ==========
+    enable_method_exp_snippets: bool = True
+    max_paragraphs_per_facet: int = 50           # BM25 top-N per facet
+    max_snippets_per_paper_facet: int = 5        # Max snippets per (paper, facet)
+    debug_max_paragraphs_per_facet: int = 20     # Reduced for debug
+    
+    # ========== 1.4 Key Papers & Intro+RW Full ==========
+    enable_intro_rw_full: bool = True
+    key_paper_top_cited_k: int = 5               # Top-K by citation count
+    key_paper_latest_k: int = 5                  # Top-K by year
+    key_paper_survey_k: int = 5                  # Top-K surveys
+    
+    # ========== 2.1 Synthesis JSON Builder ==========
+    enable_synthesis_json: bool = True           # Always generate synthesis_input.json
+    auto_generate_intro_rw_report: bool = False  # If True, call heavy LLM to generate MD
+    max_papers_per_bucket_for_prompt: int = 15   # Limit papers in prompt for heavy LLM
+
+
+@dataclass
+class Paragraph:
+    """
+    A paragraph extracted from Method or Experiment sections.
+    Used as the unit for BM25 indexing and LLM filtering.
+    """
+    paper_id: str
+    section_role: str  # "method" or "experiment"
+    section_heading: str
+    para_id: int
+    text: str
+    token_count: int
+    # Context for better understanding
+    prev_para_text: str = ""
+    next_para_text: str = ""
+
+
+@dataclass
+class MethodExpSnippet:
+    """
+    A filtered and summarized snippet from Method/Experiment sections.
+    One snippet per (paper_id, facet_label) pair, with LLM-generated bullet.
+    
+    Written to synthesis/method_exp_snippets.jsonl
+    """
+    paper_id: str
+    facet_label: str
+    section_role: str  # "method" or "experiment"
+    section_heading: str
+    loc: str  # e.g., "method_para_12-13"
+    bullet: str  # LLM-generated one-sentence summary
+    snippet: str  # Original text excerpt (1-3 sentences)
+    bm25_score: float = 0.0
+    llm_relevance: float = 0.0
 
 
 # =============================================================================

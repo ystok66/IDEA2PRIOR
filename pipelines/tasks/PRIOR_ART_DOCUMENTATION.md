@@ -55,6 +55,44 @@ Prior Art Check is a multi-stage pipeline that systematically searches, filters,
 
 ---
 
+## Module Structure (Refactored Dec 2024)
+
+The prior art system is organized into modular files with clear separation of concerns:
+
+```
+pipelines/tasks/
+├── prior_art_check.py       # Main orchestrator (3 functions)
+├── prior_art_retrieval.py   # Block 1: Candidate discovery (11 functions)
+├── prior_art_scoring.py     # Block 2+3: Scoring & evidence (17 functions)
+├── prior_art_fulltext.py    # Block 3: Fulltext enhancements (1.3/1.4) 🆕
+├── prior_art_synthesis.py   # Part 2: Synthesis JSON builder (2.1) 🆕
+├── prior_art_report.py      # Block 4: Report rendering (8 functions)
+├── prior_art_types.py       # Shared dataclasses & constants
+└── prior_art_llm_utils.py   # LLM helper functions
+```
+
+### Module Responsibilities
+
+| Module                     | Responsibility                                                               | Key Functions                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **prior_art_check.py**     | Main orchestrator, entry point                                               | `run_prior_art_check()`, `build_prior_art_intent()`                                                      |
+| **prior_art_retrieval.py** | LLM seed generation, OpenAlex search, citation graph                         | `seed_papers_from_llm()`, `retrieve_candidates_with_buckets()`, `expand_corpus_via_citation_graph()`     |
+| **prior_art_scoring.py**   | Facet extraction, pre-filtering, abstract/fulltext scoring, evidence finding | `decompose_idea_into_facets()`, `score_papers_with_abstract_only()`, `refine_top_papers_with_fulltext()` |
+| **prior_art_fulltext.py**  | 1.3 Method/Exp snippets, 1.4 Key Papers & Intro+RW Full                      | `build_method_experiment_snippets()`, `select_key_papers_and_dump_intro_rw_full()`                       |
+| **prior_art_synthesis.py** | 2.1 Synthesis JSON builder with prompt templates                             | `build_synthesis_input()`, `make_prompt_templates()`                                                     |
+| **prior_art_report.py**    | Pure rendering functions for Markdown report                                 | `render_prior_art_report()`, `render_structural_coverage_section()`                                      |
+| **prior_art_types.py**     | `PriorArtConfig`, `PriorArtMatch`, constants                                 | `HIGH_LEVEL_FACET_TYPES`, `GENERIC_STOPWORDS`                                                            |
+| **prior_art_llm_utils.py** | JSON repair, text extraction from LLM responses                              | `extract_text_from_llm_response()`, `repair_json_output()`                                               |
+
+### Dependency Rules
+
+- **Orchestrator** (`prior_art_check.py`) imports all submodules
+- **Submodules** do NOT import `prior_art_check` (no circular dependencies)
+- **Report module** has no LLM/network calls (pure rendering)
+- **Types module** is imported by all other modules
+
+---
+
 ## Key Data Structures
 
 ### PriorArtConfig
@@ -166,6 +204,88 @@ class PriorArtConfig:
 
 ---
 
+## Block 3 Enhancements (Dec 2024) 🆕
+
+### Overview
+
+Block 3 provides advanced fulltext processing for top-scored papers:
+
+| Feature                      | Description                                                                   | Output                                              |
+| ---------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------- |
+| **1.3 Method/Exp Snippets**  | Extract paragraphs from Method/Experiment sections using BM25 + LLM filtering | `method_exp_snippets.jsonl`                         |
+| **1.4 Key Papers Selection** | Select top_cited / latest / survey papers for detailed analysis               | `key_papers_selection.json`, `intro_rw_full/*.json` |
+| **2.1 Synthesis JSON**       | Consolidate all results into a single JSON with prompt templates              | `synthesis_input.json`                              |
+
+### 1.3 Method/Experiment Snippets
+
+Uses BM25 to find relevant paragraphs, then LLM-light to filter and summarize:
+
+```python
+build_method_experiment_snippets(state, facets, idea_features, run_mgr, config)
+```
+
+**Output**: `synthesis/method_exp_snippets.jsonl`
+
+```json
+{
+  "paper_id": "...",
+  "facet_label": "F1",
+  "bullet": "...",
+  "snippet": "...",
+  "section_role": "method"
+}
+```
+
+### 1.4 Key Papers & Intro+RW Full
+
+Selects key papers (top_cited, latest, survey) and exports full Intro+RW text:
+
+```python
+select_key_papers_and_dump_intro_rw_full(agent, state, task_root, config)
+```
+
+**Anchor + Window Collection**: The Intro/RW extraction uses "anchor + window" logic to capture complete sections including subsections. For example, "1. Introduction" → collects until "2. Related Work" is detected.
+
+**Outputs**:
+
+- `synthesis/key_papers_selection.json` - Buckets and per-paper roles
+- `synthesis/intro_rw_full/{paper_id}.json` - Full Intro + Related Work text
+
+### 2.1 Synthesis JSON Builder
+
+Consolidates all Block 1-3 results into a single self-contained JSON:
+
+```python
+build_synthesis_input(state, config, run_dir, facets, user_query, retrieval_queries)
+```
+
+**Output**: `synthesis/synthesis_input.json`
+
+**Structure**:
+
+```json
+{
+  "metadata": {
+    "topic": "...",
+    "idea_description": "...",
+    "facets": [...],
+    "task": {"task_type": "prior_art_check", "user_query": "...", "user_intent_notes": [...], "constraints": {}},
+    "audience": "expert_researcher",
+    "usage_context": ["paper_introduction", "related_work_section"]
+  },
+  "global_stats": {"num_candidates": 86, "coverage_by_level": {...}, "facet_coverage": [...]},
+  "retrieval_summary": {"query_seeds": [...], "facet_queries": {...}, "sources": [...], "exploration_notes": {...}},
+  "limitations": {"retrieval_coverage": "not_exhaustive", "llm_noise": true, "notes": [...]},
+  "buckets": {"high_overlap": [...], "partial_overlap": [...], "adjacent": [...], "ignored": [...]},
+  "papers": [...],
+  "prompt_templates": {"full_markdown_report": "...", "short_related_work_section": "..."}
+}
+```
+
+**Usage**: The JSON is self-contained. Any LLM/tool can use `prompt_templates.full_markdown_report` + the JSON to generate a full prior art report.
+
+---
+
 ## Output Artifacts
 
 Each run creates:
@@ -178,8 +298,13 @@ runs/<run_id>/
 ├── pdf_sections/                  # Parsed section JSONs
 │   └── {paper_id}.sections.json
 └── synthesis/
-    ├── prior_art_report.md        # Final report
-    └── intro_rw_summaries.jsonl   # Block 3 summaries
+    ├── prior_art_report.md           # Final markdown report
+    ├── intro_rw_summaries.jsonl      # Block 3 Intro/RW summaries
+    ├── method_exp_snippets.jsonl     # 1.3 Method/Experiment snippets 🆕
+    ├── key_papers_selection.json     # 1.4 Key papers with roles 🆕
+    ├── intro_rw_full/                # 1.4 Full Intro+RW for key papers 🆕
+    │   └── {paper_id}.json
+    └── synthesis_input.json          # 2.1 Consolidated JSON + prompts 🆕
 ```
 
 ---

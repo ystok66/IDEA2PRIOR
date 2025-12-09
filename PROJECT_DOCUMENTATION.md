@@ -47,15 +47,25 @@ paperarena_hub/
 │   ├── run_manager.py            # 运行管理 (RunManager)
 │   ├── coverage_classifier.py    # 覆盖率分类器
 │   ├── llm_config.py             # LLM 配置
+│   ├── sections.py               # PDF 分节解析 (Section, PaperSections)
+│   ├── intro_rw_summarizer.py    # Intro+RW 摘要生成
 │   ├── exploration_loop.py       # 探索循环
 │   └── tasks/
-│       └── prior_art_check.py    # Prior Art Check 任务
+│       ├── prior_art_check.py      # Prior Art 主入口
+│       ├── prior_art_retrieval.py  # Block 1: 候选论文发现
+│       ├── prior_art_scoring.py    # Block 2+3: 评分与证据
+│       ├── prior_art_fulltext.py   # Block 3: 全文处理 (1.3/1.4)
+│       ├── prior_art_synthesis.py  # Part 2: 综合 JSON 构建 (2.1)
+│       ├── prior_art_report.py     # 报告渲染
+│       ├── prior_art_types.py      # 共享类型定义
+│       └── prior_art_llm_utils.py  # LLM 工具函数
 ├── tools/                        # 工具集合
 │   ├── openalex_search.py       # OpenAlex API 工具
 │   ├── semantic_scholar_search.py # Semantic Scholar API 工具
 │   ├── google_file_search.py    # Google File Search (Gemini)
 │   ├── duckduckgo_search.py     # DuckDuckGo 搜索工具
 │   ├── async_web_crawler.py     # 核心爬虫类
+│   ├── pdf_parser.py            # PDF 解析与分节
 │   ├── pdf_extractor.py         # PDF 提取工具
 │   └── ...
 ├── runs/                         # 运行产物目录 🆕
@@ -800,7 +810,57 @@ keywords = generate_keywords(light_model, query)
 
 ## 更新历史
 
-### 最新更新（2025-12-07）
+### 最新更新（2025-12-08）🆕
+
+#### 1. Block 3 全文处理增强 (1.3/1.4)
+
+**文件**: `pipelines/tasks/prior_art_fulltext.py`
+
+##### ✅ 1.3 Method/Experiment Snippets
+
+- 使用 BM25 从 Method/Experiment 章节提取相关段落
+- LLM-Light 过滤并生成结构化 bullets
+- 输出: `synthesis/method_exp_snippets.jsonl`
+
+##### ✅ 1.4 Key Papers & Intro+RW Full
+
+- 选择关键论文 (top_cited, latest, survey)
+- 导出完整 Introduction + Related Work 文本
+- **Anchor + Window Collection**: 修复了 Intro/RW 截断问题，现在可以捕获包含子节的完整章节
+- 输出: `synthesis/key_papers_selection.json`, `synthesis/intro_rw_full/{paper_id}.json`
+
+#### 2. Synthesis JSON 构建器 (2.1)
+
+**文件**: `pipelines/tasks/prior_art_synthesis.py`
+
+整合所有 Block 1-3 结果到单个自描述 JSON，支持外部 LLM/工具直接使用：
+
+- `metadata`: topic, idea_description, facets, task (含 user_query/intent_notes), audience, usage_context
+- `retrieval_summary`: 检索查询、数据源、探索统计
+- `limitations`: 覆盖率限制、LLM 噪声说明
+- `buckets`: high_overlap, partial_overlap, adjacent, ignored
+- `papers`: 每篇论文的完整数据（intro_rw_summary/full, method_exp_snippets, key_roles）
+- `prompt_templates`: 内置 full_markdown_report 和 short_related_work_section 提示词
+
+**用法**: 默认只生成 JSON，不调用 heavy LLM。设置 `config.auto_generate_intro_rw_report=True` 可自动生成 MD 报告。
+
+#### 3. 新增配置项
+
+```python
+@dataclass
+class PriorArtConfig:
+    # 1.3/1.4 配置
+    enable_method_exp_snippets: bool = True
+    enable_intro_rw_full: bool = True
+
+    # 2.1 Synthesis 配置
+    enable_synthesis_json: bool = True
+    auto_generate_intro_rw_report: bool = False  # 默认关闭
+```
+
+---
+
+### 更新（2025-12-07）
 
 #### 1. 结构化覆盖率分析 (Block 3 & Phase 6) 🏗️
 

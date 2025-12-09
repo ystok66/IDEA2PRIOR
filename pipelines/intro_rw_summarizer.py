@@ -17,6 +17,7 @@ from smolagents import LiteLLMModel
 from pipelines.sections import PaperSections, load_paper_sections
 from pipelines.summaries import IntroRwSummary, save_intro_rw_summaries_jsonl
 from pipelines.llm_config import get_litellm_config
+from pipelines.tasks.prior_art_fulltext import extract_intro_rw_blocks
 
 
 def _extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
@@ -89,9 +90,15 @@ def summarize_intro_rw_for_paper(
         IntroRwSummary with extracted information.
         Returns empty summary on failure (pipeline continues).
     """
-    # 1. Extract intro and related work text
-    intro_text = paper_sections.get_intro_text()
-    rw_text = paper_sections.get_related_work_text()
+    # 1. Extract intro and related work text using anchor+window collection
+    # This captures complete sections including subsections
+    sections_list = [{
+        "role": s.role,
+        "heading": s.heading,
+        "text": s.text,
+    } for s in paper_sections.sections]
+    
+    intro_text, _, rw_text, _ = extract_intro_rw_blocks(sections_list)
     
     # Handle missing sections
     if not intro_text and not rw_text:
@@ -264,9 +271,14 @@ def _summarize_single_paper(
         )
         return (paper_id, None, 'no_sections')
     
-    # Check if there's actually intro/rw content
-    intro_text = paper_sections.get_intro_text()
-    rw_text = paper_sections.get_related_work_text()
+    # Check if there's actually intro/rw content using anchor+window collection
+    sections_list = [{
+        "role": s.role,
+        "heading": s.heading,
+        "text": s.text,
+    } for s in paper_sections.sections]
+    
+    intro_text, _, rw_text, _ = extract_intro_rw_blocks(sections_list)
     
     if not intro_text and not rw_text:
         logger.warning(
