@@ -103,7 +103,11 @@ class DatabaseSearch(Tool):
         self, conference: str, year: int
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
         """
-        Load conference data from JSON files
+        Load conference data from JSON files.
+        
+        Supports two formats for backward compatibility:
+        1. Old format: Single file per conference (e.g., "cvpr2025.json")
+        2. New format: Individual JSON files per paper, filtered by conference field
 
         Args:
             conference: Conference name
@@ -112,7 +116,7 @@ class DatabaseSearch(Tool):
         Returns:
             Tuple of (paper list, error message or None)
         """
-        # Try old format first: single file per conference
+        # Try old format first: single file per conference (backward compatibility)
         filename = f"{conference}{year}.json"
         filepath = self.database_dir / filename
 
@@ -127,7 +131,7 @@ class DatabaseSearch(Tool):
                         f"Invalid database format: expected list, got {type(papers)}",
                     )
 
-                logger.info(f"📄 Loaded {len(papers)} papers from {filename}")
+                logger.info(f"📄 Loaded {len(papers)} papers from {filename} (old format)")
                 return papers, None
 
             except json.JSONDecodeError as e:
@@ -141,7 +145,7 @@ class DatabaseSearch(Tool):
         json_files = list(self.database_dir.glob("*.json"))
         
         if not json_files:
-            return None, f"No JSON files found in: {self.database_dir}"
+            return None, f"Database file not found: {filepath} and no JSON files found in: {self.database_dir}"
         
         # Normalize conference name for matching
         conference_normalized = conference.lower()
