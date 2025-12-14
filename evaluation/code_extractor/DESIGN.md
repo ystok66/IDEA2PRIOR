@@ -1,31 +1,32 @@
 # Code Extractor Evaluation - Design Document
 
-## 1. 设计目标
+## 1. Design Objectives
 
-设计一个全面的评估框架，用于评估 Code Extractor 工具在以下方面的表现：
-- 代码/伪代码提取质量
-- 完整性评估准确性
-- 可复现性评估准确性
-- 依赖识别准确性
-- 模型结构分析准确性
-- 缺失组件检测准确性
+Design a comprehensive evaluation framework to assess the Code Extractor tool's performance in the following aspects:
+- Code/pseudocode extraction quality
+- Completeness assessment accuracy
+- Reproducibility assessment accuracy
+- Dependency identification accuracy
+- Model structure analysis accuracy
+- Missing components detection accuracy
 
-## 2. 评估架构
+## 2. Evaluation Architecture
 
-### 2.1 三层评估体系
+### 2.1 Three-Layer Evaluation System
 
 ```
 ┌─────────────────────────────────────┐
-│   Ground Truth (人工标注数据)        │
-│   - 10篇论文的标注数据               │
-│   - 包含完整性、可复现性、依赖等     │
+│   Ground Truth (Manually Annotated) │
+│   - 10 papers annotated data        │
+│   - Includes completeness, repro,   │
+│     dependencies, etc.              │
 └─────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────┐
 │   Code Extractor Tool               │
-│   - 从PDF提取代码/伪代码             │
-│   - 评估完整性和可复现性             │
-│   - 识别依赖和框架                   │
+│   - Extract code/pseudocode from PDF│
+│   - Assess completeness & repro     │
+│   - Identify dependencies & frameworks│
 └─────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────┐
@@ -35,20 +36,20 @@
 └─────────────────────────────────────┘
 ```
 
-### 2.2 核心组件
+### 2.2 Core Components
 
-#### 2.2.1 Ground Truth 数据
-- **来源**: 人工标注的10篇论文数据
-- **字段**:
-  - `pseudocode_completeness` (0-2): 伪代码完整性
-  - `reproducibility` (1-3): 可复现性评分
-  - `dependencies`: 依赖列表
-  - `model_structure`: 模型结构
-  - `missing_components`: 缺失组件列表
+#### 2.2.1 Ground Truth Data
+- **Source**: Manually annotated data for 10 papers
+- **Fields**:
+  - `pseudocode_completeness` (0-2): Pseudocode completeness
+  - `reproducibility` (1-3): Reproducibility score
+  - `dependencies`: List of dependencies
+  - `model_structure`: Model structure details
+  - `missing_components`: List of missing components
 
 #### 2.2.2 Code Extractor Tool
-- **功能**: 从PDF中提取代码/伪代码，评估完整性和可复现性
-- **输出格式**: Markdown报告，包含：
+- **Functionality**: Extract code/pseudocode from PDFs, assess completeness and reproducibility
+- **Output Format**: Markdown report containing:
   - Completeness score (0-1.0)
   - Reproducibility score (0-1.0)
   - Identified dependencies
@@ -56,107 +57,107 @@
   - Missing components
 
 #### 2.2.3 Output Parser
-- **功能**: 解析 Code Extractor 的输出
-- **关键修复**:
-  - **范围映射**: 将工具输出的 0-1.0 映射到 ground truth 的 0-2 (completeness) 和 1-3 (reproducibility)
-  - **Model Structure 提取**: 从代码块中提取 JSON 格式的模型结构
-  - **Missing Components 优化**: 优先从 "LLM Evaluation Results" 部分提取
+- **Functionality**: Parse Code Extractor output
+- **Key Fixes**:
+  - **Range Mapping**: Map tool output 0-1.0 to ground truth 0-2 (completeness) and 1-3 (reproducibility)
+  - **Model Structure Extraction**: Extract JSON-format model structure from code blocks
+  - **Missing Components Optimization**: Prioritize extraction from "LLM Evaluation Results" section
 
 #### 2.2.4 LLM Judge
-- **模型**: ChatGPT (gpt-4o-mini)
-- **评估类型**:
-  1. **Standalone Evaluation**: 独立评估工具输出质量（不依赖 ground truth）
-  2. **Comparison Evaluation**: 与 ground truth 对比评估
-- **评估指标** (0-10分):
+- **Model**: ChatGPT (gpt-4o-mini)
+- **Evaluation Types**:
+  1. **Standalone Evaluation**: Independent assessment of tool output quality (without ground truth)
+  2. **Comparison Evaluation**: Comparison with ground truth
+- **Evaluation Metrics** (0-10 points):
   - Pseudocode Completeness Match
   - Reproducibility Score Match
   - Dependency Identification
   - Model Structure Analysis
   - Missing Components Detection
 
-## 3. 关键技术决策
+## 3. Key Technical Decisions
 
-### 3.1 PDF 匹配算法
+### 3.1 PDF Matching Algorithm
 
-**问题**: 论文标题与PDF文件名格式不一致，需要智能匹配
+**Problem**: Paper titles and PDF filenames have inconsistent formats, requiring intelligent matching
 
-**解决方案**: 三层匹配策略
-1. **精确匹配**: 标准化文本后完全匹配
-2. **子串匹配**: 80%相似度阈值
-3. **词权重匹配**: 基于词长度和重要性的加权匹配，至少60%匹配度
+**Solution**: Three-layer matching strategy
+1. **Exact Match**: Complete match after text normalization
+2. **Substring Match**: 80% similarity threshold
+3. **Word Weight Matching**: Weighted matching based on word length and importance, minimum 60% match
 
-**实现**:
+**Implementation**:
 ```python
 def normalize_text(text: str) -> str:
-    # 处理特殊字符、连字符、空格等
-    # 统一转换为小写，规范化空格
+    # Handle special characters, hyphens, spaces, etc.
+    # Convert to lowercase, normalize spaces
 
 def find_pdf_for_paper(paper_title: str) -> Optional[str]:
-    # 1. 精确匹配
-    # 2. 子串匹配（80%阈值）
-    # 3. 词权重匹配（60%阈值）
+    # 1. Exact match
+    # 2. Substring match (80% threshold)
+    # 3. Word weight match (60% threshold)
 ```
 
-### 3.2 范围映射问题
+### 3.2 Range Mapping Issue
 
-**问题**: 
-- Tool 输出: Completeness (0-1.0), Reproducibility (0-1.0)
+**Problem**: 
+- Tool Output: Completeness (0-1.0), Reproducibility (0-1.0)
 - Ground Truth: Completeness (0-2), Reproducibility (1-3)
 
-**解决方案**: 在 Parser 中进行范围映射
+**Solution**: Range mapping in Parser
 - Completeness: `value * 2` (0-1.0 → 0-2)
 - Reproducibility: `value * 2 + 1` (0-1.0 → 1-3)
 
-### 3.3 多次评估取平均
+### 3.3 Multiple Evaluations Averaging
 
-**目的**: 提高评估结果的可靠性和稳定性
+**Purpose**: Improve reliability and stability of evaluation results
 
-**实现**: 
-- 默认运行3次 LLM Judge 评估
-- 计算平均值和标准差
-- 聚合所有评估的反馈和建议
+**Implementation**: 
+- Default: Run 3 LLM Judge evaluations
+- Calculate mean and standard deviation
+- Aggregate feedback and recommendations from all evaluations
 
-## 4. 评估流程
+## 4. Evaluation Process
 
-### 4.1 单篇论文评估流程
+### 4.1 Single Paper Evaluation Process
 
 ```
-1. 加载 Ground Truth
+1. Load Ground Truth
    ↓
-2. 查找 PDF 文件（智能匹配）
+2. Find PDF file (intelligent matching)
    ↓
-3. 运行 Code Extractor
-   - 提取代码/伪代码
-   - 评估完整性和可复现性
-   - 识别依赖和框架
+3. Run Code Extractor
+   - Extract code/pseudocode
+   - Assess completeness and reproducibility
+   - Identify dependencies and frameworks
    ↓
-4. 解析工具输出
-   - 提取关键字段
-   - 范围映射
+4. Parse tool output
+   - Extract key fields
+   - Range mapping
    ↓
-5. Standalone LLM Judge 评估（3次）
-   - 独立评估工具输出质量
+5. Standalone LLM Judge evaluation (3 times)
+   - Independent assessment of tool output quality
    ↓
-6. Comparison LLM Judge 评估（3次）
-   - 与 Ground Truth 对比
+6. Comparison LLM Judge evaluation (3 times)
+   - Compare with Ground Truth
    ↓
-7. 聚合结果
-   - 计算平均值和标准差
-   - 生成摘要报告
+7. Aggregate results
+   - Calculate mean and standard deviation
+   - Generate summary report
    ↓
-8. 保存结果
-   - JSON 格式（完整数据）
-   - Markdown 格式（人类可读）
+8. Save results
+   - JSON format (complete data)
+   - Markdown format (human-readable)
 ```
 
-### 4.2 批量评估
+### 4.2 Batch Evaluation
 
-- 支持评估所有论文或指定论文
-- 支持并行评估（未来优化）
+- Support evaluating all papers or specified papers
+- Support parallel evaluation (future optimization)
 
-## 5. 输出格式
+## 5. Output Format
 
-### 5.1 JSON 输出
+### 5.1 JSON Output
 ```json
 {
   "paper_id": 1,
@@ -175,14 +176,14 @@ def find_pdf_for_paper(paper_title: str) -> Optional[str]:
 }
 ```
 
-### 5.2 Markdown 摘要
-- 论文信息
-- Ground Truth 摘要
-- Standalone 评估结果
-- Comparison 评估结果
-- 详细分数、优势、弱点、建议
+### 5.2 Markdown Summary
+- Paper information
+- Ground Truth summary
+- Standalone evaluation results
+- Comparison evaluation results
+- Detailed scores, strengths, weaknesses, recommendations
 
-## 6. 成功标准
+## 6. Success Criteria
 
 - **Pseudocode Completeness Match** > 80% (8.0/10)
 - **Reproducibility Score Match** > 70% (7.0/10)
@@ -191,57 +192,57 @@ def find_pdf_for_paper(paper_title: str) -> Optional[str]:
 - **Missing Components Detection** > 70% (7.0/10)
 - **Overall Score** > 7.0/10
 
-## 7. 已知限制和改进方向
+## 7. Known Limitations and Future Improvements
 
-### 7.1 当前限制
-1. **Gemini API 依赖**: LLM 辅助提取功能依赖 Gemini API，如果 API 被暂停，功能会降级
-2. **PDF 解析质量**: 依赖 PDFExtractorRAGTool 的解析质量
-3. **评估时间**: 每篇论文需要 2-5 分钟（包括多次 LLM 评估）
+### 7.1 Current Limitations
+1. **Gemini API Dependency**: LLM-assisted extraction depends on Gemini API; if API is suspended, functionality degrades
+2. **PDF Parsing Quality**: Depends on PDFExtractorRAGTool parsing quality
+3. **Evaluation Time**: 2-5 minutes per paper (including multiple LLM evaluations)
 
-### 7.2 改进方向
-1. **Web 搜索增强**: 集成 web 搜索功能，补充 PDF 中缺失的信息
-2. **缓存机制**: 缓存 PDF 解析结果和评估结果
-3. **并行评估**: 支持多篇论文并行评估
-4. **更智能的匹配**: 使用语义相似度进行 PDF 匹配
-5. **评估指标优化**: 根据实际使用情况调整评估指标权重
+### 7.2 Future Improvements
+1. **Web Search Enhancement**: Integrate web search functionality to supplement missing information in PDFs
+2. **Caching Mechanism**: Cache PDF parsing results and evaluation results
+3. **Parallel Evaluation**: Support parallel evaluation of multiple papers
+4. **Smarter Matching**: Use semantic similarity for PDF matching
+5. **Evaluation Metrics Optimization**: Adjust evaluation metric weights based on actual usage
 
-## 8. 文件结构
+## 8. File Structure
 
 ```
 evaluation/code_extractor/
-├── README.md                    # 使用说明
-├── DESIGN.md                    # 本文档（设计思路）
-├── RESULTS_ANALYSIS.md          # 结果分析
-├── ground_truth/                # Ground Truth 数据
+├── README.md                    # Usage guide
+├── DESIGN.md                    # This document (design rationale)
+├── RESULTS_ANALYSIS.md          # Results analysis
+├── ground_truth/                # Ground Truth data
 │   └── code_extractor_ground_truth.json
-├── scripts/                     # 评估脚本
+├── scripts/                     # Evaluation scripts
 │   ├── evaluate_code_extractor.py
 │   └── setup_pdf.sh
-├── results/                     # 评估结果
+├── results/                     # Evaluation results
 │   ├── paper_*_evaluation.json
 │   └── paper_*_evaluation_summary.md
-└── pdfs/                        # PDF 文件
+└── pdfs/                        # PDF files
     └── *.pdf
 ```
 
-## 9. 依赖关系
+## 9. Dependencies
 
-- **Code Extractor Tool**: 核心工具
-- **PDF Extractor**: PDF 解析
-- **Semantic Scholar Tool**: 论文搜索（可选）
+- **Code Extractor Tool**: Core tool
+- **PDF Extractor**: PDF parsing
+- **Semantic Scholar Tool**: Paper search (optional)
 - **OpenAI API**: LLM Judge
-- **Gemini API**: LLM 辅助提取（可选）
+- **Gemini API**: LLM-assisted extraction (optional)
 
-## 10. 使用示例
+## 10. Usage Examples
 
 ```bash
-# 评估所有论文
+# Evaluate all papers
 python evaluation/code_extractor/scripts/evaluate_code_extractor.py
 
-# 评估特定论文
+# Evaluate specific paper
 python evaluation/code_extractor/scripts/evaluate_code_extractor.py --paper-id 1
 
-# 多次评估取平均
+# Multiple evaluations with averaging
 python evaluation/code_extractor/scripts/evaluate_code_extractor.py --num-evaluations 5
 ```
 
