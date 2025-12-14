@@ -297,11 +297,12 @@ class PDFExtractorRAGTool(Tool):
         """
         try:
             # Use vector retriever to find most relevant content
-            # SimpleVectorRetriever.retrieve returns a formatted string
             result = self.retriever.retrieve(query=query, contents=[content])
 
-            # Check if result is an error message
+            # Handle different return types for backward compatibility
+            # New version returns a formatted string, old version may return a list
             if isinstance(result, str):
+                # New format: formatted string with "Relative content X:" headers
                 if "Not enough relative contents" in result:
                     # No relevant content found, return beginning of content
                     logger.info("ℹ️ No relevant chunks found, using beginning of content")
@@ -323,6 +324,33 @@ class PDFExtractorRAGTool(Tool):
                 if len(combined_result) > 2000:
                     combined_result = combined_result[:2000] + "\n\n... (content truncated)"
                 
+                return combined_result
+            elif isinstance(result, list):
+                # Old format: list of chunks (for backward compatibility)
+                if not result:
+                    # If no relevant chunks found, return beginning of content
+                    logger.info("ℹ️ No relevant chunks found, using beginning of content")
+                    return content[:2000] + "\n\n... (no specific matches found for query)"
+
+                # Combine the most relevant chunks
+                result_parts = []
+                total_length = 0
+
+                for chunk in result:
+                    chunk_text = (
+                        chunk.get("text", "") if isinstance(chunk, dict) else str(chunk)
+                    )
+                    if (
+                        total_length + len(chunk_text) > 1800
+                    ):  # Leave room for truncation message
+                        break
+                    result_parts.append(chunk_text)
+                    total_length += len(chunk_text)
+
+                combined_result = "\n\n---\n\n".join(result_parts)
+                if len(combined_result) > 2000:
+                    combined_result = combined_result[:2000] + "\n\n... (content truncated)"
+
                 return combined_result
             else:
                 # Unexpected return type
