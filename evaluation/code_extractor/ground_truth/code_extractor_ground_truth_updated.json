@@ -1,0 +1,221 @@
+[
+  {
+    "id": 1,
+    "title": "AutoML-Zero: Evolving Machine Learning Algorithms From Scratch",
+    "pseudocode_completeness": 2,
+    "reproducibility": 3,
+    "frameworks": [
+      "TensorFlow"
+    ],
+    "dependencies": [],
+    "model_structure": {
+      "description": "Evolves algorithms composed of simple operators; dynamic architecture",
+      "layers": "variable; evolved automatically",
+      "parameters": "not predefined"
+    },
+    "missing_components": [
+      "exact training hyperparameters",
+      "data preprocessing pipeline",
+      "reproduction of evolution search space"
+    ],
+    "notes": "Code available; reproduction effort non-trivial"
+  },
+  {
+    "id": 2,
+    "title": "Attention Is All You Need",
+    "pseudocode_completeness": 2,
+    "reproducibility": 3,
+    "frameworks": [
+      "TensorFlow",
+      "PyTorch (subsequent implementations)"
+    ],
+    "dependencies": [],
+    "model_structure": {
+      "description": "6-layer encoder-decoder transformer",
+      "layers": 12,
+      "parameters": "~65M"
+    },
+    "missing_components": [
+      "full training loop code",
+      "dataset preprocessing code"
+    ],
+    "notes": "Widely reproduced with many open-source implementations"
+  },
+  {
+    "id": 3,
+    "title": "Self-Attention with Relative Position Representations",
+    "pseudocode_completeness": 2,
+    "reproducibility": 3,
+    "frameworks": [
+      "TensorFlow"
+    ],
+    "dependencies": [],
+    "model_structure": {
+      "description": "Transformer variant with relative positional embeddings",
+      "layers": "same as standard transformer; modifications in attention",
+      "parameters": "unspecified"
+    },
+    "missing_components": [
+      "end-to-end training pipeline",
+      "dataset preprocessing",
+      "hyperparameter tuning procedure"
+    ],
+    "notes": "Conceptually clear; partial code available in community"
+  },
+  {
+    "id": 4,
+    "title": "Privileged Zero-Shot AutoML",
+    "pseudocode_completeness": 2,
+    "reproducibility": 3,
+    "frameworks": [
+      "PyTorch"
+    ],
+    "dependencies": [],
+    "model_structure": {
+      "description": "AutoML with privileged information",
+      "layers": "not defined; uses meta-models",
+      "parameters": "not provided"
+    },
+    "missing_components": [
+      "algorithm hyperparameters",
+      "model architecture details",
+      "training loop",
+      "data processing"
+    ],
+    "notes": "Limited code; qualitative description heavy"
+  },
+  {
+    "id": 5,
+    "title": "Automatic Analysis of Available Source Code of Top Artificial Intelligence Conference Papers",
+    "pseudocode_completeness": 0,
+    "reproducibility": 3,
+    "frameworks": [],
+    "dependencies": [],
+    "model_structure": {},
+    "missing_components": [
+      "no algorithmic pseudocode",
+      "no reproduction protocol"
+    ],
+    "notes": "Meta study; provides dataset and statistics, not algorithms"
+  },
+  {
+    "id": 6,
+    "title": "SystemDS: A Declarative Machine Learning System for the End-to-End Data Science Lifecycle",
+    "pseudocode_completeness": 2,
+    "reproducibility": 3,
+    "frameworks": [
+      "Java runtime system",
+      "C++",
+      "Python interface"
+    ],
+    "dependencies": [],
+    "model_structure": {
+      "description": "System architecture with ML operators and compiler",
+      "layers": "not neural",
+      "parameters": "not applicable"
+    },
+    "missing_components": [
+      "end-to-end training examples",
+      "hyperparameter search"
+    ],
+    "notes": "Complex system; code exists but heavy engineering"
+  },
+  {
+    "id": 7,
+    "title": "Evolving Unsupervised Deep Neural Networks for Learning Meaningful Representations",
+    "pseudocode_completeness": 2,
+    "reproducibility": 1,
+    "frameworks": [
+      "TensorFlow"
+    ],
+    "dependencies": [
+      "numpy",
+      "tensorflow"
+    ],
+    "model_structure": {
+      "description": "Evolutionary procedure on unsupervised deep nets",
+      "layers": "varies",
+      "parameters": "varies"
+    },
+    "missing_components": [
+      "exact architecture configuration",
+      "optimizer configuration",
+      "data preprocessing"
+    ],
+    "notes": "Partial pseudocode; high reproduction cost"
+  },
+  {
+    "id": 8,
+    "title": "DarwinML: A Graph-based Evolutionary Algorithm for Automated Machine Learning",
+    "pseudocode_completeness": 2,
+    "reproducibility": 2,
+    "frameworks": [
+      "Python",
+      "scikit-learn"
+    ],
+    "dependencies": [
+      "numpy",
+      "scipy",
+      "sklearn"
+    ],
+    "model_structure": {
+      "description": "Graph-based pipeline evolution",
+      "layers": "not neural; block-based",
+      "parameters": "depends on block configurations"
+    },
+    "missing_components": [
+      "full pipeline execution examples",
+      "hyperparameters for experimental setup"
+    ],
+    "notes": "Clear algorithm; code may exist but not standardized"
+  },
+  {
+    "id": 9,
+    "title": "Integrating Machine Learning with Human Knowledge",
+    "pseudocode_completeness": 1,
+    "reproducibility": 1,
+    "frameworks": [
+      "PyTorch (likely)"
+    ],
+    "dependencies": [
+      "numpy",
+      "torch"
+    ],
+    "model_structure": {
+      "description": "Hybrid rule-learning + deep learning",
+      "layers": "not specified",
+      "parameters": "not provided"
+    },
+    "missing_components": [
+      "full model architecture",
+      "training loop",
+      "evaluation pipeline",
+      "dataset preprocessing"
+    ],
+    "notes": "High-level conceptual paper; limited implementation detail"
+  },
+  {
+    "id": 10,
+    "title": "Data-Efficient Learning with Neural Programs",
+    "pseudocode_completeness": 2,
+    "reproducibility": 2,
+    "frameworks": [
+      "PyTorch"
+    ],
+    "dependencies": [
+      "numpy",
+      "torch"
+    ],
+    "model_structure": {
+      "description": "Neural programs based on structured priors",
+      "layers": "RNN / transformer hybrids",
+      "parameters": "not fully specified"
+    },
+    "missing_components": [
+      "data pipeline",
+      "hyperparameter search",
+      "evaluation code"
+    ],
+    "notes": "Conceptually clear; partial precision details missing"
+  }
+]

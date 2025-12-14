@@ -236,8 +236,17 @@ class PDFExtractorRAGTool(Tool):
         chunk_overlap: int = 200,
         pdf_base_dir: Path | str = None,
         output_base_dir: Path | str = None,
+        embedding_api_key: str | None = None,
     ):
-        """Initialize the PDF extractor RAG tool"""
+        """Initialize the PDF extractor RAG tool
+        
+        Args:
+            chunk_size: Size of text chunks for vector search
+            chunk_overlap: Overlap between chunks
+            pdf_base_dir: Directory containing PDF files
+            output_base_dir: Directory for parsed markdown output
+            embedding_api_key: OpenAI API key specifically for embeddings (optional)
+        """
         super().__init__()
         # Fixed paths for PDF processing (same as PDFExtractorTool)
         if pdf_base_dir is None:
@@ -253,9 +262,18 @@ class PDFExtractorRAGTool(Tool):
         else:
             self.output_base_dir = Path(output_base_dir)
 
-        # Initialize vector retriever for content search
+        # Initialize vector retriever with dedicated OpenAI API key for embeddings
+        # Use provided key or fall back to environment variable
+        embedding_key = embedding_api_key or os.getenv("OPENAI_EMBEDDING_API_KEY") or os.getenv("OPENAI_API_KEY")
+        
+        # Initialize embedding model with dedicated API key
+        # OpenAIEmbedding will use OpenAI's official endpoint (https://api.openai.com/v1)
+        # even if OPENAI_BASE_URL points to Gemini, because we set OPENAI_EMBEDDING_BASE_URL
+        # or it defaults to OpenAI's endpoint
+        embedding_model = OpenAIEmbedding(api_key=embedding_key)
+        
         self.retriever = SimpleVectorRetriever(
-            embedding_model=OpenAIEmbedding(),
+            embedding_model=embedding_model,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             path=None,  # Don't use persistent storage for PDF content
@@ -279,32 +297,65 @@ class PDFExtractorRAGTool(Tool):
         """
         try:
             # Use vector retriever to find most relevant content
-            relevant_chunks = self.retriever.retrieve(query=query, contents=[content])
+            result = self.retriever.retrieve(query=query, contents=[content])
 
-            if not relevant_chunks:
-                # If no relevant chunks found, return beginning of content
-                return content[:2000] + "\n\n... (no specific matches found for query)"
+            # Handle different return types for backward compatibility
+            # New version returns a formatted string, old version may return a list
+            if isinstance(result, str):
+                # New format: formatted string with "Relative content X:" headers
+                if "Not enough relative contents" in result:
+                    # No relevant content found, return beginning of content
+                    logger.info("ℹ️ No relevant chunks found, using beginning of content")
+                    return content[:2000] + "\n\n... (no specific matches found for query)"
+                
+                # Result is a formatted string with relevant content
+                # Format: "Relative content 1:\n{chunk}\nRelative content 2:\n{chunk}\n..."
+                # Extract just the content parts (remove "Relative content X:" headers)
+                import re
+                # Extract content after "Relative content X:" headers
+                chunks = re.split(r'Relative content \d+:\n', result)
+                chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+                
+                if not chunks:
+                    return content[:2000] + "\n\n... (no specific matches found for query)"
+                
+                # Combine chunks up to 2000 characters
+                combined_result = "\n\n---\n\n".join(chunks)
+                if len(combined_result) > 2000:
+                    combined_result = combined_result[:2000] + "\n\n... (content truncated)"
+                
+                return combined_result
+            elif isinstance(result, list):
+                # Old format: list of chunks (for backward compatibility)
+                if not result:
+                    # If no relevant chunks found, return beginning of content
+                    logger.info("ℹ️ No relevant chunks found, using beginning of content")
+                    return content[:2000] + "\n\n... (no specific matches found for query)"
 
-            # Combine the most relevant chunks
-            result_parts = []
-            total_length = 0
+                # Combine the most relevant chunks
+                result_parts = []
+                total_length = 0
 
-            for chunk in relevant_chunks:
-                chunk_text = (
-                    chunk.get("text", "") if isinstance(chunk, dict) else str(chunk)
-                )
-                if (
-                    total_length + len(chunk_text) > 1800
-                ):  # Leave room for truncation message
-                    break
-                result_parts.append(chunk_text)
-                total_length += len(chunk_text)
+                for chunk in result:
+                    chunk_text = (
+                        chunk.get("text", "") if isinstance(chunk, dict) else str(chunk)
+                    )
+                    if (
+                        total_length + len(chunk_text) > 1800
+                    ):  # Leave room for truncation message
+                        break
+                    result_parts.append(chunk_text)
+                    total_length += len(chunk_text)
 
-            result = "\n\n---\n\n".join(result_parts)
-            if len(result) > 2000:
-                result = result[:2000] + "\n\n... (content truncated)"
+                combined_result = "\n\n---\n\n".join(result_parts)
+                if len(combined_result) > 2000:
+                    combined_result = combined_result[:2000] + "\n\n... (content truncated)"
 
-            return result
+                return combined_result
+            else:
+                # Unexpected return type
+                logger.warning(f"⚠️ Unexpected return type from retriever: {type(result)}")
+                return content[:2000] + "\n\n... (unexpected result format)"
 
         except Exception as e:
             logger.warning(

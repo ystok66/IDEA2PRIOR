@@ -1,0 +1,201 @@
+{
+  "topic": "gan",
+  "seed_paper": "Generative Adversarial Nets",
+  "ground_truth_summary": {
+    "total_papers": 41,
+    "year_range": "2012 - 2023",
+    "key_papers_count": 4
+  },
+  "our_output_length": 18536,
+  "num_evaluations": 3,
+  "successful_evaluations": 3,
+  "evaluation": {
+    "scores": {
+      "paper_coverage": 3.0,
+      "citation_accuracy": 5.0,
+      "network_similarity": 4.0,
+      "additional_value": 7.0
+    },
+    "overall_score": 4.75,
+    "score_std_dev": {
+      "paper_coverage": 0.0,
+      "citation_accuracy": 0.0,
+      "network_similarity": 0.0,
+      "additional_value": 0.0,
+      "overall_score": 0.0
+    },
+    "detailed_comparison": {
+      "papers_in_both": [
+        "Generative Adversarial Nets (2014)",
+        "Conditional generative adversarial nets for convolutional face generation (2015)"
+      ],
+      "papers_only_in_connected_papers": [
+        "Deep Learning Approach To Face Conditioning Using Invertible Conditional Generative Adversarial Networks (ICGAN) (2020)",
+        "Performance Analysis of Convolutional Neural Networks and Multilayer Perceptron in Generative Adversarial Networks (2023)"
+      ],
+      "papers_only_in_our_tool": [
+        "Quantifying microstructures of earth materials using higher-order spatial correlations and deep generative adversarial networks (2023)",
+        "Enhanced Generative Adversarial Networks with Restart Learning Rate in Discriminator (2022)",
+        "Understanding Generative Adversarial Networks (GANs): A Review (2025)"
+      ],
+      "citation_relationships_match": false,
+      "key_differences": [
+        "Our tool includes a broader range of papers (170 vs 41) but lacks some key papers from Connected Papers.",
+        "The citation relationships in our tool do not align well with those in Connected Papers."
+      ]
+    },
+    "strengths": [
+      "Our tool provides a more extensive collection of papers and citation relationships.",
+      "The visualization and timeline features offer additional insights into the evolution of the technology.",
+      "Our tool provides a larger dataset of papers, offering a more comprehensive view of the technology evolution.",
+      "The visualization and timeline features in our tool enhance understanding of the evolution of Generative Adversarial Networks."
+    ],
+    "weaknesses": [
+      "Citation relationships are not accurately represented, leading to potential misinterpretations.",
+      "Key papers from Connected Papers are missing in our tool's output.",
+      "Key papers from Connected Papers are missing in our tool output."
+    ],
+    "recommendations": [
+      "Improve the accuracy of citation relationships to better reflect the actual connections between papers.",
+      "Incorporate key papers from Connected Papers into our tool to improve coverage.",
+      "Enhance the citation relationship analysis to ensure accuracy and relevance.",
+      "Incorporate key papers from Connected Papers into our tool's database.",
+      "Incorporate key papers from Connected Papers into our tool to enhance coverage."
+    ],
+    "topic": "gan",
+    "evaluation_timestamp": "2025-12-06T23:42:57.974562",
+    "num_runs": 3
+  },
+  "individual_evaluations": [
+    {
+      "scores": {
+        "paper_coverage": 3,
+        "citation_accuracy": 5,
+        "network_similarity": 4,
+        "additional_value": 7
+      },
+      "overall_score": 4.75,
+      "detailed_comparison": {
+        "papers_in_both": [
+          "Generative Adversarial Nets (2014)",
+          "Conditional generative adversarial nets for convolutional face generation (2015)"
+        ],
+        "papers_only_in_connected_papers": [
+          "Deep Learning Approach To Face Conditioning Using Invertible Conditional Generative Adversarial Networks (ICGAN) (2020)",
+          "Performance Analysis of Convolutional Neural Networks and Multilayer Perceptron in Generative Adversarial Networks (2023)"
+        ],
+        "papers_only_in_our_tool": [
+          "Quantifying microstructures of earth materials using higher-order spatial correlations and deep generative adversarial networks (2023)",
+          "Enhanced Generative Adversarial Networks with Restart Learning Rate in Discriminator (2022)",
+          "Understanding Generative Adversarial Networks (GANs): A Review (2025)"
+        ],
+        "citation_relationships_match": false,
+        "key_differences": [
+          "Our tool includes a broader range of papers (170 vs 41) but lacks some key papers from Connected Papers.",
+          "The citation relationships in our tool do not align well with those in Connected Papers."
+        ]
+      },
+      "strengths": [
+        "Our tool provides a larger dataset of papers, offering a more comprehensive view of the technology evolution.",
+        "The visualization and timeline features in our tool enhance understanding of the evolution of Generative Adversarial Networks."
+      ],
+      "weaknesses": [
+        "Key papers from Connected Papers are missing in our tool's output.",
+        "Citation relationships are not accurately represented, leading to potential misinterpretations."
+      ],
+      "recommendations": [
+        "Incorporate key papers from Connected Papers into our tool to improve coverage.",
+        "Enhance the citation relationship analysis to ensure accuracy and relevance."
+      ],
+      "topic": "gan",
+      "evaluation_timestamp": "2025-12-06T23:42:43.928096"
+    },
+    {
+      "scores": {
+        "paper_coverage": 3,
+        "citation_accuracy": 5,
+        "network_similarity": 4,
+        "additional_value": 7
+      },
+      "overall_score": 4.75,
+      "detailed_comparison": {
+        "papers_in_both": [
+          "Generative Adversarial Nets (2014)",
+          "Conditional generative adversarial nets for convolutional face generation (2015)"
+        ],
+        "papers_only_in_connected_papers": [
+          "Deep Learning Approach To Face Conditioning Using Invertible Conditional Generative Adversarial Networks (ICGAN) (2020)",
+          "Performance Analysis of Convolutional Neural Networks and Multilayer Perceptron in Generative Adversarial Networks (2023)"
+        ],
+        "papers_only_in_our_tool": [
+          "Quantifying microstructures of earth materials using higher-order spatial correlations and deep generative adversarial networks (2023)",
+          "Enhanced Generative Adversarial Networks with Restart Learning Rate in Discriminator (2022)",
+          "Understanding Generative Adversarial Networks (GANs): A Review (2025)"
+        ],
+        "citation_relationships_match": false,
+        "key_differences": [
+          "Our tool includes a broader range of papers (170 vs 41) but lacks some key papers from Connected Papers.",
+          "The citation relationships in our tool do not align well with those in Connected Papers."
+        ]
+      },
+      "strengths": [
+        "Our tool provides a more extensive collection of papers and citation relationships.",
+        "The visualization and timeline features offer additional insights into the evolution of the technology."
+      ],
+      "weaknesses": [
+        "Key papers from Connected Papers are missing in our tool's output.",
+        "Citation relationships are not accurately represented, leading to potential misinterpretations."
+      ],
+      "recommendations": [
+        "Incorporate key papers from Connected Papers into our tool's database.",
+        "Improve the accuracy of citation relationships to better reflect the actual connections between papers."
+      ],
+      "topic": "gan",
+      "evaluation_timestamp": "2025-12-06T23:42:50.658532"
+    },
+    {
+      "scores": {
+        "paper_coverage": 3,
+        "citation_accuracy": 5,
+        "network_similarity": 4,
+        "additional_value": 7
+      },
+      "overall_score": 4.75,
+      "detailed_comparison": {
+        "papers_in_both": [
+          "Generative Adversarial Nets (2014)",
+          "Conditional generative adversarial nets for convolutional face generation (2015)"
+        ],
+        "papers_only_in_connected_papers": [
+          "Deep Learning Approach To Face Conditioning Using Invertible Conditional Generative Adversarial Networks (ICGAN) (2020)",
+          "Performance Analysis of Convolutional Neural Networks and Multilayer Perceptron in Generative Adversarial Networks (2023)"
+        ],
+        "papers_only_in_our_tool": [
+          "Quantifying microstructures of earth materials using higher-order spatial correlations and deep generative adversarial networks (2023)",
+          "Enhanced Generative Adversarial Networks with Restart Learning Rate in Discriminator (2022)",
+          "Understanding Generative Adversarial Networks (GANs): A Review (2025)"
+        ],
+        "citation_relationships_match": false,
+        "key_differences": [
+          "Our tool includes a broader range of papers (170 vs 41) but lacks some key papers from Connected Papers.",
+          "The citation relationships in our tool do not align well with those in Connected Papers."
+        ]
+      },
+      "strengths": [
+        "Our tool provides a more extensive collection of papers and citation relationships.",
+        "The visualization and timeline features offer additional insights into the evolution of the technology."
+      ],
+      "weaknesses": [
+        "Key papers from Connected Papers are missing in our tool output.",
+        "Citation relationships are not accurately represented, leading to potential misinterpretations."
+      ],
+      "recommendations": [
+        "Incorporate key papers from Connected Papers into our tool to enhance coverage.",
+        "Improve the accuracy of citation relationships to better reflect the actual connections between papers."
+      ],
+      "topic": "gan",
+      "evaluation_timestamp": "2025-12-06T23:42:57.973980"
+    }
+  ],
+  "timestamp": "2025-12-06T23:42:57.974597"
+}

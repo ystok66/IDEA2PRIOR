@@ -1,0 +1,284 @@
+{
+  "paper_id": 7,
+  "paper_title": "Evolving Unsupervised Deep Neural Networks for Learning Meaningful Representations",
+  "ground_truth": {
+    "id": 7,
+    "title": "Evolving Unsupervised Deep Neural Networks for Learning Meaningful Representations",
+    "pseudocode_completeness": 2,
+    "reproducibility": 3,
+    "frameworks": [
+      "TensorFlow"
+    ],
+    "dependencies": [],
+    "model_structure": {
+      "description": "Evolutionary procedure on unsupervised deep nets",
+      "layers": "varies",
+      "parameters": "varies"
+    },
+    "missing_components": [
+      "exact architecture configuration",
+      "optimizer configuration",
+      "data preprocessing"
+    ],
+    "notes": "Partial pseudocode; high reproduction cost"
+  },
+  "our_output_length": 23766,
+  "parsed_output": {
+    "pseudocode_completeness": null,
+    "reproducibility_score": null,
+    "dependencies": [],
+    "model_structure": {
+      "layers": [],
+      "parameters": {},
+      "architecture": ""
+    },
+    "missing_components": [],
+    "classification": "📕 None"
+  },
+  "num_evaluations": 1,
+  "standalone_evaluation": {
+    "successful_evaluations": 1,
+    "averaged_result": {
+      "scores": {
+        "code_pseudocode_extraction_quality": 3.0,
+        "code_extraction_quality": 3.0,
+        "pseudocode_completeness": 5.0,
+        "reproducibility_assessment": 1.0,
+        "dependency_identification": 0.0,
+        "model_structure_analysis": 2.0,
+        "missing_components_detection": 8.0,
+        "overall_quality": 3.0
+      },
+      "overall_score": 3.0,
+      "estimated_pseudocode_completeness": 1.0,
+      "estimated_reproducibility": 1.0,
+      "identified_dependencies": [],
+      "identified_missing_components": [
+        "Algorithm (Steps 1-3) missing output description",
+        "Algorithm (Steps 2-3) missing input description",
+        "Algorithm (Steps 5-8) missing output description",
+        "Algorithm (Steps 1-8) missing output description",
+        "Algorithm (Steps 1-6) missing input description",
+        "Algorithm (Steps 1-4) missing output description",
+        "Algorithm (Steps 7-8) missing input description",
+        "Algorithm (Steps 2-8) missing output description",
+        "Algorithm (Steps 3-8) missing output description",
+        "Algorithm (Steps 3-4) missing output description"
+      ],
+      "model_structure_summary": {
+        "description": "No model structure identified due to lack of code.",
+        "layers": "[]",
+        "parameters": "{}"
+      },
+      "strengths": [
+        "Pseudocode extracted despite being incomplete.",
+        "Syntax check passed."
+      ],
+      "weaknesses": [
+        "No executable code found.",
+        "High number of missing components in pseudocode.",
+        "No dependencies identified."
+      ],
+      "recommendations": [
+        "Provide complete pseudocode with clear input/output descriptions.",
+        "Include executable code to enhance reproducibility.",
+        "List dependencies and frameworks used in the implementation."
+      ],
+      "paper_title": "Evolving Unsupervised Deep Neural Networks for Learning Meaningful Representations",
+      "evaluation_timestamp": "2025-12-07T15:31:21.553621",
+      "num_runs": 1
+    },
+    "individual_evaluations": [
+      {
+        "scores": {
+          "code_pseudocode_extraction_quality": 3,
+          "pseudocode_completeness": 5,
+          "reproducibility_assessment": 1,
+          "dependency_identification": 0,
+          "model_structure_analysis": 2,
+          "missing_components_detection": 8,
+          "overall_quality": 3
+        },
+        "overall_score": 3,
+        "estimated_pseudocode_completeness": 1,
+        "estimated_reproducibility": 1,
+        "identified_dependencies": [],
+        "identified_missing_components": [
+          "Algorithm (Steps 1-3) missing output description",
+          "Algorithm (Steps 2-3) missing input description",
+          "Algorithm (Steps 5-8) missing output description",
+          "Algorithm (Steps 1-8) missing output description",
+          "Algorithm (Steps 1-6) missing input description",
+          "Algorithm (Steps 1-4) missing output description",
+          "Algorithm (Steps 7-8) missing input description",
+          "Algorithm (Steps 2-8) missing output description",
+          "Algorithm (Steps 3-8) missing output description",
+          "Algorithm (Steps 3-4) missing output description",
+          "Algorithm (Steps 4-8) missing input description",
+          "Algorithm (Steps 3-8) missing input description",
+          "Algorithm (Steps 2-3) missing output description",
+          "Algorithm (Steps 1-6) missing output description",
+          "Algorithm (Steps 2-8) missing input description",
+          "Algorithm (Steps 3-4) missing input description",
+          "Algorithm (Steps 7-8) missing output description",
+          "Algorithm (Steps 2-4) missing input description",
+          "Algorithm (Steps 1-3) missing input description",
+          "Algorithm (Steps 1-8) missing input description",
+          "Algorithm (Steps 1-4) missing input description",
+          "Algorithm (Steps 2-4) missing output description",
+          "Algorithm (Steps 5-8) missing input description",
+          "Algorithm (Steps 4-6) missing input description",
+          "Algorithm (Steps 4-6) missing output description",
+          "Algorithm (Steps 4-8) missing output description",
+          "Algorithm (Steps 6-8) missing output description",
+          "Algorithm (Steps 6-8) missing input description"
+        ],
+        "model_structure_summary": {
+          "description": "No model structure identified due to lack of code.",
+          "layers": "[]",
+          "parameters": "{}"
+        },
+        "strengths": [
+          "Pseudocode extracted despite being incomplete.",
+          "Syntax check passed."
+        ],
+        "weaknesses": [
+          "No executable code found.",
+          "High number of missing components in pseudocode.",
+          "No dependencies identified."
+        ],
+        "recommendations": [
+          "Provide complete pseudocode with clear input/output descriptions.",
+          "Include executable code to enhance reproducibility.",
+          "List dependencies and frameworks used in the implementation."
+        ],
+        "paper_title": "Evolving Unsupervised Deep Neural Networks for Learning Meaningful Representations",
+        "evaluation_timestamp": "2025-12-07T15:31:13.669682",
+        "evaluation_type": "standalone"
+      }
+    ]
+  },
+  "comparison_evaluation": {
+    "successful_evaluations": 1,
+    "averaged_result": {
+      "scores": {
+        "pseudocode_completeness_match": 5.0,
+        "reproducibility_score_match": 0.0,
+        "dependency_identification": 10.0,
+        "model_structure_analysis": 5.0,
+        "missing_components_detection": 5.0
+      },
+      "overall_score": 5.0,
+      "score_std_dev": {
+        "pseudocode_completeness_match": 0.0,
+        "reproducibility_score_match": 0.0,
+        "dependency_identification": 0.0,
+        "model_structure_analysis": 0.0,
+        "missing_components_detection": 0.0,
+        "overall_score": 0.0
+      },
+      "detailed_comparison": {
+        "pseudocode_completeness": {
+          "ground_truth": 2,
+          "our_tool": 1.5,
+          "match": false
+        },
+        "reproducibility": {
+          "ground_truth": 3,
+          "our_tool": 1,
+          "match": false
+        },
+        "dependencies": {
+          "ground_truth": [],
+          "our_tool": [],
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "missing_components": {
+          "ground_truth": [
+            "exact architecture configuration",
+            "optimizer configuration",
+            "data preprocessing"
+          ],
+          "our_tool": [],
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      },
+      "strengths": [
+        "Identified no dependencies correctly.",
+        "Pseudocode extraction is present."
+      ],
+      "weaknesses": [
+        "Pseudocode completeness is significantly lower than ground truth.",
+        "Reproducibility score is very low.",
+        "Missing components were not identified."
+      ],
+      "recommendations": [
+        "Improve pseudocode extraction to include more details.",
+        "Enhance reproducibility evaluation methods.",
+        "Implement a more thorough missing components detection mechanism."
+      ],
+      "paper_title": "Evolving Unsupervised Deep Neural Networks for Learning Meaningful Representations",
+      "evaluation_timestamp": "2025-12-07T15:31:21.553720",
+      "num_runs": 1
+    },
+    "individual_evaluations": [
+      {
+        "scores": {
+          "pseudocode_completeness_match": 5,
+          "reproducibility_score_match": 0,
+          "dependency_identification": 10,
+          "model_structure_analysis": 5,
+          "missing_components_detection": 5
+        },
+        "overall_score": 5,
+        "detailed_comparison": {
+          "pseudocode_completeness": {
+            "ground_truth": 2,
+            "our_tool": 1.5,
+            "match": false
+          },
+          "reproducibility": {
+            "ground_truth": 3,
+            "our_tool": 1,
+            "match": false
+          },
+          "dependencies": {
+            "ground_truth": [],
+            "our_tool": [],
+            "precision": 1.0,
+            "recall": 1.0
+          },
+          "missing_components": {
+            "ground_truth": [
+              "exact architecture configuration",
+              "optimizer configuration",
+              "data preprocessing"
+            ],
+            "our_tool": [],
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        "strengths": [
+          "Identified no dependencies correctly.",
+          "Pseudocode extraction is present."
+        ],
+        "weaknesses": [
+          "Pseudocode completeness is significantly lower than ground truth.",
+          "Reproducibility score is very low.",
+          "Missing components were not identified."
+        ],
+        "recommendations": [
+          "Improve pseudocode extraction to include more details.",
+          "Enhance reproducibility evaluation methods.",
+          "Implement a more thorough missing components detection mechanism."
+        ],
+        "paper_title": "Evolving Unsupervised Deep Neural Networks for Learning Meaningful Representations",
+        "evaluation_timestamp": "2025-12-07T15:31:21.553139"
+      }
+    ]
+  },
+  "timestamp": "2025-12-07T15:31:21.553737"
+}
