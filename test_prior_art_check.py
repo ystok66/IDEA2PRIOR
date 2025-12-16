@@ -16,10 +16,31 @@ from pipelines.tasks import run_prior_art_check
 class MockAgent:
     """Mock agent for testing without requiring real LLM calls."""
     
+    def __call__(self, messages):
+        """
+        Make MockAgent callable for call_llm_json compatibility.
+        Extracts prompt from messages and delegates to run().
+        """
+        if isinstance(messages, list) and len(messages) > 0:
+            prompt = messages[0].get("content", "") if isinstance(messages[0], dict) else str(messages[0])
+        else:
+            prompt = str(messages)
+        return self.run(prompt)
+    
     def run(self, prompt: str) -> str:
         """
         Simple deterministic mock that returns valid JSON based on prompt content.
         """
+        # For seed papers from LLM
+        if "list up to" in prompt.lower() and "real papers" in prompt.lower():
+            return '''[
+                {"title": "MonoGRNet: A Geometric Reasoning Network for Monocular 3D Object Detection", "venue": "CVPR", "year": 2019, "doi": null, "arxiv_id": null, "url": null}
+            ]'''
+        
+        # For search queries
+        if "search queries" in prompt.lower():
+            return '["monocular 3D detection", "3D object detection augmentation"]'
+        
         # For facet decomposition
         if "key technical facets" in prompt.lower():
             return '''[
@@ -55,6 +76,10 @@ class MockAgent:
                 "assumption_facets": ["calibrated pinhole camera", "no depth supervision"]
             }'''
         
+        # For relevance keywords
+        if "relevance keywords" in prompt.lower():
+            return '["3d detection", "monocular", "augmentation"]'
+        
         # Fallback
         return '{"result": "mock response"}'
 
@@ -80,7 +105,8 @@ def test_prior_art_check():
         topic=topic,
         years=(2019, 2024),
         venues=[],
-        max_rounds=1
+        max_rounds=1,
+        debug_mode=True,
     )
     
     logger.info("✅ Task finished. Generated Report:")

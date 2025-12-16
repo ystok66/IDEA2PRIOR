@@ -24,6 +24,11 @@ from tools.semantic_scholar_search import SemanticScholarPaperDetailTool, Semant
 from tools.paper_resolver import PaperResolverTool
 from tools.pdf_parser import PdfParserTool
 
+# Conditional import for type checking
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from pipelines.tasks.prior_art_types import PriorArtConfig
+
 
 def run_exploration_loop(
     agent,
@@ -32,6 +37,7 @@ def run_exploration_loop(
     max_papers: int = 80,
     min_new_per_round: int = 5,
     search_queries: Optional[List[str]] = None,
+    cfg: Optional["PriorArtConfig"] = None,
 ) -> PipelineState:
     """
     Run the multi-round exploration loop.
@@ -65,7 +71,7 @@ def run_exploration_loop(
         state.discovery_round = round_idx + 1
 
         # 1) Discover new papers for this round.
-        newly_added = discover_papers_round(agent, state, search_queries)
+        newly_added = discover_papers_round(agent, state, search_queries, cfg=cfg)
 
         logger.info(f"Round {round_idx + 1}: discovered {len(newly_added)} new papers.")
         logger.info(f"Total papers in state: {len(state.papers)}")
@@ -101,10 +107,17 @@ def run_exploration_loop(
 def discover_papers_round(
     agent, 
     state: PipelineState, 
-    search_queries: Optional[List[str]] = None
+    search_queries: Optional[List[str]] = None,
+    cfg: Optional["PriorArtConfig"] = None,
 ) -> List[Paper]:
     """
     Discover a batch of new papers for the current round.
+    
+    Args:
+        agent: The agent instance
+        state: Pipeline state
+        search_queries: Optional list of search queries
+        cfg: Optional PriorArtConfig for excluded paper filtering
     """
     logger.info("Discovering papers via OpenAlex...")
     
@@ -207,6 +220,13 @@ def discover_papers_round(
             doi=doi,
             citation_count=work.get("cited_by_count")
         )
+        
+        # Excluded paper check (blind evaluation)
+        if cfg:
+            from pipelines.tasks.prior_art_utils import is_excluded_paper
+            if is_excluded_paper(paper, cfg):
+                logger.debug(f"[ExcludedPaper] Skipping excluded paper: {title[:40]}...")
+                continue
         
         # Add to state
         state.papers[canonical_key] = paper
