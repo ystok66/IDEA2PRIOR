@@ -19,6 +19,7 @@ from pipelines.tasks.prior_art_types import (
     PriorArtConfig, PriorArtMatch, HIGH_LEVEL_FACET_TYPES
 )
 from pipelines.evidence import FacetCoverageStats, FacetReportView, coverage_label
+from pipelines.tasks.prior_art_utils import is_excluded_paper
 
 if TYPE_CHECKING:
     from pipelines.paper_record import PaperRecord
@@ -29,6 +30,39 @@ from pipelines.paper_record import is_in_domain_for_topic
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+def get_effective_coverage(
+    paper_id: str,
+    coverage_by_id: Dict[str, int],
+    evidence_by_paper: Optional[Dict[str, List]] = None,
+    assign_evidence_level_fn=None,
+) -> int:
+    """
+    Get effective coverage level for a paper, using LLM scoring as primary source.
+    
+    Core principle: Infrastructure failures (PDF not downloaded/parsed) should NOT
+    lower coverage level. Evidence can only RAISE the level, never lower it.
+    
+    Args:
+        paper_id: Paper identifier
+        coverage_by_id: Dict of paper_id -> coverage_level from LLM scoring
+        evidence_by_paper: Optional dict of paper_id -> evidence_spans list
+        assign_evidence_level_fn: Optional function to compute evidence-based level
+        
+    Returns:
+        Effective coverage level (0-3)
+    """
+    llm_level = coverage_by_id.get(paper_id, 0)
+    
+    # If we have evidence AND a function to compute evidence-based level,
+    # take the max to ensure evidence can only raise, never lower
+    if evidence_by_paper and assign_evidence_level_fn:
+        evidence_spans = evidence_by_paper.get(paper_id, [])
+        if evidence_spans:
+            evidence_level = assign_evidence_level_fn(paper_id, evidence_spans, True)
+            return max(llm_level, evidence_level)
+    
+    return llm_level
 
 def get_papers_by_coverage_bucket(
     coverage_levels: Dict[str, int],
@@ -380,32 +414,72 @@ def render_prior_art_report(
     lines.append("⚠️ These papers may present potential conflicts or very similar approaches:")
     lines.append("")
     
-    # Build buckets using single source of truth: coverage_classifier output
-    # scored_papers is ONLY used for sorting and optional notes (not for bucket membership)
+    # Build buckets using LLM scoring's coverage_level as PRIMARY source
+    # Core principle: infrastructure failures (PDF not downloaded) should NOT lower coverage
     buckets = {"high": [], "partial": [], "adjacent": []}
-    if coverage_levels and paper_records:
+    
+    # Build coverage_by_id dict for O(1) lookup (avoids O(N^2) list scanning)
+    coverage_by_id: Dict[str, int] = {}
+    if scored_papers:
+        # Filter out excluded papers from scored_papers
+        if config and config.excluded_papers:
+            scored_papers = [m for m in scored_papers if not is_excluded_paper(
+                state.papers.get(m.paper_id, {}), config
+            )]
+        coverage_by_id = {m.paper_id: m.coverage_level for m in scored_papers}
+    
+    # Build paper_records lookup from state.papers if not provided
+    if not paper_records:
+        paper_records = {}
+        for paper_id, paper in state.papers.items():
+            class MinimalRecord:
+                def __init__(self, pid, p):
+                    self.paper_id = pid  # Paper object doesn't have paper_id attr; use dict key
+                    self.title = p.title
+                    self.venue = p.venue
+                    self.year = p.year
+                    self.citation_count = getattr(p, 'citation_count', 0)
+            paper_records[paper_id] = MinimalRecord(paper_id, paper)
+    
+    # PRIMARY: Use LLM scoring's coverage_level
+    if coverage_by_id:
+        for pid, level in coverage_by_id.items():
+            # Try to find record in paper_records or state.papers
+            record = paper_records.get(pid)
+            if not record and pid in state.papers:
+                paper = state.papers[pid]
+                class MinimalRecord:
+                    def __init__(self, id, p):
+                        self.paper_id = id  # Paper object doesn't have paper_id attr; use dict key
+                        self.title = p.title
+                        self.venue = p.venue
+                        self.year = p.year
+                        self.citation_count = getattr(p, 'citation_count', 0)
+                record = MinimalRecord(pid, paper)
+            
+            if not record:
+                continue
+            
+            # Use LLM level directly (evidence can only raise level via get_effective_coverage
+            # if we integrate evidence_by_paper in the future)
+            if level == 3:
+                buckets["high"].append(record)
+            elif level == 2:
+                buckets["partial"].append(record)
+            elif level == 1:
+                buckets["adjacent"].append(record)
+        
+        # Sort each bucket by LLM task_similarity score
+        for bucket_name in buckets:
+            buckets[bucket_name] = sort_bucket_with_scores(buckets[bucket_name], scored_papers)
+    
+    # FALLBACK: Use evidence-based coverage_levels if no scored_papers
+    elif coverage_levels and paper_records:
         buckets = get_papers_by_coverage_bucket(
             coverage_levels=coverage_levels,
             paper_records=paper_records,
-            topic=state.intent.topic if hasattr(state.intent, "topic") else "monocular_3d_detection",
+            topic=state.intent.topic if hasattr(state.intent, "topic") else "",
         )
-        # Sort each bucket by LLM score
-        for bucket_name in buckets:
-            buckets[bucket_name] = sort_bucket_with_scores(buckets[bucket_name], scored_papers)
-    else:
-        # Fallback to old logic if coverage_levels not available
-        # This maintains backward compatibility
-        match_map = {m.paper_id: m for m in scored_papers}
-        for m in scored_papers:
-            if m.coverage_level == 3:
-                if m.paper_id in paper_records:
-                    buckets["high"].append(paper_records[m.paper_id])
-            elif m.coverage_level == 2:
-                if m.paper_id in paper_records:
-                    buckets["partial"].append(paper_records[m.paper_id])
-            elif m.coverage_level == 1:
-                if m.paper_id in paper_records:
-                    buckets["adjacent"].append(paper_records[m.paper_id])
     
     # Build match map for notes lookup (scored_papers = optional decoration)
     match_map = {m.paper_id: m for m in scored_papers} if scored_papers else {}
@@ -450,6 +524,10 @@ def render_prior_art_report(
                     lines.append("**Evidence snippets**")
                     for s in snippets:
                         lines.append(f"- {s}")
+                else:
+                    # No evidence snippets: PDF likely not downloaded or parsed
+                    lines.append("")
+                    lines.append("> ⚠️ *Note: PDF not successfully downloaded or parsed. Assessment based on abstract and metadata only.*")
             
             lines.append("")
     else:

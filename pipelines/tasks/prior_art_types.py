@@ -117,6 +117,7 @@ class PriorArtConfig:
     prefilter_min_papers: int = 30          # Only prefilter if > 30 candidates
     prefilter_max_keep: int = 80            # Max to keep from lexical filter
     prefilter_max_keywords: int = 20
+    enable_survey_penalty: bool = False     # If True, penalize survey/review papers in lexical filter
     
     # ========== Prefilter Config (Stage 2: Light LLM) ==========
     enable_llm_prefilter: bool = True       # Use light LLM for relevance check
@@ -146,7 +147,9 @@ class PriorArtConfig:
     
     # ========== Block 1: Enhanced Candidate Retrieval ==========
     # Dual-bucket search (main + recent)
-    recent_year_threshold: int = 2024       # "Recent bucket" starts from this year
+    # Recent bucket year range (closed interval)
+    recent_year_start: int = 2024           # "Recent bucket" starts from this year
+    recent_year_end: int = 2025             # "Recent bucket" ends at this year (inclusive)
     recent_min_quota_ratio: float = 0.3     # At least 30% from recent bucket
     recent_max_quota_ratio: float = 0.6     # At most 60% from recent bucket
     max_candidates: int = 200               # Total candidate limit
@@ -163,6 +166,17 @@ class PriorArtConfig:
     max_seed_queries: int = 6
     debug_max_seed_queries: int = 3
     
+    # ========== Citation Graph Expansion ==========
+    # Maximum neighbors to fetch from S2 API per seed (references + citations combined)
+    max_neighbors_per_seed: int = 200
+    # How many neighbors to keep after lexical filtering (per seed)
+    topk_neighbors_after_lexical: int = 15
+    
+    # ========== Evidence Extraction ==========
+    enable_bm25_evidence: bool = True             # Use BM25 to backfill low-evidence papers
+    evidence_bm25_top_k: int = 3                  # BM25 sentences per paper
+    min_evidence_per_paper_for_bm25: int = 2      # Threshold below which BM25 kicks in
+    
     # ========== Feature Flags ==========
     enable_dataset_metric_stats: bool = False  # Disabled until reliable
     
@@ -178,10 +192,43 @@ class PriorArtConfig:
     key_paper_latest_k: int = 5                  # Top-K by year
     key_paper_survey_k: int = 5                  # Top-K surveys
     
+    # ========== Web Search Configuration ==========
+    # SerpAPI (quota-conscious: only 2 calls per idea instead of 12)
+    enable_serpapi: bool = True                  # Use SerpAPI for web search
+    serpapi_num_results_all: int = 30            # Results for all-years search
+    serpapi_num_results_recent: int = 30         # Results for recent-range search
+    serpapi_timeout_sec: int = 20                # Request timeout
+    
+    # DuckDuckGo (free, used for additional coverage)
+    enable_duckduckgo: bool = True               # Use DuckDuckGo for complementary search
+    ddg_num_queries: int = 3                     # Number of queries to generate for DDG
+    ddg_max_results_per_query: int = 20          # Max results per DDG query per mode
+    
+    # Parallel web search
+    max_workers_web_search: int = 6              # Thread pool size for HTTP calls
+    
+    # ========== LLM-Driven Query/Pattern Generation ==========
+    enable_llm_idea_queries: bool = True         # Generate queries purely from idea (no topic)
+    enable_llm_facet_patterns: bool = True       # Generate facet patterns from idea (replace hardcoded)
+    llm_max_facets: int = 6                      # Max facets to generate
+    llm_max_patterns_per_facet: int = 10         # Max patterns per facet
+    seed_validation_threshold: float = 0.35     # Jaccard threshold for seed validation
+    
     # ========== 2.1 Synthesis JSON Builder ==========
     enable_synthesis_json: bool = True           # Always generate synthesis_input.json
     auto_generate_intro_rw_report: bool = False  # If True, call heavy LLM to generate MD
     max_papers_per_bucket_for_prompt: int = 15   # Limit papers in prompt for heavy LLM
+    
+    # ========== PDF Pipeline Fallback ==========
+    # DDG search for PDF URLs when other sources fail (disabled by default for determinism)
+    enable_web_pdf_fallback: bool = False        # If True, search DDG as last resort for PDF URLs
+    ddg_pdf_search_query_suffix: str = "filetype:pdf"  # Appended to title search
+    
+    # ========== Excluded Papers (Blind Evaluation) ==========
+    # List of papers to exclude from the pipeline for controlled experiments.
+    # Each dict can contain: title, doi, arxiv_id, s2_id, openalex_id
+    # Papers matching ANY of these identifiers will be filtered out at all stages.
+    excluded_papers: List[Dict[str, str]] = field(default_factory=list)
 
 
 @dataclass

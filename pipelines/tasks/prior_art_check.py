@@ -65,7 +65,7 @@ from pipelines.evidence import (
     EvidenceSpan, collect_facet_evidence, compute_facet_coverage, 
     summarize_facet_coverage, FACET_PATTERNS, FacetReportView,
     build_facet_report_views, summarize_facet_for_report,
-    coverage_label, FacetCoverageStats,
+    coverage_label, FacetCoverageStats, generate_facet_patterns_from_idea,
 )
 from pipelines.coverage_classifier import (
     classify_all_papers, get_papers_by_level, validate_coverage_consistency
@@ -87,6 +87,8 @@ from pipelines.tasks.prior_art_report import render_prior_art_report
 from pipelines.tasks.prior_art_retrieval import (
     seed_papers_from_llm,
     validate_llm_seeds_via_openalex,
+    seed_papers_from_serpapi,
+    merge_seeds,
     generate_search_queries_from_idea,
     generate_seed_queries_llm,
     retrieve_candidates_with_buckets,
@@ -110,6 +112,7 @@ from pipelines.tasks.prior_art_fulltext import (
     select_key_papers_and_dump_intro_rw_full,
 )
 from pipelines.tasks.prior_art_synthesis import build_synthesis_input
+from pipelines.tasks.prior_art_utils import is_excluded_paper, filter_excluded_papers
 
 # Standard library
 import requests
@@ -194,6 +197,7 @@ def run_prior_art_check(
     max_rounds: int = 2,
     use_citation_graph: bool = True,
     debug_mode: bool = False,
+    excluded_papers: Optional[List[Dict[str, str]]] = None,
 ) -> str:
     """
     High-level entry point for the prior-art check task.
@@ -204,6 +208,10 @@ def run_prior_art_check(
       3) Decompose the idea into facets.
       4) Score papers against these facets.
       5) Render a structured report.
+      
+    Args:
+        excluded_papers: Optional list of papers to exclude for blind evaluation.
+            Each dict can contain: title, doi, arxiv_id, s2_id, openalex_id
     """
     intent = build_prior_art_intent(
         idea_description=idea_description,
@@ -212,7 +220,7 @@ def run_prior_art_check(
         venues=venues,
     )
     state = PipelineState(intent=intent)
-    cfg = PriorArtConfig(debug_mode=debug_mode)
+    cfg = PriorArtConfig(debug_mode=debug_mode, excluded_papers=excluded_papers or [])
     
     # NOTE: debug_mode no longer forces workers=1
     # It only reduces data scale (top_n, paragraphs, etc.) while keeping concurrency
@@ -235,9 +243,12 @@ def run_prior_art_check(
         "max_rounds": max_rounds,
         "use_citation_graph": use_citation_graph,
         "debug_mode": debug_mode,
-        "recent_year_threshold": cfg.recent_year_threshold,
+        "recent_year_start": cfg.recent_year_start,
+        "recent_year_end": cfg.recent_year_end,
         "recent_min_quota_ratio": cfg.recent_min_quota_ratio,
         "recent_max_quota_ratio": cfg.recent_max_quota_ratio,
+        # Blind evaluation: record excluded papers for experiment traceability
+        "excluded_papers_for_eval": cfg.excluded_papers if cfg.excluded_papers else None,
     }
     run_mgr.save_config(run_config)
 
@@ -248,28 +259,59 @@ def run_prior_art_check(
         f"fulltext_top_k={fulltext_top_k}; run_id={run_mgr.run_id}"
     )
 
-    # 1) Let the LLM propose seed papers (world knowledge).
-    llm_seed_dicts = seed_papers_from_llm(agent, idea_description, topic)
+    # 1) Seed paper discovery
+    # Step 1a: Let the LLM propose seed papers from memory (idea-only, no topic)
+    llm_seed_dicts = seed_papers_from_llm(agent, idea_description)
+    
+    # Step 1b: Optionally discover more seeds via web search (SerpAPI + DuckDuckGo)
+    if cfg.enable_serpapi or cfg.enable_duckduckgo:
+        web_search_seeds = seed_papers_from_serpapi(
+            idea_description=idea_description,
+            year_start=years[0] if years else 2018,
+            year_end=years[1] if years else 2025,
+            cfg=cfg,
+        )
+        # Merge seeds (deduplicating by title)
+        all_seed_dicts = merge_seeds(llm_seed_dicts, web_search_seeds)
+        logger.info(f"[PriorArt] Merged seeds: {len(llm_seed_dicts)} LLM + {len(web_search_seeds)} WebSearch = {len(all_seed_dicts)} total")
+    else:
+        all_seed_dicts = llm_seed_dicts
+    
+    # Filter excluded papers from seeds (blind evaluation)
+    if cfg.excluded_papers:
+        original_count = len(all_seed_dicts)
+        all_seed_dicts = [s for s in all_seed_dicts if not is_excluded_paper(s, cfg)]
+        if len(all_seed_dicts) < original_count:
+            logger.info(f"[ExcludedPaper] Filtered {original_count - len(all_seed_dicts)} excluded paper(s) from seeds")
+    
+    # Step 1c: Validate all seeds via OpenAlex
     validated_seed_papers = validate_llm_seeds_via_openalex(
-        llm_seed_dicts,
+        all_seed_dicts,
         max_workers=cfg.max_workers_openalex,
     )
+    seed_paper_ids: Set[str] = set()  # Track seed papers for lexical filter exemption
     for p in validated_seed_papers:
+        # Filter excluded papers (blind evaluation)
+        if is_excluded_paper(p, cfg):
+            logger.info(f"[ExcludedPaper] Skipping excluded validated seed: {p.title[:50]}...")
+            continue
         # Make sure to insert into state.papers with a stable paper_id
-        # Use DOI or OpenAlex ID as key
-        key = p.doi if p.doi else p.openalex_id
+        # Use DOI, OpenAlex ID, or S2 ID as key (in order of preference)
+        key = p.doi if p.doi else (p.openalex_id if p.openalex_id else p.s2_id)
         if key and key not in state.papers:
             state.papers[key] = p
+            seed_paper_ids.add(key)  # Track this as a seed paper
             logger.info(f"[PriorArt] Added seed paper: {p.title}")
 
-    # 2) Ask the LLM to generate search queries.
-    search_queries = generate_search_queries_from_idea(agent, idea_description, topic)
+    # 2) Ask the LLM to generate search queries (idea-only, no topic).
+    search_queries = generate_search_queries_from_idea(agent, idea_description)
 
     state = run_exploration_loop(
         agent=agent,
         state=state,
         max_rounds=max_rounds,
         search_queries=search_queries,
+        cfg=cfg,  # Pass config for excluded paper filtering
     )
 
     logger.info(
@@ -339,7 +381,7 @@ def run_prior_art_check(
                 seed_queries=refined_queries,
                 state=state,
                 cfg=cfg,
-                year_start=max(year_start, cfg.recent_year_threshold),  # Focus on recent
+                year_start=max(year_start, cfg.recent_year_start),  # Focus on recent
                 year_end=year_end,
             )
             new_refined = 0
@@ -360,6 +402,18 @@ def run_prior_art_check(
     }
     logger.info(f"[Block1] After quota selection: {len(state.papers)} papers")
     
+    # ========== Pre-Block 3: Generate idea_keywords for evidence & scoring ==========
+    # Generate relevance keywords early for reuse in evidence collection, scoring, and citation expansion
+    idea_keywords = generate_relevance_keywords_from_idea(
+        agent=agent,
+        topic=topic,
+        idea=idea_description,
+        facets=facets,
+        max_keywords=cfg.prefilter_max_keywords,
+    )
+    strong_cues = idea_keywords[:10] if idea_keywords else []  # Top 10 as strong cues
+    logger.info(f"[Pre-Block3] Generated {len(idea_keywords)} idea_keywords for evidence extraction")
+    
     # ========== Block 3: Evidence Collection & Domain Filtering ==========
     # Convert Papers to PaperRecords for structured analysis
     paper_records: Dict[str, PaperRecord] = {}
@@ -369,8 +423,27 @@ def run_prior_art_check(
     
     logger.info(f"[Block3] Created {len(paper_records)} PaperRecords")
     
-    # Collect facet evidence from all papers
-    evidence_spans = collect_facet_evidence(list(paper_records.values()))
+    # Collect facet evidence from all papers (with dynamic keywords and BM25 backfill)
+    # Use LLM-generated facet patterns if enabled, otherwise use hardcoded defaults
+    if cfg.enable_llm_facet_patterns:
+        logger.info("[Block3] Generating dynamic facet patterns from idea...")
+        dynamic_patterns = generate_facet_patterns_from_idea(
+            idea_description=idea_description,
+            max_facets=cfg.llm_max_facets,
+            max_patterns_per_facet=cfg.llm_max_patterns_per_facet,
+        )
+        facet_patterns_to_use = dynamic_patterns if dynamic_patterns else FACET_PATTERNS
+    else:
+        facet_patterns_to_use = FACET_PATTERNS
+    
+    evidence_spans = collect_facet_evidence(
+        list(paper_records.values()),
+        facet_patterns=facet_patterns_to_use,
+        idea_keywords=idea_keywords,
+        use_bm25=cfg.enable_bm25_evidence,
+        bm25_top_k=cfg.evidence_bm25_top_k,
+        min_evidence_for_bm25=cfg.min_evidence_per_paper_for_bm25,
+    )
     
     # Compute unified facet coverage
     facet_coverage = compute_facet_coverage(evidence_spans)
@@ -428,16 +501,21 @@ def run_prior_art_check(
         idea_high_level_facets=idea_high_level_facets,
         idea_description=idea_description,
         cfg=cfg,
-        stage="initial"
+        stage="initial",
+        seed_paper_ids=seed_paper_ids,  # Exempt seed papers from lexical filter
     )
 
     # Citation graph expansion (optional)
+    # Note: idea_keywords and strong_cues already generated above (Pre-Block 3)
+    
     if use_citation_graph:
         expand_corpus_via_citation_graph(
             state=state,
             matches=matches,
+            cfg=cfg,
+            idea_keywords=idea_keywords,
+            strong_cues=strong_cues,
             max_seed_papers=5,
-            max_neighbors_per_seed=30,
             max_workers=cfg.max_workers_s2,
         )
         
@@ -451,7 +529,8 @@ def run_prior_art_check(
             idea_high_level_facets=idea_high_level_facets,
             idea_description=idea_description,
             cfg=cfg,
-            stage="after_citation"
+            stage="after_citation",
+            seed_paper_ids=seed_paper_ids,  # Exempt seed papers from lexical filter
         )
 
     # Stage 2: fulltext refinement for top-K candidates.
@@ -570,5 +649,43 @@ def run_prior_art_check(
             logger.info(f"[PriorArtCheck] Debug copy saved to {out_path}")
     except Exception as e:
         logger.warning(f"[PriorArtCheck] Failed to save report: {e}")
+    # ========== Phase 5: Fulltext Statistics Summary ==========
+    # Log summary of PDF/sections status for debugging and observability
+    try:
+        pdf_attempted = sum(1 for p in state.papers.values() if getattr(p, 'pdf_status', 'not_attempted') != 'not_attempted')
+        pdf_downloaded = sum(1 for p in state.papers.values() if getattr(p, 'pdf_status', '') == 'downloaded')
+        pdf_not_found = sum(1 for p in state.papers.values() if getattr(p, 'pdf_status', '') == 'not_found')
+        pdf_error = sum(1 for p in state.papers.values() if getattr(p, 'pdf_status', '') == 'error')
+        sections_parsed = sum(1 for p in state.papers.values() if getattr(p, 'section_status', '') == 'parsed')
+        sections_error = sum(1 for p in state.papers.values() if getattr(p, 'section_status', '') == 'parse_error')
+        
+        # Count papers with abstract-only assessment among high-relevance papers
+        abstract_only_high_relevance = sum(
+            1 for m in matches 
+            if m.coverage_level >= 2 and (
+                getattr(state.papers.get(m.paper_id), 'pdf_status', 'not_attempted') != 'downloaded' or
+                getattr(state.papers.get(m.paper_id), 'section_status', 'not_attempted') != 'parsed'
+            )
+        )
+        
+        logger.info(
+            f"[Fulltext Stats] PDFs: attempted={pdf_attempted}, downloaded={pdf_downloaded}, "
+            f"not_found={pdf_not_found}, error={pdf_error}. "
+            f"Sections: parsed={sections_parsed}, parse_error={sections_error}. "
+            f"High-relevance w/ abstract-only: {abstract_only_high_relevance}"
+        )
+        
+        # Also log to run directory for later analysis
+        run_mgr.append_search_log("fulltext_stats", {
+            "pdf_attempted": pdf_attempted,
+            "pdf_downloaded": pdf_downloaded,
+            "pdf_not_found": pdf_not_found,
+            "pdf_error": pdf_error,
+            "sections_parsed": sections_parsed,
+            "sections_error": sections_error,
+            "abstract_only_high_relevance": abstract_only_high_relevance,
+        })
+    except Exception as e:
+        logger.debug(f"[PriorArtCheck] Failed to compute fulltext stats: {e}")
 
     return report

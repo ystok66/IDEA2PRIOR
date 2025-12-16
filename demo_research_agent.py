@@ -8,9 +8,13 @@ using web search and content reading tools, bypassing the local database.
 import os
 import sys
 import argparse
+import warnings
 from typing import Optional
 from dotenv import load_dotenv
 from loguru import logger
+
+# Suppress Pydantic serialization warnings from smolagents/litellm
+warnings.filterwarnings("ignore", message=".*PydanticSerializationUnexpectedValue.*")
 
 # Fix Windows encoding issue for Chinese characters
 if sys.platform.startswith('win'):
@@ -167,6 +171,24 @@ def parse_args():
         action="store_true",
         help="Enable debug mode (limits LLM calls for prior_art_check).",
     )
+    parser.add_argument(
+        "--excluded_paper_title",
+        type=str,
+        default=None,
+        help="Title of paper to exclude for blind evaluation.",
+    )
+    parser.add_argument(
+        "--excluded_paper_arxiv",
+        type=str,
+        default=None,
+        help="arXiv ID of paper to exclude (e.g., 2304.07647).",
+    )
+    parser.add_argument(
+        "--excluded_paper_doi",
+        type=str,
+        default=None,
+        help="DOI of paper to exclude.",
+    )
     return parser.parse_args()
 
 def main():
@@ -225,6 +247,17 @@ def main():
                 years = (args.year_start, args.year_end)
             
             logger.info(f"Running Prior Art Check for idea on topic: {args.topic}")
+            
+            # Build excluded papers list if any excluded paper args provided
+            excluded_papers = None
+            if args.excluded_paper_title or args.excluded_paper_arxiv or args.excluded_paper_doi:
+                excluded_papers = [{
+                    "title": args.excluded_paper_title or "",
+                    "arxiv_id": args.excluded_paper_arxiv,
+                    "doi": args.excluded_paper_doi,
+                }]
+                logger.info(f"🔒 Blind Evaluation Mode: Excluding paper '{args.excluded_paper_title or args.excluded_paper_arxiv}'")
+            
             report = run_prior_art_check(
                 agent=agent,
                 idea_description=args.idea,
@@ -233,6 +266,7 @@ def main():
                 venues=None,
                 max_rounds=args.max_rounds,
                 debug_mode=args.debug,
+                excluded_papers=excluded_papers,
             )
             print("\n" + "="*60)
             print(report)

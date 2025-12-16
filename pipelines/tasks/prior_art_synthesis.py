@@ -28,6 +28,7 @@ from pipelines.tasks.prior_art_types import (
     PriorArtConfig,
     PriorArtMatch,
 )
+from pipelines.tasks.prior_art_utils import is_excluded_paper
 
 
 # =============================================================================
@@ -316,6 +317,11 @@ def build_synthesis_input(
     # 优先使用传入的 coverage_levels
     if coverage_levels:
         for pid in state.papers.keys():
+            # Skip excluded papers (blind evaluation)
+            paper = state.papers.get(pid)
+            if paper and is_excluded_paper(paper, config):
+                continue
+            
             level = coverage_levels.get(pid, 0)
             if level >= 3:
                 buckets["high_overlap"].append(pid)
@@ -448,6 +454,7 @@ def build_synthesis_input(
             "year": paper.year or 0,
             "venue": paper.venue or "",
             "citation_count": paper.citation_count or 0,
+            "abstract": paper.abstract or "",  # 始终包含 abstract，即使 PDF 未下载
             "overlap_level": level,
             "overlap_bucket": overlap_bucket,
             # 从 match 获取 facet_labels

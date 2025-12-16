@@ -53,14 +53,23 @@ class PaperResolverTool(Tool):
         return json.dumps(result)  # Return proper JSON string, not str(dict)
 
     def resolve_pdf_and_metadata(self, doi=None, arxiv_id=None, s2_id=None, openalex_id=None, title=None):
+        # 0. Extract arXiv ID from DOI if it's in the format 10.48550/arxiv.{ID}
+        # This handles cases where DOI is the only identifier and S2 returns 429 errors
+        if doi and not arxiv_id:
+            import re
+            arxiv_doi_match = re.match(r'^10\.48550/arxiv\.(\d+\.\d+)$', doi, re.IGNORECASE)
+            if arxiv_doi_match:
+                arxiv_id = arxiv_doi_match.group(1)
+                logger.info(f"[PaperResolver] Extracted arXiv ID {arxiv_id} from DOI {doi}")
+        
         # 1. arXiv (Fastest, High Confidence)
         if arxiv_id:
-            logger.info(f"Resolving via arXiv ID: {arxiv_id}")
+            logger.debug(f"[PaperResolver] Trying source 1/5: arXiv (id={arxiv_id})")
             url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
             return {"pdf_url": url, "source": "arxiv", "metadata": {"arxiv_id": arxiv_id}}
 
         # 2. Semantic Scholar (Rich Metadata + Links)
-        logger.info("Checking Semantic Scholar...")
+        logger.debug(f"[PaperResolver] Trying source 2/5: Semantic Scholar (doi={doi}, s2_id={s2_id})")
         paper = self._lookup_semantic_scholar(doi, s2_id, arxiv_id, title)
         if paper:
             # Check for OA PDF
@@ -88,7 +97,7 @@ class PaperResolverTool(Tool):
 
         # 3. OpenAlex (Good for OA)
         if doi or openalex_id or title:
-            logger.info("Checking OpenAlex...")
+            logger.debug(f"[PaperResolver] Trying source 3/5: OpenAlex (doi={doi}, openalex_id={openalex_id})")
             work = self._lookup_openalex(doi, openalex_id, title)
             if work:
                 pdf_url = self._normalize_pdf_url(self._openalex_pdf_url(work))
@@ -104,7 +113,7 @@ class PaperResolverTool(Tool):
 
         # 4. Unpaywall (Fallback for DOI)
         if doi:
-            logger.info("Checking Unpaywall...")
+            logger.debug(f"[PaperResolver] Trying source 4/5: Unpaywall (doi={doi})")
             info = self._lookup_unpaywall(doi)
             if info:
                 pdf_url = self._normalize_pdf_url(self._unpaywall_pdf_url(info))
@@ -116,8 +125,21 @@ class PaperResolverTool(Tool):
                         "source": "unpaywall",
                     }
 
-        # 5. Failed to find PDF
-        logger.warning("No PDF found.")
+        # 5. DDG Search (last resort, optional)
+        # This is behind a config flag as it can be unreliable and non-deterministic
+        if title:
+            logger.debug(f"[PaperResolver] Trying source 5/5: DDG Search (title={title[:40]}...)")
+            pdf_url = self._search_ddg_for_pdf(title)
+            if pdf_url:
+                logger.info(f"[PaperResolver] Selected PDF from DDG search: {pdf_url[:80]}...")
+                return {
+                    "pdf_url": pdf_url,
+                    "metadata": {"title": title},
+                    "source": "ddg_search",
+                }
+
+        # 6. Failed to find PDF
+        logger.warning(f"[PaperResolver] No PDF found for doi={doi}, title={title[:40] if title else 'N/A'}...")
         return {
             "pdf_url": None,
             "metadata": {},
@@ -246,3 +268,75 @@ class PaperResolverTool(Tool):
             "venue": info.get("genre"), # Unpaywall structure varies
             "authors": [a.get("family") for a in info.get("z_authors", [])]
         }
+
+    def _search_ddg_for_pdf(self, title: str, max_results: int = 5) -> Optional[str]:
+        """
+        Search DuckDuckGo for a PDF URL as a last resort.
+        
+        This is optional and non-deterministic, so it should only be used
+        when all other methods fail and config.enable_web_pdf_fallback is True.
+        
+        Args:
+            title: Paper title to search for
+            max_results: Maximum search results to check
+            
+        Returns:
+            PDF URL if found, None otherwise
+        """
+        if not title:
+            return None
+        
+        # Import DDG library (prefer new ddgs, fall back to old)
+        DDGS = None
+        try:
+            from ddgs import DDGS as NewDDGS
+            DDGS = NewDDGS
+        except ImportError:
+            try:
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=RuntimeWarning)
+                    from duckduckgo_search import DDGS as OldDDGS
+                DDGS = OldDDGS
+            except ImportError:
+                logger.debug("[PaperResolver] DDG library not available for PDF search")
+                return None
+        
+        # Search query: title + filetype:pdf
+        query = f"{title} filetype:pdf"
+        
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=max_results))
+            
+            # Filter to actual PDF URLs
+            for r in results:
+                url = r.get("href", r.get("link", ""))
+                if not url:
+                    continue
+                
+                # Check if URL looks like a PDF
+                url_lower = url.lower()
+                if url_lower.endswith(".pdf"):
+                    logger.debug(f"[PaperResolver] DDG found PDF URL: {url[:80]}...")
+                    return url
+                
+                # Also accept arxiv/openreview URLs (can be converted to PDF)
+                if "arxiv.org/abs/" in url_lower:
+                    # Convert abstract URL to PDF
+                    pdf_url = url.replace("/abs/", "/pdf/") + ".pdf"
+                    logger.debug(f"[PaperResolver] DDG found arXiv, converted to PDF: {pdf_url[:80]}...")
+                    return pdf_url
+                
+                if "openreview.net/forum" in url_lower:
+                    # OpenReview forum pages have PDF links
+                    pdf_url = url.replace("/forum?", "/pdf?")
+                    logger.debug(f"[PaperResolver] DDG found OpenReview, converted to PDF: {pdf_url[:80]}...")
+                    return pdf_url
+            
+            logger.debug(f"[PaperResolver] DDG search found no PDF for: {title[:50]}...")
+            return None
+            
+        except Exception as e:
+            logger.debug(f"[PaperResolver] DDG search error: {e}")
+            return None

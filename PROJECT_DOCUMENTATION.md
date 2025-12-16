@@ -8,9 +8,12 @@
 4. [工具详解](#工具详解)
 5. [RAG 系统](#rag-系统)
 6. [配置与环境](#配置与环境)
-7. [更新历史](#更新历史)
-8. [使用指南](#使用指南)
-9. [开发指南](#开发指南)
+7. [LLM 配置系统](#llm-配置系统-2025-11-30-新增-)
+8. [Rate Limiting & Concurrency](#rate-limiting--concurrency-2025-12-09-新增-)
+9. [Prior Art Check Pipeline 详解](#prior-art-check-pipeline-详解) 🆕
+10. [更新历史](#更新历史)
+11. [使用指南](#使用指南)
+12. [开发指南](#开发指南)
 
 ---
 
@@ -881,9 +884,187 @@ def process_func(item):
 
 ---
 
+## Prior Art Check Pipeline 详解
+
+Prior Art Check 是一个多阶段的学术先行技术检测管道。详细的技术文档参见 `pipelines/tasks/PRIOR_ART_DOCUMENTATION.md`。
+
+### 整体架构
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          run_prior_art_check()                          │
+│                         (Main Orchestrator)                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Block 1: Candidate Discovery (~200 papers)                             │
+│    └─ seed_papers_from_llm() → validate_llm_seeds_via_openalex()        │
+│    └─ generate_search_queries_from_idea() → run_exploration_loop()      │
+│    └─ retrieve_candidates_with_buckets() → 双桶检索 (main + recent)     │
+│    └─ refine_queries_llm() → 层级精炼 (可选)                             │
+│    └─ apply_citation_recency_quota() → 30-60%近期配额                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Facet Extraction                                                       │
+│    └─ decompose_idea_into_facets() → 3-7个技术Facet                     │
+│    └─ extract_idea_features() → datasets/metrics/methods                │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Block 2: Abstract-Level Scoring                                        │
+│    └─ Stage 2a: Lexical Prefilter (simple_relevance_score)              │
+│    └─ Stage 2b: LLM Relevance Filter (llm_relevance_prefilter)          │
+│    └─ Stage 2c: LLM Coverage Scoring (coverage_level 0-3)               │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Block 3: Fulltext Refinement (Top-K papers)                            │
+│    └─ enrich_papers_with_fulltext() → PDF下载+解析                      │
+│    └─ find_evidence_snippets() → BM25证据提取                           │
+│    └─ refine_top_papers_with_fulltext() → 全文精炼评分+role             │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Post-Processing                                                        │
+│    └─ 1.3: build_method_experiment_snippets() → method_exp_snippets.jsonl│
+│    └─ 1.4: select_key_papers_and_dump_intro_rw_full() → key papers      │
+│    └─ 2.1: build_synthesis_input() → synthesis_input.json               │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Report Generation                                                      │
+│    └─ render_prior_art_report() → prior_art_*.md                        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Block 2: Abstract-Level Scoring
+
+Block 2 包含 3 个过滤阶段：
+
+| Stage | 函数                                 | 输入        | 输出             |
+| ----- | ------------------------------------ | ----------- | ---------------- |
+| 2a    | `prefilter_papers_for_llm_scoring()` | ~200 papers | ~80 papers       |
+| 2b    | `llm_relevance_prefilter()`          | ~100 papers | ~60-80 papers    |
+| 2c    | `score_papers_with_abstract_only()`  | ~80 papers  | 评分后的 matches |
+
+**Stage 2a Lexical Scoring**:
+
+- 关键词在标题中: +3.0
+- 关键词在摘要中: +1.0
+- Seed papers 始终保留
+
+**Stage 2b LLM Relevance Filter**:
+
+- Light LLM 判断 `is_relevant: true/false`
+- 过滤掉明显不相关的论文
+
+**Stage 2c LLM 输出**:
+
+```python
+{
+  "coverage_level": 0-3,           # 核心评分
+  "covered_facets": ["F1", "F3"],  # 覆盖的 facet
+  "task_similarity": 0.0-1.0,      # 任务相似度
+  "method_similarity": 0.0-1.0,    # 方法相似度
+}
+```
+
+**打分策略对比**:
+
+| 阶段 | 方法       | 输入                      | 输出            | 速度  |
+| ---- | ---------- | ------------------------- | --------------- | ----- |
+| 2a   | 关键词匹配 | Title + Abstract          | score           | ⚡ 快 |
+| 2b   | Light LLM  | Title + Abstract          | true/false      | 中    |
+| 2c   | Light LLM  | Title + Abstract + Facets | coverage 0-3    | 慢    |
+| 3    | Light LLM  | Abstract + Snippets       | coverage + role | 最慢  |
+
+### Block 3: Fulltext Refinement
+
+对 Top-K 论文进行全文分析：
+
+1. **PDF 下载**: `enrich_papers_with_fulltext()` - 多源解析 (arXiv→S2→OpenAlex→Unpaywall)
+2. **Evidence 提取**: `find_evidence_snippets()` - BM25 搜索 paper.chunks
+3. **全文精炼**: `refine_top_papers_with_fulltext()` - 精炼评分 + role 分配
+
+**Role 定义**:
+| Role | 含义 |
+|------|------|
+| `main_contribution` | 论文主要贡献与 idea 高度重叠 |
+| `key_technique` | 使用类似关键技术 |
+| `background` | 背景参考 |
+| `irrelevant` | 全文分析后判定不相关 |
+
+### 1.4 Key Papers Selection
+
+选择关键论文并导出完整 Intro+RW：
+
+- **3 个桶**: top_cited / latest / survey
+- **每个桶**: 1 primary + 0-2 alternates
+- **总计**: 5-9 篇论文
+- **输出**: 完整的 Introduction + Related Work 章节全文
+
+```
+synthesis/
+├── key_papers_selection.json       # 选择结果
+└── intro_rw_full/{paper_id}.json   # 完整 Intro+RW
+```
+
+### Coverage Levels
+
+| Level | Label        | 含义                       |
+| ----- | ------------ | -------------------------- |
+| 3     | High Overlap | 直接解决相同问题，潜在冲突 |
+| 2     | Partial      | 部分 facet 重叠            |
+| 1     | Adjacent     | 相邻领域                   |
+| 0     | Ignored      | 不相关                     |
+
+### 配置参数 (PriorArtConfig)
+
+```python
+# Block 2
+enable_prefilter: bool = True
+prefilter_max_keep: int = 80
+enable_llm_prefilter: bool = True
+max_workers_llm_scoring: int = 20
+
+# Block 3
+fulltext_top_k: int = 20
+debug_fulltext_top_k: int = 5
+max_workers_pdf: int = 5
+
+# 1.3/1.4
+enable_method_exp_snippets: bool = True
+enable_intro_rw_full: bool = True
+key_paper_top_cited_k: int = 5
+key_paper_latest_k: int = 5
+key_paper_survey_k: int = 5
+```
+
+---
+
 ## 更新历史
 
-### 最新更新（2025-12-09）🆕
+### 最新更新（2025-12-11）🆕
+
+#### PDF 下载鲁棒性增强
+
+**文件**: `prior_art_scoring.py`, `prior_art_synthesis.py`, `prior_art_utils.py`, `paper_resolver.py`
+
+##### ✅ 1. PDF 下载重试逻辑
+
+- 新增自动重试机制：如果 `fulltext_top_k` 篇论文中有下载失败，系统自动尝试后续论文
+- 实现于 `refine_top_papers_with_fulltext()` 函数
+- 验证结果：从 18/20 成功 → 自动重试 → 20/20 (100%)
+
+##### ✅ 2. synthesis_input.json 包含 Abstract
+
+- 每篇论文条目现在始终包含 `abstract` 字段
+- 即使 PDF 下载失败，LLM 仍有上下文可用
+- 实现于 `build_synthesis_input()` 函数
+
+##### ✅ 3. OpenAlex ID 传递增强
+
+- `ensure_pdf_url()` 现在传递 `paper.openalex_id` 给 `PaperResolverTool`
+- 提高 OpenAlex 作为 PDF 源的解析成功率
+
+##### ✅ 4. PDF 解析调试日志
+
+- 在 `resolve_pdf_and_metadata()` 中添加详细日志
+- 显示每个源的尝试顺序：arXiv → Semantic Scholar → OpenAlex → Unpaywall → DDG
+- 便于诊断 PDF 获取失败原因
+
+---
+
+### 更新（2025-12-09）
 
 #### Rate Limiting 重构
 

@@ -562,6 +562,7 @@ def simple_relevance_score(
     paper_abstract: str,
     keywords: List[str],
     strong_cues: Optional[List[str]] = None,
+    enable_survey_penalty: bool = False,
 ) -> float:
     """
     Compute a cheap heuristic relevance score using keyword matches.
@@ -569,8 +570,9 @@ def simple_relevance_score(
     This function must remain domain-agnostic. Do not hard-code 3D vision / NLP / RL
     specific keywords here. Use the `keywords` / `strong_cues` arguments to specialize.
     
-    Applies penalty for generic terms (surveys, tutorials, etc.) to prevent
-    broad overview papers from dominating the results.
+    Args:
+        enable_survey_penalty: If True, apply penalty for survey/review papers.
+                               Default is False (no penalty).
     """
     score = 0.0
     title_norm = paper_title.lower() if paper_title else ""
@@ -593,14 +595,16 @@ def simple_relevance_score(
             score += 1.0
     
     # Penalty for generic terms in title (surveys, reviews, etc.)
-    for stopword in GENERIC_STOPWORDS:
-        if stopword in title_norm:
-            score -= 1.5  # Penalty for generic title
-            break  # Only penalize once
-    
-    # Additional penalty for "survey" or "review" in title
-    if "survey" in title_norm or "review" in title_norm:
-        score -= 2.0
+    # Only apply if enable_survey_penalty is True
+    if enable_survey_penalty:
+        for stopword in GENERIC_STOPWORDS:
+            if stopword in title_norm:
+                score -= 1.5  # Penalty for generic title
+                break  # Only penalize once
+        
+        # Additional penalty for "survey" or "review" in title
+        if "survey" in title_norm or "review" in title_norm:
+            score -= 2.0
             
     return max(0.0, score)  # Don't go below 0
 
@@ -610,38 +614,71 @@ def prefilter_papers_for_llm_scoring(
     keywords: List[str],
     min_keep: int,
     max_keep: int,
+    enable_survey_penalty: bool = False,
+    seed_paper_ids: Optional[Set[str]] = None,
 ) -> List[Tuple[str, Paper]]:
     """
     Stage 1: Apply a lightweight lexical pre-filter using simple_relevance_score.
+    
+    Args:
+        enable_survey_penalty: If True, penalize survey/review papers. Default False.
+        seed_paper_ids: Set of paper IDs that are seed papers (from LLM or web search).
+                        These are automatically kept regardless of lexical score.
+    
+    Improvements:
+    1. Seed papers are always kept (they were pre-validated by LLM/web search)
+    2. All papers with score > 0 are kept (not just top N)
     """
     # Use top k keywords as strong cues default
     strong_cues = keywords[:10] if keywords else []
+    seed_ids = seed_paper_ids or set()
 
-    scored_papers = []
-    for pid, p in papers:
-        s = simple_relevance_score(p.title, p.abstract, keywords, strong_cues=strong_cues)
-        scored_papers.append((s, pid, p))
-        
-    # Sort descending by score
-    scored_papers.sort(key=lambda x: x[0], reverse=True)
+    # Separate seed papers from regular papers
+    seed_papers = []
+    regular_papers = []
     
-    kept = scored_papers[:max_keep]
+    for pid, p in papers:
+        s = simple_relevance_score(
+            p.title, p.abstract, keywords, 
+            strong_cues=strong_cues,
+            enable_survey_penalty=enable_survey_penalty
+        )
+        if pid in seed_ids:
+            seed_papers.append((s, pid, p))
+        else:
+            regular_papers.append((s, pid, p))
+    
+    # Sort regular papers descending by score
+    regular_papers.sort(key=lambda x: x[0], reverse=True)
+    
+    # Strategy: Keep all papers with score > 0, plus all seed papers
+    # This ensures we don't lose potentially relevant papers due to strict threshold
+    positive_score_papers = [x for x in regular_papers if x[0] > 0]
+    
+    # Apply max_keep limit only to non-seed papers if needed
+    if len(positive_score_papers) > max_keep:
+        kept_regular = positive_score_papers[:max_keep]
+    else:
+        kept_regular = positive_score_papers
+    
+    # Combine: always include all seed papers + top regular papers
+    kept = seed_papers + kept_regular
     
     # Log detailed stats
-    if scored_papers:
-        top_score = scored_papers[0][0]
-        # Avoid index error if kept is empty (unlikely given min_keep)
-        lowest_kept_score = kept[-1][0] if kept else 0.0
+    if papers:
+        top_score = max([x[0] for x in seed_papers + regular_papers]) if (seed_papers or regular_papers) else 0.0
+        lowest_kept_score = min([x[0] for x in kept]) if kept else 0.0
         
         logger.info(
-            f"[PreFilter-Lexical] Input: {len(papers)} papers. Kept: {len(kept)}. "
-            f"Score Threshold (lowest kept): {lowest_kept_score:.2f} (Top: {top_score:.2f})"
+            f"[PreFilter-Lexical] Input: {len(papers)} papers. "
+            f"Kept: {len(kept)} (seeds={len(seed_papers)}, regular={len(kept_regular)}). "
+            f"Score range: [{lowest_kept_score:.2f}, {top_score:.2f}]"
         )
         
-        if len(scored_papers) > max_keep:
-            dropped_count = len(scored_papers) - len(kept)
-            best_dropped_score = scored_papers[max_keep][0]
-            logger.info(f"[PreFilter-Lexical] Dropped {dropped_count} papers. Best dropped score: {best_dropped_score:.2f}")
+        dropped_count = len(regular_papers) - len(kept_regular)
+        if dropped_count > 0:
+            zero_score_count = len([x for x in regular_papers if x[0] <= 0])
+            logger.info(f"[PreFilter-Lexical] Dropped {dropped_count} papers ({zero_score_count} had score=0).")
             
     return [(pid, p) for _, pid, p in kept]
 
@@ -683,10 +720,10 @@ def llm_relevance_prefilter(
         prompt = f"""You are an academic research assistant. Quickly determine if this paper might be relevant to the research topic below.
 
 Research Topic: {topic}
-Research Idea: {idea_description[:500]}
+Research Idea: {idea_description}
 
 Paper Title: {paper.title}
-Paper Abstract: {(paper.abstract or "N/A")[:800]}
+Paper Abstract: {paper.abstract or "N/A"}
 
 Is this paper potentially relevant to the research topic/idea above?
 Only output valid JSON, no explanation:
@@ -742,6 +779,7 @@ def score_papers_with_abstract_only(
     idea_description: str = "",
     cfg: Optional[PriorArtConfig] = None,
     stage: str = "initial",
+    seed_paper_ids: Optional[Set[str]] = None,
 ) -> List[PriorArtMatch]:
     """
     Cheap first-stage scoring: use only title/venue/year/citations
@@ -794,6 +832,8 @@ def score_papers_with_abstract_only(
             keywords=keywords,
             min_keep=10,
             max_keep=cfg.prefilter_max_keep,
+            enable_survey_penalty=cfg.enable_survey_penalty,
+            seed_paper_ids=seed_paper_ids,  # Always keep seed papers
         )
     
     # Stage 2: Light LLM true/false relevance filter
@@ -1368,8 +1408,8 @@ def refine_top_papers_with_fulltext(
     model_id, api_base, api_key = get_litellm_config(role="light")
     light_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
 
-    # 1. Sort and select top_k candidates
-    top_candidates = sorted(
+    # 1. Sort ALL candidates by relevance
+    sorted_candidates = sorted(
         matches,
         key=lambda m: (
             m.coverage_level,
@@ -1378,15 +1418,49 @@ def refine_top_papers_with_fulltext(
             state.papers[m.paper_id].citation_count or 0,
         ),
         reverse=True,
-    )[:top_k]
-
-    # 2. Ensure fulltext chunks exist
-    enrich_papers_with_fulltext(
-        state,
-        [m.paper_id for m in top_candidates],
-        max_workers=max_workers,
-        run_mgr=run_mgr,
     )
+    
+    # 2. Retry logic: keep trying papers until we reach top_k successful downloads
+    #    or exhaust all candidates
+    successful_pids = []
+    candidate_idx = 0
+    max_attempts = min(len(sorted_candidates), top_k * 3)  # Don't try more than 3x top_k
+    
+    logger.info(f"[Fulltext] Target: {top_k} papers, available candidates: {len(sorted_candidates)}")
+    
+    while len(successful_pids) < top_k and candidate_idx < max_attempts:
+        # Determine batch size: try to fill remaining slots
+        remaining = top_k - len(successful_pids)
+        batch_end = min(candidate_idx + remaining, len(sorted_candidates))
+        batch = sorted_candidates[candidate_idx:batch_end]
+        
+        if not batch:
+            break
+        
+        batch_pids = [m.paper_id for m in batch]
+        
+        # Try to download this batch
+        enrich_papers_with_fulltext(
+            state,
+            batch_pids,
+            max_workers=max_workers,
+            run_mgr=run_mgr,
+        )
+        
+        # Check which papers succeeded (have chunks or has_fulltext)
+        for pid in batch_pids:
+            paper = state.papers.get(pid)
+            if paper and (paper.chunks or getattr(paper, 'has_fulltext', False)):
+                successful_pids.append(pid)
+        
+        candidate_idx = batch_end
+        
+        logger.info(f"[Fulltext] Progress: {len(successful_pids)}/{top_k} successfully enriched")
+    
+    # Build top_candidates from successful papers
+    top_candidates = [m for m in sorted_candidates if m.paper_id in successful_pids][:top_k]
+    
+    logger.info(f"[Fulltext] Final: {len(top_candidates)} papers with fulltext out of target {top_k}")
 
     # 3. Build evidence keyword set using LLM (domain-agnostic)
     evidence_kw_from_llm = generate_evidence_keywords_from_idea(

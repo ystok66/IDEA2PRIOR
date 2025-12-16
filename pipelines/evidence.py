@@ -113,6 +113,214 @@ FACET_PATTERNS = {
 }
 
 
+# ========== Dynamic Facet Pattern Generation (LLM-based) ==========
+
+def generate_facet_patterns_from_idea(
+    idea_description: str,
+    max_facets: int = 6,
+    max_patterns_per_facet: int = 10,
+) -> Dict[str, List[str]]:
+    """
+    Use expert LLM to dynamically generate facet patterns from the idea.
+    
+    This replaces hardcoded FACET_PATTERNS with idea-specific patterns.
+    
+    Args:
+        idea_description: The research idea
+        max_facets: Maximum number of facets to generate
+        max_patterns_per_facet: Maximum patterns per facet
+        
+    Returns:
+        Dict mapping facet_id to list of lexical patterns
+    """
+    import json
+    from smolagents import LiteLLMModel
+    from pipelines.llm_config import get_litellm_config
+    from pipelines.tasks.prior_art_llm_utils import (
+        extract_text_from_llm_response, 
+        repair_json_output,
+    )
+    
+    model_id, api_base, api_key = get_litellm_config(role="expert")
+    expert_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
+    
+    # Step 1: Generate facets from idea
+    facets = _generate_facets_from_idea(
+        idea_description=idea_description,
+        expert_model=expert_model,
+        max_facets=max_facets,
+    )
+    
+    if not facets:
+        logger.warning("[Evidence] Failed to generate facets, using empty patterns")
+        return {}
+    
+    logger.info(f"[Evidence] Generated {len(facets)} facets from idea:")
+    for f in facets:
+        logger.info(f"  - {f['id']}: {f['name']}")
+    
+    # Step 2: Generate patterns for each facet
+    facet_patterns = _generate_patterns_for_facets(
+        idea_description=idea_description,
+        facets=facets,
+        expert_model=expert_model,
+        max_patterns_per_facet=max_patterns_per_facet,
+    )
+    
+    return facet_patterns
+
+
+def _generate_facets_from_idea(
+    idea_description: str,
+    expert_model,
+    max_facets: int = 6,
+) -> List[Dict[str, str]]:
+    """
+    Step 1: Generate facet definitions from the idea.
+    """
+    import json
+    from pipelines.tasks.prior_art_llm_utils import (
+        extract_text_from_llm_response, 
+        repair_json_output,
+    )
+    
+    prompt = f"""You are an expert researcher.
+
+Given the following research idea:
+
+\"\"\"{idea_description}\"\"\"
+
+1. Identify the main technical facets (sub-aspects) needed to understand
+   and evaluate this idea. For example, if the idea describes a new training
+   method, facets might include "base model architecture", "training objective",
+   "data augmentation", "optimization algorithm", etc.
+2. Each facet should be short (a few words) and technical.
+3. Facets should be distinct from each other.
+
+Output format:
+Return ONLY a JSON object:
+
+{{
+  "facets": [
+    {{
+      "id": "F1",
+      "name": "...",
+      "description": "1-2 sentence explanation"
+    }},
+    ...
+  ]
+}}
+
+Constraints:
+- At most {max_facets} facets.
+- Do NOT include any extra commentary outside the JSON.
+"""
+    
+    messages = [{"role": "user", "content": prompt}]
+    resp = expert_model(messages)
+    text = extract_text_from_llm_response(resp)
+    
+    try:
+        data = json.loads(text)
+        return data.get("facets", [])
+    except Exception:
+        try:
+            repaired = repair_json_output(text)
+            data = json.loads(repaired)
+            return data.get("facets", [])
+        except Exception:
+            logger.warning("[Evidence] Failed to parse facet generation JSON")
+            return []
+
+
+def _generate_patterns_for_facets(
+    idea_description: str,
+    facets: List[Dict[str, str]],
+    expert_model,
+    max_patterns_per_facet: int = 10,
+) -> Dict[str, List[str]]:
+    """
+    Step 2: Generate lexical patterns for each facet.
+    """
+    import json
+    from pipelines.tasks.prior_art_llm_utils import (
+        extract_text_from_llm_response, 
+        repair_json_output,
+    )
+    
+    facets_str = json.dumps(facets, ensure_ascii=False, indent=2)
+    
+    prompt = f"""You are helping to design lexical patterns for detecting evidence sentences
+in research papers related to the following idea:
+
+\"\"\"{idea_description}\"\"\"
+
+You are given a list of facets in JSON:
+
+```json
+{facets_str}
+```
+
+For each facet, you must propose a list of lexical patterns (short phrases)
+that are likely to appear in sentences that provide evidence for that facet.
+
+Guidelines:
+- Patterns should be in English.
+- Patterns should be short phrases that can be matched by substring search.
+- Include both:
+  - specific phrases directly from the facet name/description,
+  - and a few variants or synonyms.
+- Avoid extremely generic words alone (e.g., just "model" or "data").
+- Patterns should be directly grounded in the facet name and description.
+
+Output format:
+Return ONLY a JSON object:
+
+{{
+  "facet_patterns": [
+    {{
+      "facet_id": "F1",
+      "patterns": ["...", "...", ...]
+    }},
+    ...
+  ]
+}}
+
+Constraints:
+- For each facet, at most {max_patterns_per_facet} patterns.
+- Do NOT include any extra commentary outside the JSON.
+"""
+    
+    messages = [{"role": "user", "content": prompt}]
+    resp = expert_model(messages)
+    text = extract_text_from_llm_response(resp)
+    
+    try:
+        data = json.loads(text)
+        facet_patterns_list = data.get("facet_patterns", [])
+    except Exception:
+        try:
+            repaired = repair_json_output(text)
+            data = json.loads(repaired)
+            facet_patterns_list = data.get("facet_patterns", [])
+        except Exception:
+            logger.warning("[Evidence] Failed to parse pattern generation JSON")
+            return {}
+    
+    # Convert to dict format
+    result: Dict[str, List[str]] = {}
+    for fp in facet_patterns_list:
+        fid = fp.get("facet_id", "")
+        patterns = [p.strip().lower() for p in fp.get("patterns", []) if p.strip()]
+        if fid and patterns:
+            result[fid] = patterns
+    
+    logger.info(f"[Evidence] Generated patterns for {len(result)} facets")
+    for fid, plist in result.items():
+        logger.info(f"  - {fid}: {len(plist)} patterns")
+    
+    return result
+
 @dataclass
 class EvidenceSpan:
     """
@@ -134,6 +342,10 @@ class EvidenceSpan:
 def collect_facet_evidence(
     paper_records: List[PaperRecord],
     facet_patterns: Dict[str, List[str]] = None,
+    idea_keywords: Optional[List[str]] = None,
+    use_bm25: bool = False,
+    bm25_top_k: int = 3,
+    min_evidence_for_bm25: int = 2,
 ) -> List[EvidenceSpan]:
     """
     Collect all facet evidence from a list of PaperRecords.
@@ -144,6 +356,10 @@ def collect_facet_evidence(
     Args:
         paper_records: List of PaperRecords to analyze
         facet_patterns: Optional custom facet patterns (defaults to FACET_PATTERNS)
+        idea_keywords: Optional list of dynamic keywords from LLM (used for __idea_global__ evidence)
+        use_bm25: If True, use BM25 to backfill papers with insufficient evidence
+        bm25_top_k: Number of top sentences to extract via BM25 per paper
+        min_evidence_for_bm25: Minimum evidence threshold; BM25 only applied if below this
         
     Returns:
         List of EvidenceSpan objects
@@ -153,14 +369,22 @@ def collect_facet_evidence(
     
     evidence: List[EvidenceSpan] = []
     
+    # Track evidence per paper for BM25 backfill decision
+    evidence_by_paper: Dict[str, List[EvidenceSpan]] = {}
+    
     for record in paper_records:
         paper_id = record.paper_id
+        evidence_by_paper[paper_id] = []
+        
+        # =========================================================
+        # Step 1: Facet-specific pattern matching (original logic)
+        # =========================================================
         
         # Check title (high strength)
         title_lower = record.title.lower()
         for facet_label, patterns in facet_patterns.items():
             if any(p in title_lower for p in patterns):
-                evidence.append(EvidenceSpan(
+                span = EvidenceSpan(
                     paper_id=paper_id,
                     facet_label=facet_label,
                     section_role="other",
@@ -168,7 +392,9 @@ def collect_facet_evidence(
                     role="own_method",  # Title usually describes own contribution
                     strength=0.9,
                     source="title",
-                ))
+                )
+                evidence.append(span)
+                evidence_by_paper[paper_id].append(span)
         
         # Check abstract
         if record.abstract:
@@ -184,7 +410,7 @@ def collect_facet_evidence(
                     if any(p in sent_lower for p in patterns):
                         # Strength based on sentence role
                         strength = 0.8 if sent_role == "own_method" else 0.5
-                        evidence.append(EvidenceSpan(
+                        span = EvidenceSpan(
                             paper_id=paper_id,
                             facet_label=facet_label,
                             section_role="abstract",
@@ -192,7 +418,9 @@ def collect_facet_evidence(
                             role=sent_role,
                             strength=strength,
                             source="abstract",
-                        ))
+                        )
+                        evidence.append(span)
+                        evidence_by_paper[paper_id].append(span)
         
         # Check sections
         for section in record.sections:
@@ -212,7 +440,7 @@ def collect_facet_evidence(
                         else:
                             strength = 0.5
                         
-                        evidence.append(EvidenceSpan(
+                        span = EvidenceSpan(
                             paper_id=paper_id,
                             facet_label=facet_label,
                             section_role=section.role,
@@ -220,10 +448,168 @@ def collect_facet_evidence(
                             role=sent_role,
                             strength=strength,
                             source="section",
-                        ))
+                        )
+                        evidence.append(span)
+                        evidence_by_paper[paper_id].append(span)
+        
+        # =========================================================
+        # Step 2: idea_keywords matching (__idea_global__ facet)
+        # =========================================================
+        if idea_keywords:
+            idea_kw_lower = [kw.lower() for kw in idea_keywords]
+            
+            # Check title against idea_keywords
+            for kw in idea_kw_lower:
+                if kw in title_lower and len(kw) >= 4:  # Skip very short keywords
+                    span = EvidenceSpan(
+                        paper_id=paper_id,
+                        facet_label="__idea_global__",
+                        section_role="other",
+                        sentence=record.title,
+                        role="own_method",
+                        strength=0.7,
+                        source="title",
+                    )
+                    evidence.append(span)
+                    evidence_by_paper[paper_id].append(span)
+                    break  # One match per title is enough
+            
+            # Check abstract against idea_keywords
+            if record.abstract:
+                for sent in abstract_sentences:
+                    sent_lower = sent.lower()
+                    matched_kw_count = sum(1 for kw in idea_kw_lower if kw in sent_lower and len(kw) >= 4)
+                    if matched_kw_count >= 2:  # Need at least 2 keyword matches
+                        sent_role = infer_sentence_role(sent, "intro")
+                        span = EvidenceSpan(
+                            paper_id=paper_id,
+                            facet_label="__idea_global__",
+                            section_role="abstract",
+                            sentence=sent,
+                            role=sent_role,
+                            strength=0.5 + 0.1 * min(matched_kw_count, 5),  # Scale by match count
+                            source="abstract",
+                        )
+                        evidence.append(span)
+                        evidence_by_paper[paper_id].append(span)
+            
+            # Check sections against idea_keywords (intro/method only for efficiency)
+            for section in record.sections:
+                if section.role not in {"intro", "method", "related_work"}:
+                    continue
+                for sent in section.sentences:
+                    sent_lower = sent.lower()
+                    matched_kw_count = sum(1 for kw in idea_kw_lower if kw in sent_lower and len(kw) >= 4)
+                    if matched_kw_count >= 2:
+                        sent_role = infer_sentence_role(sent, section.role)
+                        strength = 0.5 + 0.1 * min(matched_kw_count, 5)
+                        if section.role == "method" and sent_role == "own_method":
+                            strength = min(1.0, strength + 0.2)
+                        
+                        span = EvidenceSpan(
+                            paper_id=paper_id,
+                            facet_label="__idea_global__",
+                            section_role=section.role,
+                            sentence=sent,
+                            role=sent_role,
+                            strength=strength,
+                            source="section",
+                        )
+                        evidence.append(span)
+                        evidence_by_paper[paper_id].append(span)
+    
+    # =========================================================
+    # Step 3: BM25 backfill for papers with insufficient evidence
+    # =========================================================
+    if use_bm25 and idea_keywords:
+        bm25_evidence = _collect_bm25_backfill(
+            paper_records=paper_records,
+            evidence_by_paper=evidence_by_paper,
+            idea_keywords=idea_keywords,
+            bm25_top_k=bm25_top_k,
+            min_evidence_threshold=min_evidence_for_bm25,
+        )
+        evidence.extend(bm25_evidence)
     
     logger.debug(f"[Evidence] Collected {len(evidence)} evidence spans from {len(paper_records)} papers")
     return evidence
+
+
+def _collect_bm25_backfill(
+    paper_records: List[PaperRecord],
+    evidence_by_paper: Dict[str, List[EvidenceSpan]],
+    idea_keywords: List[str],
+    bm25_top_k: int = 3,
+    min_evidence_threshold: int = 2,
+) -> List[EvidenceSpan]:
+    """
+    Use BM25 to find additional evidence for papers with insufficient evidence.
+    
+    Only papers with fewer than `min_evidence_threshold` evidence spans will be processed.
+    This is a "backfill" strategy - BM25 supplements pattern matching, not replaces it.
+    """
+    try:
+        from rank_bm25 import BM25Okapi
+    except ImportError:
+        logger.warning("[Evidence] rank_bm25 not installed, skipping BM25 backfill")
+        return []
+    
+    bm25_evidence: List[EvidenceSpan] = []
+    query_tokens = " ".join(idea_keywords).lower().split()
+    
+    for record in paper_records:
+        paper_id = record.paper_id
+        existing_count = len(evidence_by_paper.get(paper_id, []))
+        
+        # Only backfill if evidence is below threshold
+        if existing_count >= min_evidence_threshold:
+            continue
+        
+        # Collect all sentences from this paper
+        all_sentences: List[Tuple[str, str, str]] = []  # (text, section_role, source)
+        
+        if record.abstract:
+            for sent in record.abstract.split(". "):
+                sent = sent.strip()
+                if len(sent) > 30:
+                    all_sentences.append((sent, "abstract", "abstract"))
+        
+        for section in record.sections:
+            if section.role in {"intro", "method", "related_work", "experiment"}:
+                for sent in section.sentences:
+                    if len(sent) > 30:
+                        all_sentences.append((sent, section.role, "section"))
+        
+        if not all_sentences:
+            continue
+        
+        # Build BM25 index for this paper's sentences
+        tokenized = [s[0].lower().split() for s in all_sentences]
+        bm25 = BM25Okapi(tokenized)
+        scores = bm25.get_scores(query_tokens)
+        
+        # Get top-K sentences
+        scored = sorted(zip(all_sentences, scores), key=lambda x: x[1], reverse=True)
+        
+        for (sent_text, section_role, source), score in scored[:bm25_top_k]:
+            if score <= 0:
+                break
+            
+            sent_role = infer_sentence_role(sent_text, section_role)
+            bm25_evidence.append(EvidenceSpan(
+                paper_id=paper_id,
+                facet_label="__bm25_backfill__",
+                section_role=section_role,
+                sentence=sent_text[:500],  # Truncate long sentences
+                role=sent_role,
+                strength=min(0.7, 0.3 + score * 0.1),  # Scale BM25 score to strength
+                source=source,
+            ))
+    
+    logger.debug(f"[Evidence] BM25 backfill added {len(bm25_evidence)} spans for papers with low evidence")
+    return bm25_evidence
+
+
 
 
 # ========== Unified Facet Coverage ==========
