@@ -6,16 +6,49 @@ from pathlib import Path
 
 from loguru import logger
 
-from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
-from mineru.data.data_reader_writer import FileBasedDataWriter
-from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
-from mineru.utils.enum_class import MakeMode
-from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
-from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
-from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
-from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
-from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
-from mineru.utils.models_download_utils import auto_download_and_get_model_root_path
+# Make mineru imports optional and granular
+MINERU_AVAILABLE = False
+PIPELINE_BACKEND_AVAILABLE = False
+VLM_BACKEND_AVAILABLE = False
+
+# Try to import core mineru functionality
+try:
+    from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
+    from mineru.data.data_reader_writer import FileBasedDataWriter
+    from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
+    from mineru.utils.enum_class import MakeMode
+    from mineru.utils.models_download_utils import auto_download_and_get_model_root_path
+    MINERU_AVAILABLE = True
+    logger.info("✅ Core mineru modules imported successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Core mineru modules not available: {e}")
+    MINERU_AVAILABLE = False
+
+# Try to import pipeline backend (may fail if doclayout_yolo is not installed)
+if MINERU_AVAILABLE:
+    try:
+        from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
+        from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
+        from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
+        PIPELINE_BACKEND_AVAILABLE = True
+        logger.info("✅ Pipeline backend imported successfully")
+    except ImportError as e:
+        logger.warning(f"⚠️ Pipeline backend not available (may need doclayout_yolo): {e}")
+        PIPELINE_BACKEND_AVAILABLE = False
+
+# Try to import VLM backend
+if MINERU_AVAILABLE:
+    try:
+        from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
+        from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
+        VLM_BACKEND_AVAILABLE = True
+        logger.info("✅ VLM backend imported successfully")
+    except ImportError as e:
+        logger.warning(f"⚠️ VLM backend not available: {e}")
+        VLM_BACKEND_AVAILABLE = False
+
+if not MINERU_AVAILABLE:
+    logger.warning("⚠️ mineru module not available. PDF extraction with mineru will be disabled.")
 
 
 def do_parse(
@@ -35,12 +68,29 @@ def do_parse(
     f_dump_model_output=True,  # Whether to dump model output files
     f_dump_orig_pdf=True,  # Whether to dump original PDF files
     f_dump_content_list=True,  # Whether to dump content list files
-    f_make_md_mode=MakeMode.MM_MD,  # The mode for making markdown content, default is MM_MD
+    f_make_md_mode=None,  # The mode for making markdown content, default is MM_MD
     start_page_id=0,  # Start page ID for parsing, default is 0
     end_page_id=None,  # End page ID for parsing, default is None (parse all pages until the end of the document)
 ):
+    if not MINERU_AVAILABLE:
+        raise ImportError("mineru module is not available. Please install it to use PDF parsing with mineru.")
+    
+    if f_make_md_mode is None:
+        f_make_md_mode = MakeMode.MM_MD
 
     if backend == "pipeline":
+        if not PIPELINE_BACKEND_AVAILABLE:
+            available_backends = []
+            if PIPELINE_BACKEND_AVAILABLE:
+                available_backends.append("pipeline")
+            if VLM_BACKEND_AVAILABLE:
+                available_backends.extend(["vlm-transformers", "vlm-sglang-engine", "vlm-sglang-client"])
+            error_msg = (
+                f"Pipeline backend is not available (likely missing 'doclayout_yolo' dependency). "
+                f"Available backends: {available_backends if available_backends else 'none'}. "
+                f"To install pipeline backend dependencies, try: pip install doclayout-yolo"
+            )
+            raise ImportError(error_msg)
         for idx, pdf_bytes in enumerate(pdf_bytes_list):
             new_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(pdf_bytes, start_page_id, end_page_id)
             pdf_bytes_list[idx] = new_pdf_bytes
@@ -105,6 +155,17 @@ def do_parse(
             logger.info(f"local output dir is {local_md_dir}")
     else:
         if backend.startswith("vlm-"):
+            if not VLM_BACKEND_AVAILABLE:
+                available_backends = []
+                if PIPELINE_BACKEND_AVAILABLE:
+                    available_backends.append("pipeline")
+                if VLM_BACKEND_AVAILABLE:
+                    available_backends.extend(["vlm-transformers", "vlm-sglang-engine", "vlm-sglang-client"])
+                error_msg = (
+                    f"VLM backend is not available. "
+                    f"Available backends: {available_backends if available_backends else 'none'}"
+                )
+                raise ImportError(error_msg)
             backend = backend[4:]
 
         f_draw_span_bbox = False

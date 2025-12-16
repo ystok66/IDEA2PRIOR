@@ -28,8 +28,10 @@ from pipelines.clients import SemanticScholarClient
 from tools.openalex_search import OpenAlexWorksSearchTool
 from tools.paper_resolver import PaperResolverTool
 from tools.pdf_parser import PdfParserTool
+from tools.opposition_generator import generate_opposition_standalone
 import requests
 import os
+from pathlib import Path
 from smolagents import LiteLLMModel
 from pipelines.llm_config import get_litellm_config
 
@@ -1131,8 +1133,17 @@ def enrich_papers_with_fulltext(state: PipelineState, paper_ids: List[str]) -> N
     """
     resolver = PaperResolverTool()
     parser = PdfParserTool()
-    pdf_cache_dir = os.path.join(os.getcwd(), "pdf_cache")
-    os.makedirs(pdf_cache_dir, exist_ok=True)
+    
+    # Setup session for PDF downloads with better headers
+    download_session = requests.Session()
+    download_session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/pdf,application/octet-stream,*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+    })
+    
+    pdf_cache_dir = Path(os.path.join(os.getcwd(), "pdf_cache"))
+    pdf_cache_dir.mkdir(parents=True, exist_ok=True)
 
     for pid in paper_ids:
         paper = state.papers.get(pid)
@@ -1162,22 +1173,57 @@ def enrich_papers_with_fulltext(state: PipelineState, paper_ids: List[str]) -> N
             logger.warning(f"[Fulltext] No PDF URL found for paper: {paper.title[:50]}")
             continue
 
-        # Download PDF to local cache
-        local_filename = f"{paper.doi.replace('/', '_') if paper.doi else paper.openalex_id}.pdf"
-        local_pdf_path = os.path.join(pdf_cache_dir, local_filename)
+        # Download PDF to local cache with improved error handling
+        local_filename = f"{paper.doi.replace('/', '_') if paper.doi else (paper.openalex_id.split('/')[-1] if paper.openalex_id else 'unknown')}.pdf"
+        local_pdf_path = pdf_cache_dir / local_filename
         
-        if not os.path.exists(local_pdf_path):
-            try:
-                logger.info(f"Downloading PDF from {paper.pdf_url}...")
-                response = requests.get(paper.pdf_url, timeout=30)
-                response.raise_for_status()
-                with open(local_pdf_path, "wb") as f:
-                    f.write(response.content)
-            except Exception as e:
-                logger.warning(f"[Fulltext] Failed to download PDF for paper: {paper.title[:50]} - {e}")
+        if not local_pdf_path.exists():
+            # Collect potential PDF URLs in priority order
+            pdf_urls = []
+            if paper.arxiv_id:
+                pdf_urls.append(f"https://arxiv.org/pdf/{paper.arxiv_id}.pdf")
+            if paper.pdf_url and 'arxiv.org' not in paper.pdf_url:
+                pdf_urls.append(paper.pdf_url)
+            if paper.doi and not any('arxiv.org' in url for url in pdf_urls):
+                pdf_urls.append(f"https://doi.org/{paper.doi}")
+            
+            if not pdf_urls:
+                logger.warning(f"[Fulltext] No PDF URL available for paper: {paper.title[:50]}")
+                continue
+            
+            # Try downloading from each URL
+            download_success = False
+            for url in pdf_urls:
+                try:
+                    logger.info(f"[Fulltext] Downloading from: {url}")
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    headers = {'Referer': f"{parsed.scheme}://{parsed.netloc}/"}
+                    
+                    response = download_session.get(url, headers=headers, timeout=30, stream=True)
+                    response.raise_for_status()
+                    
+                    with open(local_pdf_path, "wb") as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                    
+                    # Verify it's a PDF
+                    with open(local_pdf_path, "rb") as f:
+                        if f.read(4) == b'%PDF':
+                            download_success = True
+                            break
+                        else:
+                            local_pdf_path.unlink()
+                except Exception as e:
+                    logger.debug(f"[Fulltext] Failed to download from {url}: {e}")
+                    continue
+            
+            if not download_success:
+                logger.warning(f"[Fulltext] Failed to download PDF for paper: {paper.title[:50]}")
                 continue
         
-        paper.local_pdf_path = local_pdf_path
+        paper.local_pdf_path = str(local_pdf_path)
 
         # Parse the PDF into chunks
         try:
@@ -1757,6 +1803,43 @@ def _clean_note_for_report(note: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _generate_opposition_for_paper(paper: Paper, topic: str, agent) -> Optional[str]:
+    """
+    Generate opposition analysis for a paper and return as JSON string.
+    
+    Args:
+        paper: Paper object
+        topic: Research topic for context
+        agent: Agent instance (can be None)
+        
+    Returns:
+        JSON string with opposition analysis, or None if generation fails
+    """
+    if agent is None:
+        return None
+    
+    try:
+        # Prepare content for opposition generation
+        content_parts = [paper.title]
+        if paper.abstract:
+            content_parts.append(paper.abstract)
+        content = "\n".join(content_parts)
+        
+        # Generate opposition (brief, max 800 tokens)
+        opposition = generate_opposition_standalone(
+            content=content,
+            context=topic,
+            focus_areas="methodology, assumptions, evidence, limitations",
+            max_tokens=800  # Keep analysis brief
+        )
+        
+        # Return markdown directly (not JSON)
+        return opposition
+    except Exception as e:
+        logger.warning(f"Failed to generate opposition for paper '{paper.title}': {e}")
+        return None
+
+
 def render_prior_art_report(
     idea_description: str,
     facets: List[str],
@@ -1764,11 +1847,21 @@ def render_prior_art_report(
     state: PipelineState,
     idea_features: Dict[str, Set[str]],
     idea_high_level_facets: Dict[str, Set[str]],
+    agent=None,
 ) -> str:
     """
     Render a structured Markdown report for the prior-art check.
 
     This function is pure: it only reads from the inputs and returns a string.
+    
+    Args:
+        idea_description: Description of the idea being checked
+        facets: List of technical facets
+        scored_papers: List of scored paper matches
+        state: PipelineState with papers and metadata
+        idea_features: Extracted idea features
+        idea_high_level_facets: High-level facets
+        agent: Optional agent instance for opposition generation
     """
     lines = []
     
@@ -1817,6 +1910,19 @@ def render_prior_art_report(
                 for s in snippets:
                     lines.append(f"- {s}")
             
+            # Opposition Analysis
+            opposition = _generate_opposition_for_paper(paper, state.intent.topic, agent)
+            if opposition:
+                lines.append("")
+                lines.append("**Opposition Analysis:**")
+                lines.append("")
+                # Add the opposition analysis as markdown
+                for line in opposition.split('\n'):
+                    if line.strip():
+                        lines.append(f"  {line}")
+                    else:
+                        lines.append("")
+            
             lines.append("")
     else:
         lines.append("- None found.")
@@ -1838,6 +1944,20 @@ def render_prior_art_report(
             if match.structural_score > 0:
                 lines.append(f"- **Structural Overlap**: {', '.join(match.structural_overlap)}")
             lines.append(f"- **Notes**: {_clean_note_for_report(match.notes)}")
+            
+            # Opposition Analysis
+            opposition = _generate_opposition_for_paper(paper, state.intent.topic, agent)
+            if opposition:
+                lines.append("")
+                lines.append("**Opposition Analysis:**")
+                lines.append("")
+                # Add the opposition analysis as markdown
+                for line in opposition.split('\n'):
+                    if line.strip():
+                        lines.append(f"  {line}")
+                    else:
+                        lines.append("")
+            
             lines.append("")
     else:
         lines.append("- None found.")
@@ -1854,6 +1974,18 @@ def render_prior_art_report(
             paper = state.papers[match.paper_id]
             lines.append(f"- **{paper.title}** ({paper.venue or 'Unknown'}, {paper.year or 'Unknown'})")
             lines.append(f"  - {_clean_note_for_report(match.notes)}")
+            
+            # Opposition Analysis (compact format for adjacent work)
+            opposition = _generate_opposition_for_paper(paper, state.intent.topic, agent)
+            if opposition:
+                lines.append(f"  - **Opposition Analysis:**")
+                lines.append("")
+                # Add the opposition analysis as markdown with proper indentation
+                for line in opposition.split('\n'):
+                    if line.strip():
+                        lines.append(f"    {line}")
+                    else:
+                        lines.append("")
     else:
         lines.append("- None found.")
     lines.append("")
@@ -2001,5 +2133,6 @@ def run_prior_art_check(
         state=state,
         idea_features=idea_features,
         idea_high_level_facets=idea_high_level_facets,
+        agent=agent,
     )
     return report
