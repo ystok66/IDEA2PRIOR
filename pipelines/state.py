@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Literal
 from pydantic import BaseModel
 
 
@@ -57,6 +57,22 @@ class Paper(BaseModel):
     pdf_url: Optional[str] = None
     local_pdf_path: Optional[str] = None
     gemini_file_uri: Optional[str] = None  # for Gemini File API
+    pdf_resolve_failed: bool = False  # True if PDF URL resolution already attempted and failed
+    has_fulltext: bool = False  # True if fulltext was successfully parsed (PDF sections available)
+    
+    # Granular status tracking for PDF pipeline (Phase 2 addition)
+    # - "not_attempted": Default, PDF download not yet tried
+    # - "downloaded": PDF successfully downloaded  
+    # - "not_found": PDF URL resolution returned no URL
+    # - "error": Download or resolution failed due to network/other error
+    pdf_status: Literal["not_attempted", "downloaded", "not_found", "error"] = "not_attempted"
+    # - "not_attempted": Default, sections parsing not yet tried
+    # - "parsed": Sections successfully extracted from PDF
+    # - "parse_error": PDF downloaded but section parsing failed
+    section_status: Literal["not_attempted", "parsed", "parse_error"] = "not_attempted"
+    
+    # Retrieval metadata
+    retrieval_source: Optional[str] = None  # e.g., "block1_main_q0", "citation_graph"
     
     # Content
     chunks: List[Chunk] = []

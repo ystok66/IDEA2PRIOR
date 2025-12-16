@@ -24,7 +24,7 @@ def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     return v_strip
 
 def load_llm_config(role: str) -> LLMConfig:
-    assert role in ("heavy", "light")
+    assert role in ("heavy", "light", "expert")
     prefix = f"LLM_{role.upper()}"
 
     # 1. Determine Provider and Model

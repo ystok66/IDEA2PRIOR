@@ -8,11 +8,13 @@ using web search and content reading tools, bypassing the local database.
 import os
 import sys
 import argparse
+import warnings
 from typing import Optional
-from pathlib import Path
-from datetime import datetime
 from dotenv import load_dotenv
 from loguru import logger
+
+# Suppress Pydantic serialization warnings from smolagents/litellm
+warnings.filterwarnings("ignore", message=".*PydanticSerializationUnexpectedValue.*")
 
 # Fix Windows encoding issue for Chinese characters
 if sys.platform.startswith('win'):
@@ -24,67 +26,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from smolagents import CodeAgent, LiteLLMModel
 
 from pipelines.llm_config import get_litellm_config
-
-def check_requirements() -> bool:
-    """
-    Check if all required imports and dependencies are working correctly.
-    
-    Returns:
-        bool: True if all checks pass, False otherwise
-    """
-    print('=== Checking Opposition Generator Requirements ===\n')
-    
-    all_ok = True
-    
-    # 1. Check imports
-    try:
-        from tools.opposition_generator import OppositionGeneratorTool, generate_opposition_standalone
-        print('✅ Tool imports: OK')
-    except Exception as e:
-        print(f'❌ Tool imports: FAILED - {e}')
-        all_ok = False
-    
-    # 2. Check LLM config
-    try:
-        model_id, api_base, api_key = get_litellm_config('heavy')
-        print(f'✅ LLM config: OK (model={model_id})')
-    except Exception as e:
-        print(f'❌ LLM config: FAILED - {e}')
-        all_ok = False
-    
-    # 3. Check tool instantiation
-    tool = None
-    try:
-        tool = OppositionGeneratorTool()
-        print(f'✅ Tool instantiation: OK (name={tool.name})')
-    except Exception as e:
-        print(f'❌ Tool instantiation: FAILED - {e}')
-        all_ok = False
-    
-    # 4. Check tool inputs (only if tool was successfully instantiated)
-    if tool is not None:
-        try:
-            required_inputs = ['content', 'context', 'focus_areas']
-            for inp in required_inputs:
-                if inp in tool.inputs:
-                    print(f'✅ Input "{inp}": OK')
-                else:
-                    print(f'❌ Input "{inp}": MISSING')
-                    all_ok = False
-        except Exception as e:
-            print(f'❌ Input check: FAILED - {e}')
-            all_ok = False
-    
-    # 5. Check history directory exists
-    if os.path.exists('history'):
-        history_files = [f for f in os.listdir('history') if os.path.isdir(os.path.join('history', f))]
-        print(f'✅ History directory: OK ({len(history_files)} timestamp directories)')
-    else:
-        print('⚠️  History directory: MISSING (will be created automatically)')
-    
-    print('\n=== Requirements Check Complete ===\n')
-    
-    return all_ok
 
 def setup_environment() -> None:
     """Load environment variables from .env file."""
@@ -99,7 +40,6 @@ def create_minimal_agent(
     """Create a minimal CodeAgent for pipeline-driven tasks (no heavy web tools)."""
     from tools.openalex_search import OpenAlexWorksSearchTool
     from tools.semantic_scholar_search import SemanticScholarPaperDetailTool, SemanticScholarCitationTool
-    from tools.opposition_generator import OppositionGeneratorTool
     from tools.code_executor import AUTHORIZED_IMPORTS
     
     model = LiteLLMModel(
@@ -112,11 +52,10 @@ def create_minimal_agent(
     openalex_tool = OpenAlexWorksSearchTool()
     s2_detail_tool = SemanticScholarPaperDetailTool()
     s2_citation_tool = SemanticScholarCitationTool()
-    opposition_tool = OppositionGeneratorTool()
     
     
     agent = CodeAgent(
-        tools=[openalex_tool, s2_detail_tool, s2_citation_tool, opposition_tool],
+        tools=[openalex_tool, s2_detail_tool, s2_citation_tool],
         model=model,
         additional_authorized_imports=AUTHORIZED_IMPORTS
     )
@@ -135,7 +74,6 @@ def create_research_agent(
     from tools.openalex_search import OpenAlexWorksSearchTool
     from tools.semantic_scholar_search import SemanticScholarPaperDetailTool, SemanticScholarCitationTool
     from tools.google_file_search import GoogleFileSearchTool
-    from tools.opposition_generator import OppositionGeneratorTool
     from tools.code_executor import AUTHORIZED_IMPORTS
     
     model = LiteLLMModel(
@@ -168,7 +106,6 @@ def create_research_agent(
     s2_detail_tool = SemanticScholarPaperDetailTool()
     s2_citation_tool = SemanticScholarCitationTool()
     google_file_tool = GoogleFileSearchTool()
-    opposition_tool = OppositionGeneratorTool()
     
     
     agent = CodeAgent(
@@ -178,70 +115,13 @@ def create_research_agent(
             openalex_tool, 
             s2_detail_tool, 
             s2_citation_tool,
-            google_file_tool,
-            opposition_tool
+            google_file_tool
         ],
         model=model,
         additional_authorized_imports=AUTHORIZED_IMPORTS
     )
     
     return agent
-
-def save_report_to_history(task_type: str, topic: str, report: str, args, idea: Optional[str] = None):
-    """
-    Save generated report to history directory with new filename format
-    
-    Args:
-        task_type: Type of task (benchmark_landscape, prior_art_check, research_agent)
-        topic: Research topic (search topic)
-        report: Generated report content
-        args: Command line arguments
-        idea: Optional idea description (for prior_art_check)
-    """
-    try:
-        # Create history directory if it doesn't exist
-        history_dir = Path("history")
-        history_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create safe topic name for filename (sanitize for filesystem)
-        safe_topic = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in topic)
-        safe_topic = safe_topic.replace(' ', '_')
-        # Remove multiple consecutive underscores
-        while '__' in safe_topic:
-            safe_topic = safe_topic.replace('__', '_')
-        # Remove leading/trailing underscores
-        safe_topic = safe_topic.strip('_')
-        
-        # Create timestamp in format: yyyy-mm-dd-hh
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H")
-        
-        # Create filename: <search topic>_<yyyy-mm-dd-hh>.md
-        filename = f"{safe_topic}_{timestamp}.md"
-        
-        file_path = history_dir / filename
-        
-        # Write report to file (as markdown)
-        with open(file_path, "w", encoding="utf-8") as f:
-            # Write metadata header as markdown frontmatter or header
-            f.write(f"# {task_type.replace('_', ' ').title()}\n\n")
-            f.write(f"**Topic:** {topic}\n")
-            if idea:
-                f.write(f"**Idea:** {idea}\n")
-            if args.year_start and args.year_end:
-                f.write(f"**Year Range:** {args.year_start}-{args.year_end}\n")
-            f.write(f"**Max Rounds:** {args.max_rounds}\n")
-            f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write("\n---\n\n")
-            
-            # Write report content
-            f.write(report)
-        
-        logger.info(f"📁 Report saved to: {file_path}")
-        print(f"\n💾 Report saved to: {file_path}\n")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to save report to history: {e}")
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -292,9 +172,22 @@ def parse_args():
         help="Enable debug mode (limits LLM calls for prior_art_check).",
     )
     parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Check if all required imports and dependencies are working correctly.",
+        "--excluded_paper_title",
+        type=str,
+        default=None,
+        help="Title of paper to exclude for blind evaluation.",
+    )
+    parser.add_argument(
+        "--excluded_paper_arxiv",
+        type=str,
+        default=None,
+        help="arXiv ID of paper to exclude (e.g., 2304.07647).",
+    )
+    parser.add_argument(
+        "--excluded_paper_doi",
+        type=str,
+        default=None,
+        help="DOI of paper to exclude.",
     )
     return parser.parse_args()
 
@@ -302,11 +195,6 @@ def main():
     setup_environment()
     
     args = parse_args()
-    
-    # If --check flag is set, run requirements check and exit
-    if args.check:
-        check_requirements()
-        return
     
     # Build LLM configuration using new dual-role system
     # For the main research agent, we typically use "heavy" role
@@ -337,16 +225,7 @@ def main():
                 years=years,
                 venues=None,
                 max_rounds=args.max_rounds,
-                max_papers=20,
             )
-            
-            if report:
-                logger.info(f"Report generated successfully, length: {len(report)} characters")
-                # Save report to history
-                save_report_to_history("benchmark_landscape", args.topic, report, args)
-            else:
-                logger.error("Report is None or empty, not saving")
-            
             print("\n" + "="*60)
             print(report)
             print("="*60 + "\n")
@@ -368,6 +247,17 @@ def main():
                 years = (args.year_start, args.year_end)
             
             logger.info(f"Running Prior Art Check for idea on topic: {args.topic}")
+            
+            # Build excluded papers list if any excluded paper args provided
+            excluded_papers = None
+            if args.excluded_paper_title or args.excluded_paper_arxiv or args.excluded_paper_doi:
+                excluded_papers = [{
+                    "title": args.excluded_paper_title or "",
+                    "arxiv_id": args.excluded_paper_arxiv,
+                    "doi": args.excluded_paper_doi,
+                }]
+                logger.info(f"🔒 Blind Evaluation Mode: Excluding paper '{args.excluded_paper_title or args.excluded_paper_arxiv}'")
+            
             report = run_prior_art_check(
                 agent=agent,
                 idea_description=args.idea,
@@ -376,11 +266,8 @@ def main():
                 venues=None,
                 max_rounds=args.max_rounds,
                 debug_mode=args.debug,
+                excluded_papers=excluded_papers,
             )
-            
-            # Save report to history
-            save_report_to_history("prior_art_check", args.topic, report, args, idea=args.idea)
-            
             print("\n" + "="*60)
             print(report)
             print("="*60 + "\n")
@@ -399,10 +286,6 @@ def main():
                 "and summarize key trends."
             )
             result = agent.run(user_query)
-            
-            # Save report to history
-            save_report_to_history("research_agent", args.topic, result, args)
-            
             print(result)
             
     except Exception as e:

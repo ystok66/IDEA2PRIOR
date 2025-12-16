@@ -3,6 +3,8 @@ import requests
 from typing import Optional, List, Dict, Any
 from smolagents import Tool
 
+from pipelines.rate_limiter import openalex_rate_limiter
+
 class OpenAlexWorksSearchTool(Tool):
     name = "openalex_works_search"
     description = """
@@ -83,6 +85,9 @@ class OpenAlexWorksSearchTool(Tool):
             params["search"] = query
             
         try:
+            # Per-request rate limiting (sliding window, not batch + sleep)
+            openalex_rate_limiter.wait_for_slot()
+            
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
@@ -96,6 +101,21 @@ class OpenAlexWorksSearchTool(Tool):
                 work_id = work.get("id")
                 doi = work.get("doi")
                 
+                # Extract abstract from inverted index format
+                abstract = None
+                abstract_index = work.get("abstract_inverted_index")
+                if abstract_index:
+                    try:
+                        # Reconstruct abstract from inverted index
+                        word_positions = []
+                        for word, positions in abstract_index.items():
+                            for pos in positions:
+                                word_positions.append((pos, word))
+                        word_positions.sort(key=lambda x: x[0])
+                        abstract = " ".join(w for _, w in word_positions)
+                    except Exception:
+                        abstract = None
+                
                 authors = [a.get("author", {}).get("display_name", "") for a in work.get("authorships", [])]
                 
                 results.append({
@@ -105,7 +125,8 @@ class OpenAlexWorksSearchTool(Tool):
                     "authors": authors,
                     "cited_by_count": cited_by,
                     "openalex_id": work_id,
-                    "doi": doi
+                    "doi": doi,
+                    "abstract": abstract,  # Now includes abstract
                 })
                 
             if not results:
