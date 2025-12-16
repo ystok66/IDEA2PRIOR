@@ -24,11 +24,13 @@ class PdfParserTool(Tool):
 
     def forward(self, pdf_path: str, chunk_size: int = 500) -> str:
         try:
-            if not pdf_path.endswith(".pdf"):
+            # Convert Path to string if needed
+            pdf_path_str = str(pdf_path)
+            if not pdf_path_str.endswith(".pdf"):
                 return "Error: File must be a PDF."
             
             # 1. Extract text pages
-            pages = self._extract_text_pymupdf(pdf_path)
+            pages = self._extract_text_pymupdf(pdf_path_str)
             
             # 2. Create chunks
             chunks = self._simple_chunk_from_pages(pages, chunk_size)
