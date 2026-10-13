@@ -2,3 +2,12 @@ Required Notice: Copyright 2026 Idea2Prior project authors.
 This project is licensed under PolyForm Noncommercial 1.0.0.
 For commercial licensing, contact the project authors through this repository's GitHub Issues.
 Third-party dependencies and scholarly publications retain their respective rights.
+
+Idea2Prior builds on PaperArena by Daoyu Wang and collaborators:
+https://arxiv.org/abs/2510.10909
+https://github.com/ustc-ai4science/PaperArena
+The Idea2Prior license covers its original contributions and does not replace
+the applicable terms of upstream or other third-party components.
+
+Restored RAG sources carrying CAMEL-AI copyright headers remain subject to
+Apache License 2.0. The complete license is provided in rag/LICENSE.

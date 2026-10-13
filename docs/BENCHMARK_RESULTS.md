@@ -4,11 +4,13 @@ The README reports preserved October 2026 comparisons. No retrieval runs or paid
 
 ## Scope and metrics
 
-EASY maps to v0.2 A, N001–N010; MEDIUM maps to v0.5 A, C001–C010; HARD maps to v0.5 B, C001–C010. The public datasets contain 30 queries per tier; these comparison tables cover only the first 10. Different tiers have different query wording, so differences between tiers do not establish an algorithm improvement.
+The comparison covers EASY N001–N010, MEDIUM C001–C010, and HARD C001–C010. The public datasets contain 30 queries per tier; these comparison tables cover only the first 10. Different tiers have different query wording, so differences between tiers do not establish an algorithm improvement.
 
-Hit@5 counts a query as a hit when its designated reference paper appears in the returned first five papers. This measures target recovery, not the relevance of every returned paper. Mutual coverage uses the preserved same-query paper-identity matches, ignores ranking, and divides the summed intersections by five fixed slots per query. Missing papers are not removed from the denominator. It is not Jaccard similarity or directional coverage based on the number of papers actually returned. In MEDIUM, Gemini returned 43 papers across 50 slots; the displayed overlap still divides by 50.
+Hit@5 counts a query as a hit when its designated reference paper appears in the returned first five papers. This measures target recovery, not the relevance of every returned paper. Mutual coverage sums the known same-query paper-identity intersections, ignores ranking, and divides by 50 planned slots for each tier: ten queries with five slots each. A planned slot without a returned paper contributes no observed match, while remaining in the denominator. This measures the coverage of returned results in the planned scope. It is not Jaccard similarity or directional coverage based on the number of papers actually returned.
 
-EASY retains the user's agreed presentation: Idea2Prior 9/10, ChatGPT 7/10, Gemini 7/10. The ChatGPT figure uses the agreed reporting convention, with six observed hits and one convention-based counted hit. All three EASY mutual-coverage values retain the agreed nine-query denominator: 14/45, 13/45, and 17/45. MEDIUM and HARD use 50 fixed slots each.
+EASY retains the user's agreed Hit@5 presentation: Idea2Prior 9/10, ChatGPT 7/10, Gemini 7/10. The ChatGPT figure uses the agreed reporting convention, with six observed hits and one convention-based counted hit. Coverage now uses the original ten-query requested-scope comparison: Idea2Prior–ChatGPT 14/50 (28%), Idea2Prior–Gemini 15/50 (30%), and ChatGPT–Gemini 17/50 (34%). The full requested scope includes two additional recorded Idea2Prior–Gemini intersections. The original identity matches and source outputs are unchanged.
+
+Pairwise coverage complements target-paper Hit@5 by examining whether different systems return similar papers for the selected topics and prompts. It is a diagnostic of cross-system agreement. Establishing dataset representativeness or excluding selection bias would require a sampling protocol and broader evaluation.
 
 Idea2Prior's EASY score follows operational recovery: the first batch delivered five target hits out of ten planned queries, and the final selected runs delivered nine. The summary separates the final benchmark from first-attempt delivery reliability. MEDIUM and HARD retain the selected historical runs, including authorized replacements for A005 and B005. ChatGPT HARD uses only the reviewed NEW report; the OLD report is excluded.
 
@@ -48,6 +50,30 @@ Subscription fees cannot be converted into observed per-query experiment costs w
 
 Official sources: [OpenAI plan pricing](https://learn.chatgpt.com/docs/pricing), [OpenAI web-search and research guidance](https://learn.chatgpt.com/docs/web-search?surface=web), [Google AI subscription pricing](https://gemini.google/subscriptions/?currencyCode=USD), and [Google Deep Research access and limits](https://support.google.com/gemini/answer/15719111?hl=en). API model prices are separate from these browser subscriptions.
 
+## API cost estimates
+
+The references below are official **Deep Research API** prices, checked on 2026-10-13. They do not identify the backend models used by the web evaluations.
+
+For OpenAI, repricing the selected-run mean of 298,594.3 reported input tokens and 89,490.1 reported output tokens gives `input_tokens / 1,000,000 × input_rate + output_tokens / 1,000,000 × output_rate`.
+
+| Deep Research API model | Input USD / 1M | Cached input USD / 1M | Output USD / 1M | Known-workload token estimate USD / task |
+| --- | ---: | ---: | ---: | ---: |
+| [o3-deep-research](https://developers.openai.com/api/docs/models/o3-deep-research) | 10.00 | 2.50 | 40.00 | 6.565547 |
+| [o4-mini-deep-research](https://developers.openai.com/api/docs/models/o4-mini-deep-research) | 2.00 | 0.50 | 8.00 | 1.313109 |
+
+These are uncached token-only illustrations, excluding tools and unreported usage. They sum our many requests; they do not imply sending the entire workload in one request or predict an agent's actual tokenization, reasoning, or search consumption.
+
+Google publishes the following [Deep Research agent cost estimates](https://ai.google.dev/gemini-api/docs/deep-research#availability-and-pricing):
+
+| Gemini agent | Official typical-task estimate USD | Status |
+| --- | --- | --- |
+| `deep-research-preview-04-2026` | 1–3 | Preview estimate, variable |
+| `deep-research-max-preview-04-2026` | 3–7 | Preview estimate, variable |
+
+These Google ranges describe its example tasks, not our measured workload or a fixed per-task tariff. Actual billing includes underlying model inference, intermediate reasoning, caching, and tools under the [agent pricing rules](https://ai.google.dev/gemini-api/docs/pricing#pricing-for-agents). Our aggregate input/output means lack the model allocation, cache split, and tool counts needed to calculate an equivalent-workload Gemini agent bill. That estimate remains undetermined.
+
+**The benchmark ChatGPT and Gemini outputs were obtained from the October 2026 web versions of Deep Research. Their backend model IDs and API token consumption were not measured.** The historical nine-task cost sample, OpenAI workload illustrations, Google agent estimates, and browser subscriptions have separate accounting bases. These pricing references are not model presets for Idea2Prior's Chat Completions workflow.
+
 ## Source fingerprints
 
 Original browser responses and the selected pipeline/Expert outputs are included under [datasets](../datasets/README.md#historical-comparison-outputs), with byte hashes and export manifests. Raw request ledgers, configurations, PDFs, and earlier attempts remain outside the public release. This document publishes aggregate statistics and source SHA-256 fingerprints without credentials, private endpoint URLs, or local archive paths.
@@ -56,7 +82,7 @@ Original browser responses and the selected pipeline/Expert outputs are included
 | --- | --- |
 | Agreed comparison SUMMARY.json | `22376008b78ae50f8b76a39a199e32b84e0de8d1d1e1796ed34cec0161c0a5cf` |
 | Agreed comparison REPORT.md | `60c9a83072a5f4182e0c09f13061a9e76b75606d2fb74273bcbcb51eb006ef93` |
-| v0.2 usage audit JSON | `ff0957b6942c361886850d5b5706aa296d1370560a174f87ce0a8851115f478a` |
-| v0.5 usage audit JSON | `ab69b4acdaa1aedfe1a3b25c1a407c74a461f8183c2e02fdc4d09e75573b286b` |
+| EASY usage audit JSON | `ff0957b6942c361886850d5b5706aa296d1370560a174f87ce0a8851115f478a` |
+| MEDIUM/HARD usage audit JSON | `ab69b4acdaa1aedfe1a3b25c1a407c74a461f8183c2e02fdc4d09e75573b286b` |
 
 Original observations and the agreed presentation convention are preserved separately. No missing ranking is fabricated, and no original source is overwritten by this summary.

@@ -43,7 +43,6 @@ Thumbs.db
 
 # Historical source directories are private even if an OS-held directory remains.
 Idea2Paper*/
-rag/
 reflectors/
 tests_offline/
 tmpx2wm68n_/

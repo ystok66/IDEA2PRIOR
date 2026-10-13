@@ -20,14 +20,14 @@ def read_jsonl(path: Path) -> list[dict]:
 
 class PublicDatasetTests(unittest.TestCase):
     def test_all_files_match_manifests_and_prompt_queries(self):
-        for tier, prefix, variant, version in [("easy", "N", "A", "0.2"), ("medium", "C", "A", "0.5"), ("hard", "C", "B", "0.5")]:
+        for tier, prefix in [("easy", "N"), ("medium", "C"), ("hard", "C")]:
             with self.subTest(tier=tier):
                 folder = ROOT / "datasets" / tier
                 manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
                 rows = read_jsonl(folder / "queries.jsonl")
                 gold = read_jsonl(folder / "gold.jsonl")
-                self.assertEqual(manifest["source_version"], version)
-                self.assertEqual(manifest["source_variant"], variant)
+                self.assertEqual(manifest["difficulty"], tier.upper())
+                self.assertEqual(manifest["dataset_name"], tier.upper())
                 self.assertEqual(len(rows), 30)
                 self.assertEqual({row["item_id"] for row in rows}, {f"{prefix}{i:03}" for i in range(1, 31)})
                 self.assertEqual({row["item_id"] for row in rows}, {row["item_id"] for row in gold})

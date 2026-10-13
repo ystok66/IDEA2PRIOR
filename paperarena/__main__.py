@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import sys
 
-from . import RunConfig, run_retrieval
+from . import RunConfig, run_retrieval, run_extension
 
 
 def dataset_query(difficulty: str, item: str, dataset_root: str | Path | None = None) -> dict:
@@ -57,6 +57,14 @@ def main(argv=None):
     run.add_argument("--timeout-seconds", type=float, default=1800)
     run.add_argument("--mode", choices=("retrieval_eval", "full_report"))
     run.add_argument("--dry-run", action="store_true", help="Validate and save a plan without network calls")
+    extension = sub.add_parser("extension", help="Run an independent optional research task")
+    from .extensions import EXTENSIONS
+    extension.add_argument("--name", choices=tuple(EXTENSIONS), required=True)
+    extension.add_argument("--parameters", type=Path, required=True, help="JSON parameter object")
+    extension.add_argument("--config", type=Path, required=True)
+    extension.add_argument("--output-dir", type=Path, default=Path("outputs/extensions"))
+    extension.add_argument("--timeout-seconds", type=float, default=1800)
+    extension.add_argument("--dry-run", action="store_true")
     web = sub.add_parser("web", help="Start the local browser interface")
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=7860)
@@ -66,6 +74,17 @@ def main(argv=None):
         from .web import serve
         serve(host=args.host, port=args.port, output_root=args.output_dir)
         return 0
+    if args.command == "extension":
+        try:
+            config = RunConfig.from_dict(json.loads(args.config.read_text(encoding="utf-8-sig")))
+            parameters = json.loads(args.parameters.read_text(encoding="utf-8-sig"))
+            result = run_extension(args.name, config, parameters, args.output_dir,
+                                   args.timeout_seconds, dry_run=args.dry_run)
+        except Exception as error:
+            from .diagnostics import safe_error
+            result = {"status": "FAILED", "error": safe_error(error, "extension_configuration")}
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result["status"] in ("SUCCEEDED", "PARTIAL", "EMPTY", "NOT_RUN") else 1
     try:
         config_dict = json.loads(args.config.read_text(encoding="utf-8-sig"))
         if args.mode:

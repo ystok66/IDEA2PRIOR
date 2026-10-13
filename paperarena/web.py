@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
+import uuid
 
 from paperarena import APIProfile, JobManager, RunConfig
 from paperarena.model_catalog import fetch_models, ModelCatalogError
 from paperarena.diagnostics import safe_error
 from paperarena.resources import benchmark_directory
 from paperarena.__main__ import dataset_query
+from paperarena.extensions import EXTENSIONS, validate_extension
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = Path(__file__).parent / "web_assets"
@@ -19,6 +22,7 @@ MAX_BODY = 128 * 1024
 ASSET_TYPES = {"/": ("index.html", "text/html; charset=utf-8"),
                "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                "/styles.css": ("styles.css", "text/css; charset=utf-8")}
+ASSET_TYPES["/extensions.js"] = ("extensions.js", "text/javascript; charset=utf-8")
 
 
 def catalog():
@@ -88,7 +92,7 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                     self.end_headers()
                     self.wfile.write(payload)
                 elif path == "/api/catalog":
-                    self.json_response(200, {"datasets": catalog()})
+                    self.json_response(200, {"datasets": catalog(), "extensions": EXTENSIONS})
                 elif path.startswith("/api/jobs/") and path.count("/") == 3:
                     job = manager.get(path.rsplit("/", 1)[-1])
                     self.json_response(200, job)
@@ -108,19 +112,35 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                     job_id = path.split("/")[3]
                     self.json_response(200, {"cancelled": manager.cancel(job_id)})
                     return
-                if path not in {"/api/jobs", "/api/models"}:
+                if path not in {"/api/jobs", "/api/models", "/api/documents"}:
                     self.json_response(404, {"error": "Not found."})
                     return
                 if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
                     self.json_response(415, {"error": "Use application/json."})
                     return
                 length = int(self.headers.get("Content-Length", "0"))
-                if length <= 0 or length > MAX_BODY:
+                if length <= 0 or length > (17 * 1024 * 1024 if path == "/api/documents" else MAX_BODY):
                     self.json_response(413, {"error": "Invalid request size."})
                     return
                 payload = json.loads(self.rfile.read(length))
                 if not isinstance(payload, dict):
                     raise ValueError("Request must be an object.")
+                if path == "/api/documents":
+                    suffix = Path(payload.get("filename", "")).suffix.lower()
+                    if suffix not in (".pdf", ".md", ".txt") or not isinstance(payload.get("base64"), str):
+                        raise ValueError("Upload a PDF, Markdown or text document.")
+                    try:
+                        content = base64.b64decode(payload["base64"], validate=True)
+                    except Exception:
+                        raise ValueError("Invalid document encoding") from None
+                    if not content or len(content) > 12 * 1024 * 1024:
+                        raise ValueError("Document must be between 1 byte and 12 MiB.")
+                    uploads = Path(getattr(manager, "output_root", output_root)).resolve() / ".uploads"
+                    uploads.mkdir(parents=True, exist_ok=True)
+                    document = uploads / (uuid.uuid4().hex + suffix)
+                    document.write_bytes(content)
+                    self.json_response(201, {"document_path": str(document), "bytes": len(content)})
+                    return
                 if path == "/api/models":
                     profile = APIProfile.from_dict(payload.get("profile", {}))
                     models = fetch_models(profile, timeout_seconds=15.0, max_pages=5)
@@ -130,7 +150,14 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                 if not query or len(query) > 20_000:
                     raise ValueError("Enter a research idea of at most 20,000 characters.")
                 topic = None
+                extension = payload.get("extension")
+                if extension is not None:
+                    if not isinstance(extension, dict) or set(extension) - {"name", "parameters"}:
+                        raise ValueError("Invalid extension selection")
+                    extension = validate_extension(extension.get("name"), extension.get("parameters"))
                 benchmark = payload.get("benchmark")
+                if benchmark is not None and extension is not None:
+                    raise ValueError("Benchmark retrieval and extension execution are separate tasks")
                 if benchmark is not None:
                     if not isinstance(benchmark, dict) or set(benchmark) != {"difficulty", "item_id"}:
                         raise ValueError("Invalid benchmark selection.")
@@ -144,8 +171,9 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                     raise ValueError("Time limit must be between 30 and 7,200 seconds.")
                 if type(payload.get("dry_run", False)) is not bool:
                     raise ValueError("dry_run must be a boolean.")
+                options = {"extension": extension} if extension else {}
                 job_id = manager.submit(query, config, timeout_seconds=timeout,
-                                        topic=topic, dry_run=payload.get("dry_run", False))
+                                        topic=topic, dry_run=payload.get("dry_run", False), **options)
                 self.json_response(202, {"job_id": job_id})
             except ModelCatalogError as exc:
                 self.json_response(400, {"error": str(exc), "code": exc.code})

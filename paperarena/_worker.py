@@ -73,7 +73,7 @@ def _token_counts(response) -> dict:
     return values
 
 
-def install_observers(config: RunConfig, emit):
+def install_observers(config: RunConfig, emit, *, initial_phase="retrieval"):
     """Observe dispatches and reported usage without changing model prompts."""
     import smolagents
     import litellm
@@ -87,7 +87,7 @@ def install_observers(config: RunConfig, emit):
     responses = 0
     failures = 0
     last_errors = []
-    phase_state = {"value": "retrieval"}
+    phase_state = {"value": initial_phase}
     subtotals = dict.fromkeys(("prompt_tokens", "completion_tokens", "total_tokens"), 0)
     observed = dict.fromkeys(subtotals, 0)
 
@@ -194,6 +194,26 @@ def execute(payload, emit) -> int:
     os.environ["TMP"] = str(temp_dir)
     import tempfile
     tempfile.tempdir = str(temp_dir)
+    if payload.get("extension"):
+        from .extensions import execute_extension
+        Model, _, snapshot = install_observers(config, emit, initial_phase="extension")
+        emit({"usage": snapshot()})
+        output = execute_extension(payload["extension"], config, directory, Model, emit)
+        usage = snapshot()
+        diagnostics = output["diagnostics"] + usage["recent_request_errors"]
+        status = output["status"]
+        if diagnostics and status == "SUCCEEDED":
+            status = "PARTIAL"
+        error = diagnostics[-1] if diagnostics and status in ("PARTIAL", "FAILED") else None
+        if status == "FAILED" and error is None:
+            error = diagnostic_for_type("RuntimeError", phase="extension")
+        output["status"] = status
+        output["diagnostics"] = diagnostics
+        (directory / "extension.json").write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+        emit({"status": status, "phase": "finished", "operation": "extension",
+              "extension_result": output, "usage": usage, "diagnostics": diagnostics,
+              "error": error, "report_files": [output["report_path"]], "run_dir": str(directory)})
+        return 0 if status in ("SUCCEEDED", "PARTIAL", "EMPTY") else 1
     settings = default_pipeline_settings(config)
     from pipelines.tasks.prior_art_types import PriorArtConfig
     allowed = {row.name for row in fields(PriorArtConfig)}

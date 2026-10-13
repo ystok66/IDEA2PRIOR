@@ -56,10 +56,22 @@ def _stop_process(process):
         process.wait(timeout=5)
 
 
+def _resolve_for_operation(config, extension, dry_run):
+    if extension is None:
+        return config.resolved(require_key=not dry_run)
+    from .extensions import extension_model_roles
+    resolved = config.resolved(require_key=False)
+    if not dry_run:
+        for role in extension_model_roles(extension):
+            resolved.profiles[resolved.roles[role]].resolved(require_key=True)
+    return resolved
+
+
 def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path | None = None,
                   timeout_seconds: float = 1800, *, topic: str | None = None,
                   progress_callback: Callable[[dict], None] | None = None,
-                  cancel_event: threading.Event | None = None, dry_run: bool = False) -> dict:
+                  cancel_event: threading.Event | None = None, dry_run: bool = False,
+                  _extension: dict | None = None) -> dict:
     """Run once. Credentials travel through stdin; returned snapshots never contain them.
 
     Every invocation creates a fresh child directory under output_dir. A dry run
@@ -71,7 +83,13 @@ def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path |
     if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be positive and finite")
     config = config if isinstance(config, RunConfig) else RunConfig.from_dict(config)
-    config = config.resolved(require_key=not dry_run)
+    if _extension is not None:
+        _extension = copy.deepcopy(_extension)
+        path = _extension["parameters"].get("document_path")
+        if path:
+            # Resolve in the caller's directory before the isolated worker starts.
+            _extension["parameters"]["document_path"] = str(Path(path).expanduser().resolve())
+    config = _resolve_for_operation(config, _extension, dry_run)
     job_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "_" + uuid.uuid4().hex[:12]
     directory = Path(output_dir or "outputs").resolve() / job_id
     directory.mkdir(parents=True, exist_ok=False)
@@ -79,7 +97,9 @@ def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path |
     state = {"job_id": job_id, "status": "NOT_RUN" if dry_run else "STARTING",
              "output_dir": str(directory), "run_dir": None, "duration_seconds": 0.0,
              "phase": "configuration", "top5": [], "usage": None, "error": None,
-             "config": config.to_public_dict(), "scientific_validation": "NOT_ADJUDICATED"}
+             "config": config.to_public_dict(), "scientific_validation": "NOT_ADJUDICATED",
+             "operation": "extension" if _extension else "retrieval", "extension_result": None}
+    state["extension_name"] = _extension["name"] if _extension else None
     cancel_event = cancel_event or threading.Event()
 
     def update(event=None):
@@ -94,7 +114,7 @@ def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path |
     _write_json(directory / "plan.json", {"query": query, "topic": topic or query.split(". ", 1)[0].rstrip("."),
         "config": config.to_public_dict(), "timeout_seconds": timeout_seconds,
         "network_execution": "NOT_RUN" if dry_run else "AUTHORIZED_BY_CALL", "retry_policy": "none",
-        "benchmark_gold_access": False})
+        "benchmark_gold_access": False, "extension": _extension})
     if cancel_event.is_set():
         update({"status": "CANCELLED", "phase": "cancelled"})
         return copy.deepcopy(state)
@@ -111,7 +131,7 @@ def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path |
     source_root = str(Path(__file__).resolve().parents[1])
     env["PYTHONPATH"] = source_root + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     payload = {"query": query, "topic": topic or query.split(". ", 1)[0].rstrip("."),
-               "config": config.worker_dict(), "output_dir": str(directory)}
+               "config": config.worker_dict(), "output_dir": str(directory), "extension": _extension}
     command = [sys.executable, "-X", "utf8", "-m", "paperarena._worker"]
     messages: queue.Queue = queue.Queue()
     process = None
@@ -176,6 +196,15 @@ def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path |
     return copy.deepcopy(state)
 
 
+def run_extension(name: str, config: RunConfig | dict, parameters: dict | None = None,
+                  output_dir: str | Path | None = None, timeout_seconds: float = 1800, **kwargs) -> dict:
+    """Start one optional task, using the same isolated worker and diagnostics."""
+    from .extensions import validate_extension
+    request = validate_extension(name, parameters)
+    query = request["parameters"].get("query") or request["parameters"].get("topic") or name
+    return run_retrieval(query, config, output_dir, timeout_seconds, _extension=request, **kwargs)
+
+
 class JobManager:
     """Small local job queue. Default: one active job, cancellable, no retries."""
     def __init__(self, output_root: str | Path = "outputs", *, max_active_jobs: int = 1):
@@ -185,10 +214,13 @@ class JobManager:
         self._lock = threading.RLock()
 
     def submit(self, query: str, config: RunConfig | dict, *, timeout_seconds: float = 1800,
-               topic: str | None = None, dry_run: bool = False) -> str:
+               topic: str | None = None, dry_run: bool = False, extension: dict | None = None) -> str:
+        from .extensions import validate_extension
+        if extension is not None:
+            extension = validate_extension(extension["name"], extension.get("parameters"))
         config = config if isinstance(config, RunConfig) else RunConfig.from_dict(config)
         # Fail missing credentials synchronously, before putting a job in queue.
-        config = config.resolved(require_key=not dry_run)
+        config = _resolve_for_operation(config, extension, dry_run)
         if not isinstance(query, str) or not query.strip():
             raise ValueError("query must be a nonempty string")
         if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
@@ -196,7 +228,7 @@ class JobManager:
         job_id = uuid.uuid4().hex
         cancellation = threading.Event()
         with self._lock:
-            self._jobs[job_id] = {"state": {"job_id": job_id, "status": "QUEUED", "phase": "queued", "duration_seconds": 0.0, "top5": [], "usage": None, "config": config.to_public_dict()}, "cancel": cancellation}
+            self._jobs[job_id] = {"state": {"job_id": job_id, "status": "QUEUED", "phase": "queued", "duration_seconds": 0.0, "top5": [], "usage": None, "config": config.to_public_dict(), "operation": "extension" if extension else "retrieval", "extension_name": extension["name"] if extension else None}, "cancel": cancellation}
 
         def progress(state):
             state["job_id"] = job_id
@@ -205,8 +237,9 @@ class JobManager:
 
         def run():
             try:
+                options = {"_extension": extension} if extension else {}
                 run_retrieval(query, config, self.output_root, timeout_seconds, topic=topic,
-                              progress_callback=progress, cancel_event=cancellation, dry_run=dry_run)
+                              progress_callback=progress, cancel_event=cancellation, dry_run=dry_run, **options)
             except Exception as error:
                 with self._lock:
                     self._jobs[job_id]["state"].update(status="FAILED", error=safe_error(error,

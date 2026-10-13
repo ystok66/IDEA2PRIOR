@@ -24,8 +24,8 @@
   ],
   "idea2prior_selected_query_count": 10,
   "idea2prior_source_reports_sha256": {
-    "V05_A001_010_FINAL.json": "0d9e928e51a7f2d6f5e91fe33969e5afa2967b653015de9f661b493bcaa599cf",
-    "V05_C005_A_RERUN_FINAL.json": "bf477fbed5d38ea2f71a960525a33ba2742eadf40a9b5c0943c7d2965d96bc4b"
+    "MEDIUM_selected_report_1": "0d9e928e51a7f2d6f5e91fe33969e5afa2967b653015de9f661b493bcaa599cf",
+    "MEDIUM_selected_report_2": "bf477fbed5d38ea2f71a960525a33ba2742eadf40a9b5c0943c7d2965d96bc4b"
   },
   "files_sha256": {
     "chatgpt.txt": "b7ae6561bad2a814ef94e113ef30032beddbf134a6078754ff2c3bdbcb26920c",

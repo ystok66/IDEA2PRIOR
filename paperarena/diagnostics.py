@@ -4,6 +4,10 @@ from __future__ import annotations
 import re
 
 
+class PublicInputError(ValueError):
+    """A locally authored input message containing no provider payload."""
+
+
 def _label(value, fallback):
     return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,79}", value) else fallback
 
@@ -58,6 +62,9 @@ def safe_error(error, phase=None):
     # request body, response body, credential, or URL enters the public result.
     description = str(error).lower()
     current_phase = phase or getattr(error, "_paperarena_phase", None)
+    if isinstance(error, PublicInputError):
+        return {"type": type(error).__name__, "code": "INVALID_EXTENSION_INPUT",
+                "message": str(error), "phase": _label(current_phase, "configuration")}
     if isinstance(error, ValueError) and "missing api key" in description:
         return {"type": type(error).__name__, "code": "MISSING_API_KEY",
             "message": "A selected API profile has no key. Enter its key or set the configured environment variable.",
@@ -71,5 +78,11 @@ def safe_error(error, phase=None):
             "http_status": 402, "adapter_http_status": status,
             "phase": _label(current_phase, "unknown_stage")}
     marker = "get_channel_failed" if "get_channel_failed" in description or "no available channel" in description else None
-    return diagnostic_for_type(type(error).__name__, http_status=status,
+    detail = diagnostic_for_type(type(error).__name__, http_status=status,
         phase=current_phase, marker=marker)
+    if isinstance(error, ImportError):
+        module = getattr(error, "name", None)
+        if isinstance(module, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", module):
+            detail["missing_dependency"] = module
+        detail["install_hint"] = "pip install '.[extensions]' (use '.[mineru]' for MinerU or '.[pdf-rag]' for vector retrieval)"
+    return detail

@@ -1,32 +1,34 @@
 # Idea2Prior
 
-*从研究想法查找并排序已有研究。*
+从研究想法查找并排序已有研究。
 
 **从研究想法检索论文，以摘要和可获得的全文证据生成 Top 5。**
 
 项目以 [英文说明](README.md) 和英文界面为主；网页支持切换中文。
 
-提供本地网页、Python API、命令行和 Jupyter Notebook 四种入口。可配置多个 OpenAI、Gemini 或 OpenAI 兼容 API，并为检索与评分、轻量任务、Expert 排序分别选择模型。
+提供本地网页、Python API、命令行和 Jupyter Notebook 四种入口。可配置多个 OpenAI、Gemini 或 OpenAI 兼容 API，并为检索与评分、轻量任务、Expert 排序分别选择模型。在本次 30 个 idea-to-paper 查询案例中，按已采用口径统计的总体 Hit@5 为 53.3%，高于 ChatGPT、Gemini 网页版 Deep Research 的 43.3% 和 36.7%。历史样本的平均任务费用低于用时表后列出的 Deep Research API 费用参考。
+
+Idea2Prior 基于 [PaperArena: An Evaluation Benchmark for Tool-Augmented Agentic Reasoning on Scientific Literature](https://arxiv.org/abs/2510.10909) 及其[官方代码](https://github.com/ustc-ai4science/PaperArena)，在此基础上增加了根据 idea 检索论文、分阶段核验与排序、实现分析、技术演化图及本地网页/Notebook 等功能。
 
 ## 2026 年 10 月历史评测
 
 以下比较各难度的**前 10 题**。ChatGPT 和 Gemini 使用 **2026 年 10 月网页版 Deep Research** 测试，我们使用 API 流程。Hit@5 表示指定参考论文出现在返回 Top 5 中的题目比例。
 
-| 难度 | 原始输入 | Idea2Prior（我们） | ChatGPT Deep Research 网页版 | Gemini Deep Research 网页版 |
+| 难度 | 题目 ID | Idea2Prior（我们） | ChatGPT Deep Research 网页版 | Gemini Deep Research 网页版 |
 | --- | --- | ---: | ---: | ---: |
-| EASY | v0.2 A，N001–N010 | **90%（9/10）** | 70%（7/10） | 70%（7/10） |
-| MEDIUM | v0.5 A，C001–C010 | **50%（5/10）** | 30%（3/10） | 30%（3/10） |
-| HARD | v0.5 B，C001–C010 | 20%（2/10） | **30%（3/10）** | 10%（1/10） |
+| EASY | N001–N010 | **90%（9/10）** | 70%（7/10） | 70%（7/10） |
+| MEDIUM | C001–C010 | **50%（5/10）** | 30%（3/10） | 30%（3/10） |
+| HARD | C001–C010 | 20%（2/10） | **30%（3/10）** | 10%（1/10） |
 
 EASY 采用[评测口径文档](docs/BENCHMARK_RESULTS.md)中的约定展示方式，其中记录了假定项与覆盖率分母。我们的 EASY 使用运行失败题补跑后的最终结果。这些历史成绩不代表公开版本迁移后的 Gemini 默认配置成绩；每种难度提供 30 题，此处只比较前 10 题。
 
-**Top 5 相互覆盖率**：同题两系统共同论文数之和 ÷ 固定 Top 5 席位数，不考虑排名顺序。
+**Top 5 相互覆盖率**：为检查检索表现是否受到所选研究领域或提示词设计的影响，我们在目标论文 Hit@5 之外，也考察 Idea2Prior、ChatGPT Deep Research 和 Gemini Deep Research 的论文结果重合程度。分子为已记录的同题共同论文数之和，每种难度的分母统一为 **50 个计划席位（10 题 × 5）**，不考虑排名顺序。它描述系统间的结果一致程度，不能单独证明数据集具有代表性或不存在选择偏向。
 
 | 组合 | EASY | MEDIUM | HARD |
 | --- | ---: | ---: | ---: |
-| 我们 ↔ ChatGPT | 31.1%（14/45） | 22%（11/50） | 6%（3/50） |
-| 我们 ↔ Gemini | 28.9%（13/45） | 12%（6/50） | 16%（8/50） |
-| ChatGPT ↔ Gemini | 37.8%（17/45） | 20%（10/50） | 14%（7/50） |
+| 我们 ↔ ChatGPT | 28%（14/50） | 22%（11/50） | 6%（3/50） |
+| 我们 ↔ Gemini | 30%（15/50） | 12%（6/50） | 16%（8/50） |
+| ChatGPT ↔ Gemini | 34%（17/50） | 20%（10/50） | 14%（7/50） |
 
 **我们的平均单题用时和 API 已回报 token：**
 
@@ -39,7 +41,16 @@ EASY 采用[评测口径文档](docs/BENCHMARK_RESULTS.md)中的约定展示方�
 
 用户提供的网页版平均用时为 **ChatGPT 5.2 分钟/题、Gemini 4.7 分钟/题**，没有独立的逐题计时日志。我们的均值按最终采用运行计算，排除被替换的整题尝试。token 合计覆盖所有模型阶段；有 **1,491 次请求缺少 usage**，因此只是已回报小计，完整消耗未知。
 
-**费用参考（美元）**：我们的用户提供的 9 题费用样本平均为 **$0.0945/题**。2026-10-13 查询的网页版套餐参考价为 [ChatGPT Plus：$20/月](https://learn.chatgpt.com/docs/pricing)、[Google AI Pro：$19.99/月](https://gemini.google/subscriptions/?currencyCode=USD)。这是订阅价格；所查官方页面没有确定固定的单次 Deep Research 报告价格，实验实际使用的套餐未记录。API 费用、网页订阅和 9 题费用样本的核算范围不同。
+**平均任务费用。** 用户提供的历史 API 费用样本平均为 **$0.0945/任务**。下表列出官方 **Deep Research API** 报价（美元，2026-10-13 查询）。OpenAI 估算采用我们选定运行的平均已回报用量：每题 **298,594.3 个输入 tokens + 89,490.1 个输出 tokens**。
+
+| Deep Research API | 官方计费 | 单题费用参考 |
+| --- | --- | --- |
+| [OpenAI o3 Deep Research](https://developers.openai.com/api/docs/models/o3-deep-research) | 输入 $10 / 输出 $40 每百万 tokens；缓存输入 $2.50 | 按我们的已知 tokens 估算 **$6.57**，另计工具费用 |
+| [OpenAI o4-mini Deep Research](https://developers.openai.com/api/docs/models/o4-mini-deep-research) | 输入 $2 / 输出 $8 每百万 tokens；缓存输入 $0.50 | 按我们的已知 tokens 估算 **$1.31**，另计工具费用 |
+| [Gemini Deep Research](https://ai.google.dev/gemini-api/docs/deep-research#availability-and-pricing) | 按底层模型 tokens 和工具使用计费 | 官方典型任务估计 **$1–$3** |
+| [Gemini Deep Research Max](https://ai.google.dev/gemini-api/docs/deep-research#availability-and-pricing) | 按底层模型 tokens 和工具使用计费 | 官方典型任务估计 **$3–$7** |
+
+OpenAI 估算采用未缓存单价，不含未回报用量；这是对我们已有用量重新计价，并非预测研究代理的实际消耗。Google 的范围是预览阶段示例任务的费用估计，不是固定单题报价，也不是根据我们 tokens 算出的价格。要估算 Gemini 同等用量的代理费用，还需各模型用量、缓存和工具次数。**我们的 ChatGPT、Gemini 评测使用 2026 年 10 月网页版 Deep Research，未测量它们的 API 用量或后台模型。** 详见[费用口径](docs/BENCHMARK_RESULTS.md#api-cost-estimates)。
 
 详见[评测口径与来源记录](docs/BENCHMARK_RESULTS.md)及[汇总数据](docs/benchmark_results.json)。
 
@@ -172,17 +183,50 @@ Notebook 默认 `RUN_REAL_REQUESTS = False`。主动开启后才会调用 API；
 
 `retrieval_eval` 是默认模式：固定尝试 5 篇全文，不因 PDF 缺失追加候补；本地提取每篇最多 6 个相关片段、每段最多 1,800 字符。Expert 接收完整短名单摘要、摘要等级、取得的全文片段与全文缺失状态，输出 Top 5。后续报告生成被省略。
 
-`full_report` 保留完整报告流程，包含更完整的证据整理与综述输出。它与检索评测的全文规则及最终排名规则不同，不应直接混用两种模式的指标。
+`full_report` 保留 prior-art 报告流程，包含更完整的证据整理与综述输出。它与检索评测的全文规则及最终排名规则不同，不应直接混用两种模式的指标。
 
 调用层保留已有批量元数据、HTTP 连接复用、同任务有效响应复用和受限并发，新增统一配置、角色分流与可停止的独立 worker。默认不启用自动整题重跑，也不通过缩减候选池来声称精度不变。默认最多 4 个同时执行的模型请求；可通过 `pipeline.max_in_flight_requests` 调整。Expert 与其他阶段具有独立输出预算；增加预算可能增加费用。
 
+## 可选研究扩展
+
+在网页的“任务”下拉列表或 Notebook 第 6 节选择扩展。它们独立运行，默认检索评测流程保持不变。
+
+| 任务 | 输入 | 输出 |
+| --- | --- | --- |
+| `code_extractor` | 上传/本机 PDF、Markdown 或文本，可附算法查询 | 代码/伪代码、实现与完整性诊断、Markdown 和 JSON |
+| `evolution_mapper` | 主题、论文上限及可选年份 | 引文网络、时间线、演化路径和 Mermaid 报告 |
+| `planner_worker` | 研究任务，可附文档 | 计划、受限工具执行、可选 Critic 复核和逐步诊断 |
+| `benchmark_landscape` | 研究主题 | 初步数据集、指标、方法及代表论文概览 |
+| `slot_filling` | 主题、论文草稿片段及已引用论文 | 引用缺口建议、排序和理由 |
+
+```bash
+python -m pip install -e ".[extensions,notebook]"
+# 仅选择 MinerU 时安装结构化 PDF 解析依赖：
+python -m pip install -e ".[mineru]"
+# 旧版向量检索，可单独提供 embedding key：
+python -m pip install -e ".[pdf-rag]"
+```
+
+```python
+from idea2prior import run_extension
+analysis = run_extension(
+    "code_extractor", config,
+    {"document_path": "inputs/my_paper.pdf", "llm_analysis": True,
+     "execute_code": False, "parser": "native"},
+    output_dir="outputs/extensions", timeout_seconds=1800,
+)
+print(analysis["status"], analysis.get("error"))
+```
+
+网页可上传最多 12 MiB 的文档或填写本机路径，预览报告并下载 Markdown/JSON；Notebook 包含五个扩展的示例。默认不执行提取出的代码，`llm_analysis=False` 的本地分析不调用模型。原生 PDF 文本提取不包含仅以图像存在的内容；MinerU 可能需要下载模型。Planner–Worker 使用恢复的代码分析和演化图工具，限制步骤数，不自动重新执行。旧版基准概览/引用缺口沿用其探索流程，与 Top 5 评测协议分开。缺失依赖、文件问题、API 失败和未完成步骤均有诊断。详见[扩展说明](docs/OPTIONAL_EXTENSIONS.md)及[验证记录](docs/VALIDATION.md)。
+
 ## 公开 Benchmark
 
-| 难度 | 原始输入 | ID | 题数 |
-|---|---|---|---:|
-| EASY | v0.2 A | N001–N030 | 30 |
-| MEDIUM | v0.5 A | C001–C030 | 30 |
-| HARD | v0.5 B | C001–C030 | 30 |
+| 难度 | ID | 题数 |
+|---|---|---:|
+| EASY | N001–N030 | 30 |
+| MEDIUM | C001–C030 | 30 |
+| HARD | C001–C030 | 30 |
 
 `MDEIUM` 拼写作为 CLI 别名接受，正式名称为 `MEDIUM`。这些标签表示设计上的预期难度，不是经大规模实测校准的难度等级。
 
@@ -201,6 +245,22 @@ python scripts/evaluate_public_results.py --tier easy --results outputs/SELECTED
 ```
 
 也支持多题 JSON 数组或 JSONL，每行含 `item_id`、`status`、`top5`；重复 item 必须先明确选择一次尝试。评估区分有效排名命中、运行失败、未运行和工作家族匹配，不将缺结果推定为正确。指定目标是一篇已知正例，并不代表其他高相关论文没有价值。详细说明见 [`datasets/README.md`](datasets/README.md)。
+
+### 评测 prompt 的结构
+
+同一题的三个系统使用相同的完整查找 prompt，包含：①寻找对应论文的任务；②2015–2025 年发表范围及经核验预印本规则；③最多五篇、身份核验、版本去重和排序要求；④盲测研究 idea。不提供目标论文标题、DOI 或 Gold 答案作为答案线索。
+
+```text
+寻找最符合以下 idea 的研究论文。
+发表范围：2015–2025；可接受经核验的同一研究版本。
+按完整 idea 匹配程度返回最多五项不同研究。
+每项提供准确标题、作者、年份、发表渠道、DOI/稳定链接及匹配理由。
+核验权威身份，不编造引用，不用同一论文的多个版本占多个名次。
+Research idea:
+<盲测研究想法>
+```
+
+上面是结构示意；原始完整英文 prompt 保存在各难度的 `prompts/` 中。EASY 保留较多识别细节，MEDIUM 减少细节，HARD 的 idea 更短或更含糊。按维护者的构造记录，prompt 通过 ChatGPT 中 GPT-6 Astra 抽取和生成。首页比较使用每个难度的前十题及已说明的评分口径。
 
 ## 验证与目录
 
@@ -228,8 +288,18 @@ docs/           使用与验证记录
 
 未采用的旧实验、原始请求日志、缓存、旧版数据集目录和旧 Git 历史保留在发布目录之外。采用的三方比较回答和输出已放入 `datasets/*/results/`。本地工作文件 `.local/` 和生成的运行目录 `outputs/` 不进入公开 Git 或发布 ZIP；不要上传这些目录或私人归档。清理记录保存在私人归档中。
 
+## 评测范围
+
+我们仅比较**根据 idea 检索并排序论文的能力**。本次评测不衡量通用网页调查、论坛搜索、报告写作或每篇返回论文的相关性。网页和论坛搜索支持仍有限，尚未与 ChatGPT、Gemini 做相应 Benchmark。总体结果限于这些选定查询，不表示每个难度都优于所有对照。API 价格参考及历史样本费用也不代表网页版服务的真实单题费用。
+
+## 上游项目引用
+
+本项目基于 [PaperArena 论文](https://arxiv.org/abs/2510.10909)及其[官方代码](https://github.com/ustc-ai4science/PaperArena)扩展。使用本项目时，请同时引用上游研究；BibTeX 见[英文说明](README.md#upstream-acknowledgement-and-citation)。
+
 ## 许可与商业授权
 
-代码采用 [PolyForm Noncommercial 1.0.0](LICENSE)。非商业使用按正式条款授权；**商业使用请先通过本仓库的 GitHub Issues 联系作者，并取得单独商业授权**。这是公开源码的非商业许可，不是 MIT / Apache-2.0 式的开源许可。正式英文条款优先，见 [PolyForm 官方文本](https://github.com/polyformproject/polyform-licenses/blob/1.0.0/PolyForm-Noncommercial-1.0.0.md)。
+Idea2Prior 原创部分采用 [PolyForm Noncommercial 1.0.0](LICENSE)。非商业使用按正式条款授权；**商业使用请先通过本仓库的 GitHub Issues 联系作者，并取得单独商业授权**。这是公开源码的非商业许可，不是 MIT / Apache-2.0 式的开源许可。正式英文条款优先，见 [PolyForm 官方文本](https://github.com/polyformproject/polyform-licenses/blob/1.0.0/PolyForm-Noncommercial-1.0.0.md)。
 
 依赖项目保留各自许可。论文标题、DOI、书目信息与链接用于定位文献；本项目不重新许可第三方论文，也不分发其 PDF 或完整正文。
+
+上游组件保留其适用许可；恢复的 CAMEL-AI RAG 源码保留 Apache-2.0，附有[原许可文本](rag/LICENSE)。详见 [NOTICE](NOTICE)。

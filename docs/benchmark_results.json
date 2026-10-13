@@ -28,14 +28,12 @@
   },
   "metrics": {
     "hit_at_5": "Queries with the designated reference paper among the first five returned papers / planned queries.",
-    "mutual_top5_coverage": "Sum of same-query paper-identity intersections / fixed Top 5 slots; rank order ignored.",
+    "mutual_top5_coverage": "Known same-query shared identities / 50 planned Top 5 slots per tier; rank order ignored.",
     "token_accounting": "Provider-reported subtotals summed across all model stages. Missing usage is unknown.",
     "runtime_accounting": "Final selected query runs; excludes superseded whole-query attempts and shared preflight checks."
   },
   "tiers": {
     "EASY": {
-      "source_version": "0.2",
-      "source_variant": "A",
       "item_scope": [
         "N001",
         "N010"
@@ -69,25 +67,28 @@
           "left": "Ours",
           "right": "ChatGPT",
           "common_papers": 14,
-          "fixed_slots": 45,
-          "observed_queries": 9,
-          "coverage": 0.3111111111111111
+          "fixed_slots": 50,
+          "planned_queries": 10,
+          "coverage": 0.28,
+          "count_basis": "Known same-query shared identities in the requested scope"
         },
         {
           "left": "Ours",
           "right": "Gemini",
-          "common_papers": 13,
-          "fixed_slots": 45,
-          "observed_queries": 9,
-          "coverage": 0.28888888888888886
+          "common_papers": 15,
+          "fixed_slots": 50,
+          "planned_queries": 10,
+          "coverage": 0.3,
+          "count_basis": "Known same-query shared identities in the requested scope"
         },
         {
           "left": "ChatGPT",
           "right": "Gemini",
           "common_papers": 17,
-          "fixed_slots": 45,
-          "observed_queries": 9,
-          "coverage": 0.37777777777777777
+          "fixed_slots": 50,
+          "planned_queries": 10,
+          "coverage": 0.34,
+          "count_basis": "Known same-query shared identities in the requested scope"
         }
       ],
       "paperarena_usage": {
@@ -107,11 +108,10 @@
         "requests_missing_usage": 754,
         "complete_total_tokens": null
       },
-      "coverage_note": "Retains the originally agreed nine-query coverage denominator."
+      "coverage_note": "Uniform ten-query, fifty-slot reporting; use recorded requested-scope identity intersections.",
+      "dataset_name": "EASY"
     },
     "MEDIUM": {
-      "source_version": "0.5",
-      "source_variant": "A",
       "item_scope": [
         "C001",
         "C010"
@@ -153,24 +153,24 @@
           "right": "ChatGPT",
           "common_papers": 11,
           "fixed_slots": 50,
-          "observed_queries": 10,
-          "coverage": 0.22
+          "coverage": 0.22,
+          "planned_queries": 10
         },
         {
           "left": "Ours",
           "right": "Gemini",
           "common_papers": 6,
           "fixed_slots": 50,
-          "observed_queries": 10,
-          "coverage": 0.12
+          "coverage": 0.12,
+          "planned_queries": 10
         },
         {
           "left": "ChatGPT",
           "right": "Gemini",
           "common_papers": 10,
           "fixed_slots": 50,
-          "observed_queries": 10,
-          "coverage": 0.2
+          "coverage": 0.2,
+          "planned_queries": 10
         }
       ],
       "paperarena_usage": {
@@ -189,11 +189,10 @@
         },
         "requests_missing_usage": 63,
         "complete_total_tokens": null
-      }
+      },
+      "dataset_name": "MEDIUM"
     },
     "HARD": {
-      "source_version": "0.5",
-      "source_variant": "B",
       "item_scope": [
         "C001",
         "C010"
@@ -235,24 +234,24 @@
           "right": "ChatGPT",
           "common_papers": 3,
           "fixed_slots": 50,
-          "observed_queries": 10,
-          "coverage": 0.06
+          "coverage": 0.06,
+          "planned_queries": 10
         },
         {
           "left": "Ours",
           "right": "Gemini",
           "common_papers": 8,
           "fixed_slots": 50,
-          "observed_queries": 10,
-          "coverage": 0.16
+          "coverage": 0.16,
+          "planned_queries": 10
         },
         {
           "left": "ChatGPT",
           "right": "Gemini",
           "common_papers": 7,
           "fixed_slots": 50,
-          "observed_queries": 10,
-          "coverage": 0.14
+          "coverage": 0.14,
+          "planned_queries": 10
         }
       ],
       "paperarena_usage": {
@@ -271,7 +270,8 @@
         },
         "requests_missing_usage": 674,
         "complete_total_tokens": null
-      }
+      },
+      "dataset_name": "HARD"
     }
   },
   "paperarena_overall": {
@@ -316,7 +316,63 @@
         "source": "https://gemini.google/subscriptions/?currencyCode=USD"
       }
     },
-    "comparison_note": "Subscription prices are reference examples, not observed per-query browser costs; the experiment subscriptions were not recorded."
+    "comparison_note": "Historical sample cost, OpenAI known-workload illustrations, Google typical-task agent estimates, and browser subscriptions have separate accounting bases. ChatGPT and Gemini evaluation used October 2026 web Deep Research.",
+    "deep_research_api": {
+      "checked_on": "2026-10-13",
+      "currency": "USD",
+      "web_baseline_backend_models_measured": false,
+      "openai_known_workload_illustrations": {
+        "basis": "Repricing Idea2Prior reported mean workload, not measured web or research-agent usage",
+        "mean_input_tokens": 298594.3,
+        "mean_output_tokens": 89490.1,
+        "formula": "mean_input_tokens / 1000000 * input_rate + mean_output_tokens / 1000000 * output_rate",
+        "assumptions": [
+          "Uncached token rates; no cache or batch discount.",
+          "Tools and unknown usage are excluded, not treated as zero.",
+          "Per-task totals span multiple requests, not a single model input.",
+          "Actual research agents can use different tokenization, reasoning and searches."
+        ],
+        "models": [
+          {
+            "model": "o3-deep-research",
+            "input_usd_per_million": 10,
+            "cached_input_usd_per_million": 2.5,
+            "output_usd_per_million": 40,
+            "estimated_token_only_usd_per_task": 6.5655470000000005,
+            "source": "https://developers.openai.com/api/docs/models/o3-deep-research"
+          },
+          {
+            "model": "o4-mini-deep-research",
+            "input_usd_per_million": 2,
+            "cached_input_usd_per_million": 0.5,
+            "output_usd_per_million": 8,
+            "estimated_token_only_usd_per_task": 1.3131094,
+            "source": "https://developers.openai.com/api/docs/models/o4-mini-deep-research"
+          }
+        ]
+      },
+      "gemini_official_typical_task_estimates": {
+        "basis": "Google example-task estimates at preview rates, not derived from Idea2Prior tokens",
+        "fixed_per_task_tariff": false,
+        "source": "https://ai.google.dev/gemini-api/docs/deep-research#availability-and-pricing",
+        "billing_rules_source": "https://ai.google.dev/gemini-api/docs/pricing#pricing-for-agents",
+        "agents": [
+          {
+            "agent": "deep-research-preview-04-2026",
+            "estimated_usd_per_task_min": 1,
+            "estimated_usd_per_task_max": 3
+          },
+          {
+            "agent": "deep-research-max-preview-04-2026",
+            "estimated_usd_per_task_min": 3,
+            "estimated_usd_per_task_max": 7
+          }
+        ],
+        "same_known_workload_estimate_usd": null,
+        "same_workload_estimate_status": "Undetermined without per-model usage, cache split and tool counts",
+        "rates_subject_to_change": true
+      }
+    }
   },
   "source_fingerprints": {
     "agreed_summary": {
@@ -325,13 +381,53 @@
     "agreed_report": {
       "sha256": "60c9a83072a5f4182e0c09f13061a9e76b75606d2fb74273bcbcb51eb006ef93"
     },
-    "v02_usage_audit": {
+    "easy_requested_scope_comparison": {
+      "sha256": "94d5724c5501a289575665404ab56a1a2ceb81847f2ec3eaa3ac2f29c772d2ca"
+    },
+    "easy_usage_audit": {
       "sha256": "ff0957b6942c361886850d5b5706aa296d1370560a174f87ce0a8851115f478a"
     },
-    "v05_usage_audit": {
+    "medium_hard_usage_audit": {
       "sha256": "ab69b4acdaa1aedfe1a3b25c1a407c74a461f8183c2e02fdc4d09e75573b286b"
     }
   },
   "new_paid_api_calls_for_summary": 0,
-  "new_retrieval_runs_for_summary": 0
+  "new_retrieval_runs_for_summary": 0,
+  "dataset_construction_provenance": {
+    "authoring_tool": "ChatGPT",
+    "authoring_model": "GPT-6 Astra",
+    "role": "Extract and generate shared literature-search prompts",
+    "source": "maintainer-provided construction record",
+    "shared_across_methods": [
+      "Idea2Prior",
+      "ChatGPT Deep Research",
+      "Gemini Deep Research"
+    ],
+    "input_preservation": "Original prompt bytes and query strings are retained"
+  },
+  "aggregate_hit_at_5": {
+    "Ours": {
+      "hits": 16,
+      "query_cases": 30,
+      "rate": 0.5333333333333333,
+      "basis": "Adopted per-tier historical reporting convention; query cases can share target papers"
+    },
+    "ChatGPT": {
+      "hits": 13,
+      "query_cases": 30,
+      "rate": 0.43333333333333335,
+      "basis": "Adopted per-tier historical reporting convention; query cases can share target papers"
+    },
+    "Gemini": {
+      "hits": 11,
+      "query_cases": 30,
+      "rate": 0.36666666666666664,
+      "basis": "Adopted per-tier historical reporting convention; query cases can share target papers"
+    }
+  },
+  "upstream": {
+    "paper": "https://arxiv.org/abs/2510.10909",
+    "repository": "https://github.com/ustc-ai4science/PaperArena",
+    "relationship": "Extended from PaperArena"
+  }
 }

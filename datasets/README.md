@@ -2,13 +2,17 @@
 
 English is the primary documentation language. [中文说明](README.zh-CN.md) is also available.
 
-| Tier | Original input | IDs | Queries |
-| --- | --- | --- | ---: |
-| EASY | Idea2Paper Niche30 v0.2, A | N001–N030 | 30 |
-| MEDIUM | Idea2Paper Fuzzy30 v0.5, A | C001–C030 | 30 |
-| HARD | Idea2Paper Fuzzy30 v0.5, B | C001–C030 | 30 |
+| Tier | IDs | Queries |
+| --- | --- | ---: |
+| EASY | N001–N030 | 30 |
+| MEDIUM | C001–C030 | 30 |
+| HARD | C001–C030 | 30 |
 
 EASY, MEDIUM, and HARD describe intended difficulty based on how much information the prompt supplies. They do not mean the difficulty of all 30 queries has been empirically calibrated. The tiers are not independent target-paper pools: MEDIUM and HARD share targets with different queries. Original query order is preserved. Select by ID; do not assume the first EASY record is N001.
+
+## Dataset construction
+
+GPT-6 Astra in ChatGPT was used to extract and generate the shared literature-search prompts, according to the maintainer's construction record. The same filled prompt for an item is used across Idea2Prior, ChatGPT Deep Research, and Gemini Deep Research. EASY, MEDIUM, and HARD preserve the supplied query versions with different amounts of information; original prompt bytes are retained. Each tier's manifest records this construction provenance separately from the source and file hashes.
 
 ## Files and input integrity
 
@@ -28,7 +32,7 @@ Runtime retrieval reads only `queries.jsonl` and `prompts/`. **`gold.jsonl` is f
 
 ## Evaluation policy
 
-The designated paper is a known positive. Broad queries may also match other research. Hit@5 measures whether the designated paper was retrieved; it does not establish that other candidates are invalid. Semantic relevance and relationships between versions still require manual review. An arXiv ID is a record-level association; verify the relationship of historical versions to the journal paper. Original v0.5 `family_aliases` remain in the evaluation file; strict designated-target hits and work-family hits are scored separately.
+The designated paper is a known positive. Broad queries may also match other research. Hit@5 measures whether the designated paper was retrieved; it does not establish that other candidates are invalid. Semantic relevance and relationships between versions still require manual review. An arXiv ID is a record-level association; verify the relationship of historical versions to the journal paper. The original `family_aliases` remain in the evaluation file; strict designated-target hits and work-family hits are scored separately.
 
 The packages include original queries and prompts, reference bibliographic metadata, short curator notes, supplied browser responses, and selected pipeline output files. They do not contain downloaded paper PDFs, extracted full-text caches, credentials, or raw request logs. Third-party papers and provider content retain their own rights.
 
@@ -38,7 +42,7 @@ Verify the packaged files and hashes offline:
 python scripts/build_public_datasets.py
 ```
 
-For development, supply `--source-root <directory-containing-original-packages>` to rebuild the tiers. Normal use does not require the private archive. The build tool does not modify original sources.
+For development, supply `--source-root <directory-containing-easy-medium-hard>` to copy and verify canonical tiers into `--output-root`. Normal use does not require a private archive. The tool does not rewrite queries or source files.
 
 After retrieval, calculate designated-target Hit@5 offline:
 

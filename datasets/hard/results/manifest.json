@@ -24,10 +24,10 @@
   ],
   "idea2prior_selected_query_count": 10,
   "idea2prior_source_reports_sha256": {
-    "V05_AB_FIRST3_FINAL.json": "b1ad39318f16a503bea29d1934b331177c1b2cf7755c7297e631d326d6d0b572",
-    "V05_B004_005_FINAL.json": "996e757a85a337f54dc09f4bdc10286a1e11f50c39db598a419b90a147f07d1a",
-    "V05_C005_B_RERUN_FINAL.json": "0f8758b6dbc0bf007c24730f1ff298e19190bf08381235d9aa1f60391c93726d",
-    "V05_B006_015_FINAL.json": "aacdc0666f41ca0f5e1d9d3e8553cc7e719b3a99eedb480025b9dca4eabe3de2"
+    "HARD_selected_report_1": "b1ad39318f16a503bea29d1934b331177c1b2cf7755c7297e631d326d6d0b572",
+    "HARD_selected_report_2": "996e757a85a337f54dc09f4bdc10286a1e11f50c39db598a419b90a147f07d1a",
+    "HARD_selected_report_3": "0f8758b6dbc0bf007c24730f1ff298e19190bf08381235d9aa1f60391c93726d",
+    "HARD_selected_report_4": "aacdc0666f41ca0f5e1d9d3e8553cc7e719b3a99eedb480025b9dca4eabe3de2"
   },
   "files_sha256": {
     "chatgpt.txt": "da32056970328bfe8b8f5c12ba1c98682aa4a798e5a1c1fd412f29ae5c3d2805",

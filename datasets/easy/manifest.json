@@ -2,14 +2,10 @@
   "schema_version": 1,
   "difficulty": "EASY",
   "item_count": 30,
-  "source_version": "0.2",
-  "source_variant": "A",
-  "source_package": "Idea2Paper_Niche30_v0_2/Idea2Paper_Niche30_v0_2",
-  "source_query_file": "queries_A_blind.jsonl",
   "source_query_file_sha256": "e643a6207ae44ea4e9c297d9f5cf8f685f2efa138f68d59035a1e910db9ed76b",
   "source_gold_file_sha256": "c75f50bc0e8e4f1652ffc429f151a16cae103fda58b5572430b225f83cb3abfa",
   "query_file_sha256": "ff8ccdc2b05e4ada23bfdd0a0807fc60fb3afd679ae80e85e8028d88b4a6efa6",
-  "gold_file_sha256": "b34d09886932a3ffba2b62526a599d16a42567711d4ad9f11dbe479228e0c1b4",
+  "gold_file_sha256": "a98f08f763941872d61ef90ecf6bf463a933d235cb7c47db2ece71f99e308abc",
   "difficulty_status": "Intended query difficulty; not empirically calibrated across all 30 items.",
   "input_preservation": "Prompt bytes and query strings are copied without rewriting.",
   "gold_policy": "Reference identities are evaluation-only; never include gold.jsonl in retrieval input.",
@@ -196,7 +192,7 @@
     }
   ],
   "files_sha256": {
-    "gold.jsonl": "b34d09886932a3ffba2b62526a599d16a42567711d4ad9f11dbe479228e0c1b4",
+    "gold.jsonl": "a98f08f763941872d61ef90ecf6bf463a933d235cb7c47db2ece71f99e308abc",
     "prompts/N001.txt": "15940a550ad8fb0a7a6955915672fbd0b7a09fe21b50e9728a490686ca749584",
     "prompts/N002.txt": "729cd82e23ced69d11929bf201acf214e90c8c5b8f3bfc2b97174e3c4db67022",
     "prompts/N003.txt": "81b0eb6b40a8440f032b137a959a20c366a47a01a0c5a41634b019bd7abebf1c",
@@ -228,7 +224,7 @@
     "prompts/N029.txt": "f979bd7ab343bfdbb8e52e8d7b4e48c164292efc9031a3127d9cefc7eb9d7ea9",
     "prompts/N030.txt": "74e9b05b8fc43de6c95cc5cb346b1b7b4196be26c23fdfe853f31d4139a34889",
     "queries.jsonl": "ff8ccdc2b05e4ada23bfdd0a0807fc60fb3afd679ae80e85e8028d88b4a6efa6",
-    "README.md": "dd1d3f43b852b0ffa299e64414074f4474b64280c79f3001f7c8ca3e12ff7cc9",
+    "README.md": "3e761661b0bffd361f765183636280cf53874704fee171e3bb242382d1b6b415",
     "results/chatgpt.txt": "5eb77864bcf3b3dbae724d2a607f8632eca57c02c558a9209373e5f7499fbd07",
     "results/gemini.txt": "d8450f4fa50da23ebfdc4d97a81ce7a02f7e01e258ecca03d413b9f1b4a06449",
     "results/idea2prior_expert/N001.json": "f84e40511b0e9256c0e992f75034c3722cb802a0b272860ec0a53506ea2923bb",
@@ -243,7 +239,20 @@
     "results/idea2prior_expert/N010.json": "6ab4bb358038ec176537a659621f1f41dbc6fb915f78c12ad2d5d8d3b3e09628",
     "results/idea2prior_results.json": "35a134b43c4f7b9f4e0012384bd7751c78030cf233a7d92765bc121559275414",
     "results/idea2prior_top5.txt": "ffa91eaec389d934d5520a469b4e4b70305d6329dc3b7f077900f6b42d3cf601",
-    "results/manifest.json": "7b5c22482ed267f9a3da76b53221e52c1e6c1288cac03621f45f0db671081d8d",
+    "results/manifest.json": "acff17461e8fd15cec207a407da468b3d4e95007cbdc14706e9017ef14bea1f1",
     "results/README.md": "6041d11ff90b4bc75283047483656e252eb0dc5875114d3ac936d895806eaaec"
+  },
+  "dataset_name": "EASY",
+  "construction_provenance": {
+    "authoring_tool": "ChatGPT",
+    "authoring_model": "GPT-6 Astra",
+    "role": "Extract and generate shared literature-search prompts",
+    "source": "maintainer-provided construction record",
+    "shared_across_methods": [
+      "Idea2Prior",
+      "ChatGPT Deep Research",
+      "Gemini Deep Research"
+    ],
+    "input_preservation": "Original prompt bytes and query strings are retained"
   }
 }

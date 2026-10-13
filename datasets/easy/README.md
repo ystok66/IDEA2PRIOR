@@ -1,6 +1,6 @@
 # EASY benchmark
 
-This tier contains the original **Idea2Paper Niche30 v0.2 A** inputs: 30 queries with IDs **N001–N030**. Prompt bytes and query wording are preserved. Original query-file order is preserved; select by ID rather than line position.
+This tier contains the original **EASY** inputs: 30 queries with IDs **N001–N030**. Prompt bytes and query wording are preserved. Original query-file order is preserved; select by ID rather than line position.
 
 `queries.jsonl` and `prompts/` are blind runtime inputs. `gold.jsonl` is separate and must be read only after retrieval for local evaluation. `manifest.json` records original sources and SHA-256 hashes.
 
