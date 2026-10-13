@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Idea2Prior · Find papers from an idea</title><link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar"><a class="brand" href="/"><span class="brand-mark">I</span>Idea2Prior<span class="brand-tag" data-i18n="brandTag">RESEARCH WORKSPACE</span></a><div class="header-tools"><span class="local-pill"><i></i><span data-i18n="localWorkspace">Local workspace</span></span><div class="language-switch" role="group" aria-label="Interface language" data-i18n-aria="language"><button id="lang-en" type="button" aria-pressed="true">EN</button><button id="lang-zh" type="button" aria-pressed="false">中文</button></div></div></header>
+    <main>
+      <div class="intro"><div><p class="eyebrow" data-i18n="eyebrow">IDEA → EVIDENCE → TOP 5</p><h1 data-i18n="heading">Turn a research idea into a shortlist.</h1><p class="intro-copy" data-i18n="introCopy">Search, verify, and rank papers. Choose the models for each stage.</p></div><span class="intro-label" data-i18n="introLabel">Reproducible literature retrieval</span></div>
+      <div class="workspace">
+        <section class="input-panel">
+          <div class="section-title"><span class="section-number">01</span><h2 data-i18n="researchIdea">Research idea</h2></div>
+          <div class="source-tabs"><button id="custom-tab" class="source-tab active" type="button" data-i18n="customInput">Write an idea</button><button id="benchmark-tab" class="source-tab" type="button" data-i18n="benchmark">Benchmark</button></div>
+          <div id="benchmark-controls" class="benchmark-controls hidden"><div class="difficulty-buttons"><button type="button" data-difficulty="easy" class="difficulty active">EASY</button><button type="button" data-difficulty="medium" class="difficulty">MEDIUM</button><button type="button" data-difficulty="hard" class="difficulty">HARD</button></div><label><span data-i18n="selectItem">Select an item</span><select id="benchmark-item"></select></label><p class="field-help" id="dataset-description" data-i18n="blindInputOnly">Only blind research inputs are loaded.</p></div>
+          <label for="query" class="sr-only" data-i18n="researchIdea">Research idea</label><textarea id="query" rows="6" placeholder="Describe the research problem, approach, or assumptions. You can also choose a benchmark item." data-i18n-placeholder="queryPlaceholder"></textarea>
+          <div class="query-footer"><span data-i18n="queryLanguages">English or Chinese</span><span id="char-count">0 characters</span></div>
+          <div class="section-title api-title"><span class="section-number">02</span><h2 data-i18n="modelsAndApi">Models & API</h2><button id="add-profile" class="text-button" type="button" data-i18n="addApi">＋ Add API</button></div>
+          <p class="section-help" data-i18n="modelHelp">The default setup uses Gemini Flash Lite for retrieval and scoring, and Gemini Flash for Expert ranking. You can change every model and provider.</p>
+          <div id="profiles"></div>
+          <div class="role-grid"><label><span data-i18n="heavyRole">Retrieval & abstract scoring</span><select id="heavy-role"></select></label><label><span data-i18n="lightRole">Keywords & light tasks</span><select id="light-role"></select></label><label><span data-i18n="expertRole">Expert ranking</span><select id="expert-role"></select></label></div>
+          <details class="advanced"><summary data-i18n="retrievalSettings">Retrieval settings & output</summary><div class="advanced-body"><label><span data-i18n="outputMode">Output mode</span><select id="mode"><option value="retrieval_eval" data-i18n="top5Mode">Retrieval evaluation · Top 5</option><option value="full_report" data-i18n="reportMode">Full research report</option></select></label><label><span data-i18n="timeLimit">Time limit per item (minutes)</span><input id="timeout" type="number" min="1" max="120" value="30"></label><label><span data-i18n="serpapiKey">SerpAPI key (optional)</span><input id="serpapi-key" type="password" autocomplete="off" placeholder="Use public search sources when blank" data-i18n-placeholder="serpapiPlaceholder"></label><label><span data-i18n="s2Key">Semantic Scholar key (optional)</span><input id="s2-key" type="password" autocomplete="off" placeholder="For authenticated scholarly retrieval" data-i18n-placeholder="s2Placeholder"></label><label class="checkbox-label"><input id="duckduckgo" type="checkbox" checked><span data-i18n="supplementarySearch">Enable supplementary web search</span></label><p class="field-help" data-i18n="top5Protocol">Top 5 mode reviews up to 60 shortlisted papers and makes five fixed full-text attempts. Missing full text retains abstract evidence, without replacements.</p></div></details>
+          <div class="run-actions"><button id="run-button" class="primary-button" type="button"><span data-i18n="startRetrieval">Start retrieval</span><span>↗</span></button><button id="dry-run-button" class="secondary-button" type="button" data-i18n="checkConfig">Check configuration</button><button id="cancel-button" class="cancel-button hidden" type="button" data-i18n="stopRun">Stop run</button></div>
+          <p class="privacy-note" data-i18n="privacy">API keys stay in memory for this local session and are not saved to browser storage or result files. Starting retrieval calls the selected APIs.</p><p id="form-error" class="form-error hidden" role="alert"></p>
+        </section>
+        <section class="results-panel">
+          <div class="results-heading"><div class="section-title"><span class="section-number">03</span><h2 data-i18n="retrievalResults">Retrieval results</h2></div><span id="status-badge" class="status-badge" data-i18n="waiting">Ready when you are</span></div>
+          <div class="metric-grid"><div><span class="metric-label" data-i18n="elapsed">Elapsed</span><strong id="elapsed">—</strong></div><div><span class="metric-label" data-i18n="reportedTokens">Reported tokens</span><strong id="token-count">—</strong></div><div><span class="metric-label" data-i18n="rankedPapers">Ranked papers</span><strong id="paper-count">—</strong></div></div>
+          <div id="run-state" class="run-state hidden"><span class="activity-dot"></span><div><strong id="phase-label" data-i18n="preparing">Preparing</strong><p id="phase-detail" data-i18n="runningDetail">You can stop at any time. Results and stage records stay local.</p></div></div>
+          <div id="failure-details" class="failure-details hidden" role="status" aria-live="polite"><h3 data-i18n="diagnostics">Run diagnostics</h3><p id="failure-reason"></p><dl id="failure-fields"></dl><details id="diagnostic-list-details" class="diagnostic-list-details hidden"><summary id="diagnostic-list-summary" data-i18n="additionalDiagnostics">Additional diagnostics</summary><ol id="diagnostic-list" class="diagnostic-list"></ol><p id="diagnostic-list-note" class="diagnostic-list-note"></p></details></div>
+          <div id="empty-state" class="empty-state"><div class="paper-illustration"><span class="paper-page"></span><span class="paper-page"></span><span class="paper-page"></span><span class="search-orbit">↗</span></div><h3 data-i18n="emptyHeading">Relevant work, backed by evidence.</h3><p data-i18n="emptyCopy">Enter an idea and configure your API. Ranked candidate papers will appear here.</p><div class="method-tags"><span data-i18n="identityCheck">Identity checks</span><span data-i18n="abstractScoring">Abstract scoring</span><span data-i18n="pdfExcerpts">PDF excerpts</span><span data-i18n="expertRanking">Expert ranking</span></div></div>
+          <ol id="paper-list" class="paper-list"></ol>
+          <div id="result-note" class="result-note hidden"></div><div id="result-actions" class="result-actions hidden"><button id="download-json" class="secondary-button" type="button" data-i18n="downloadJson">Download result JSON</button></div>
+          <details id="technical-details" class="technical-details hidden"><summary data-i18n="runInformation">Run information</summary><pre id="technical-output"></pre></details>
+        </section>
+      </div>
+    </main>
+    <footer><span data-i18n="footerProject">Idea2Prior · Research, experiments & comparison</span><span data-i18n="footerLicense">Noncommercial use · Contact the author for commercial licensing</span></footer>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,337 @@
+{
+  "project": "Idea2Prior",
+  "schema_version": 1,
+  "status": "HISTORICAL_COMPARISON",
+  "test_period": "2026-10",
+  "documentation_updated": "2026-10-13",
+  "browser_baselines": {
+    "ChatGPT": {
+      "product": "Deep Research",
+      "surface": "web",
+      "version_period": "2026-10",
+      "backend_build": null,
+      "subscription_used": null,
+      "mean_minutes_per_query": 5.2,
+      "time_source": "user-reported; no independent per-query timing logs",
+      "tokens": null
+    },
+    "Gemini": {
+      "product": "Deep Research",
+      "surface": "web",
+      "version_period": "2026-10",
+      "backend_build": null,
+      "subscription_used": null,
+      "mean_minutes_per_query": 4.7,
+      "time_source": "user-reported; no independent per-query timing logs",
+      "tokens": null
+    }
+  },
+  "metrics": {
+    "hit_at_5": "Queries with the designated reference paper among the first five returned papers / planned queries.",
+    "mutual_top5_coverage": "Sum of same-query paper-identity intersections / fixed Top 5 slots; rank order ignored.",
+    "token_accounting": "Provider-reported subtotals summed across all model stages. Missing usage is unknown.",
+    "runtime_accounting": "Final selected query runs; excludes superseded whole-query attempts and shared preflight checks."
+  },
+  "tiers": {
+    "EASY": {
+      "source_version": "0.2",
+      "source_variant": "A",
+      "item_scope": [
+        "N001",
+        "N010"
+      ],
+      "available_dataset_queries": 30,
+      "compared_queries": 10,
+      "targets": {
+        "Ours": {
+          "hit_count": 9,
+          "denominator": 10,
+          "hit_at_5": 0.9,
+          "basis": "observed after failed-only operational recovery"
+        },
+        "ChatGPT": {
+          "hit_count": 7,
+          "denominator": 10,
+          "hit_at_5": 0.7,
+          "basis": "agreed reporting convention; observed and convention-based counts retained",
+          "observed_hit_count": 6,
+          "assumed_hit_count": 1
+        },
+        "Gemini": {
+          "hit_count": 7,
+          "denominator": 10,
+          "hit_at_5": 0.7,
+          "basis": "observed"
+        }
+      },
+      "mutual_coverage": [
+        {
+          "left": "Ours",
+          "right": "ChatGPT",
+          "common_papers": 14,
+          "fixed_slots": 45,
+          "observed_queries": 9,
+          "coverage": 0.3111111111111111
+        },
+        {
+          "left": "Ours",
+          "right": "Gemini",
+          "common_papers": 13,
+          "fixed_slots": 45,
+          "observed_queries": 9,
+          "coverage": 0.28888888888888886
+        },
+        {
+          "left": "ChatGPT",
+          "right": "Gemini",
+          "common_papers": 17,
+          "fixed_slots": 45,
+          "observed_queries": 9,
+          "coverage": 0.37777777777777777
+        }
+      ],
+      "paperarena_usage": {
+        "queries": 10,
+        "total_wall_seconds": 5344.498999999998,
+        "mean_wall_seconds": 534.4498999999998,
+        "reported_token_subtotal": {
+          "prompt_tokens": 2888218,
+          "completion_tokens": 881536,
+          "total_tokens": 3769754
+        },
+        "mean_reported_token_subtotal_per_item": {
+          "prompt_tokens": 288821.8,
+          "completion_tokens": 88153.6,
+          "total_tokens": 376975.4
+        },
+        "requests_missing_usage": 754,
+        "complete_total_tokens": null
+      },
+      "coverage_note": "Retains the originally agreed nine-query coverage denominator."
+    },
+    "MEDIUM": {
+      "source_version": "0.5",
+      "source_variant": "A",
+      "item_scope": [
+        "C001",
+        "C010"
+      ],
+      "available_dataset_queries": 30,
+      "compared_queries": 10,
+      "targets": {
+        "Ours": {
+          "hit_count": 5,
+          "denominator": 10,
+          "hit_at_5": 0.5,
+          "basis": "observed",
+          "returned_papers": 50,
+          "fixed_slots": 50,
+          "missing_slots": 0
+        },
+        "ChatGPT": {
+          "hit_count": 3,
+          "denominator": 10,
+          "hit_at_5": 0.3,
+          "basis": "observed",
+          "returned_papers": 50,
+          "fixed_slots": 50,
+          "missing_slots": 0
+        },
+        "Gemini": {
+          "hit_count": 3,
+          "denominator": 10,
+          "hit_at_5": 0.3,
+          "basis": "observed",
+          "returned_papers": 43,
+          "fixed_slots": 50,
+          "missing_slots": 7
+        }
+      },
+      "mutual_coverage": [
+        {
+          "left": "Ours",
+          "right": "ChatGPT",
+          "common_papers": 11,
+          "fixed_slots": 50,
+          "observed_queries": 10,
+          "coverage": 0.22
+        },
+        {
+          "left": "Ours",
+          "right": "Gemini",
+          "common_papers": 6,
+          "fixed_slots": 50,
+          "observed_queries": 10,
+          "coverage": 0.12
+        },
+        {
+          "left": "ChatGPT",
+          "right": "Gemini",
+          "common_papers": 10,
+          "fixed_slots": 50,
+          "observed_queries": 10,
+          "coverage": 0.2
+        }
+      ],
+      "paperarena_usage": {
+        "queries": 10,
+        "total_wall_seconds": 5887.486000000004,
+        "mean_wall_seconds": 588.7486000000005,
+        "reported_token_subtotal": {
+          "prompt_tokens": 3041229,
+          "completion_tokens": 916957,
+          "total_tokens": 3958186
+        },
+        "mean_reported_token_subtotal_per_item": {
+          "prompt_tokens": 304122.9,
+          "completion_tokens": 91695.7,
+          "total_tokens": 395818.6
+        },
+        "requests_missing_usage": 63,
+        "complete_total_tokens": null
+      }
+    },
+    "HARD": {
+      "source_version": "0.5",
+      "source_variant": "B",
+      "item_scope": [
+        "C001",
+        "C010"
+      ],
+      "available_dataset_queries": 30,
+      "compared_queries": 10,
+      "targets": {
+        "Ours": {
+          "hit_count": 2,
+          "denominator": 10,
+          "hit_at_5": 0.2,
+          "basis": "observed",
+          "returned_papers": 50,
+          "fixed_slots": 50,
+          "missing_slots": 0
+        },
+        "ChatGPT": {
+          "hit_count": 3,
+          "denominator": 10,
+          "hit_at_5": 0.3,
+          "basis": "observed",
+          "returned_papers": 50,
+          "fixed_slots": 50,
+          "missing_slots": 0
+        },
+        "Gemini": {
+          "hit_count": 1,
+          "denominator": 10,
+          "hit_at_5": 0.1,
+          "basis": "observed",
+          "returned_papers": 50,
+          "fixed_slots": 50,
+          "missing_slots": 0
+        }
+      },
+      "mutual_coverage": [
+        {
+          "left": "Ours",
+          "right": "ChatGPT",
+          "common_papers": 3,
+          "fixed_slots": 50,
+          "observed_queries": 10,
+          "coverage": 0.06
+        },
+        {
+          "left": "Ours",
+          "right": "Gemini",
+          "common_papers": 8,
+          "fixed_slots": 50,
+          "observed_queries": 10,
+          "coverage": 0.16
+        },
+        {
+          "left": "ChatGPT",
+          "right": "Gemini",
+          "common_papers": 7,
+          "fixed_slots": 50,
+          "observed_queries": 10,
+          "coverage": 0.14
+        }
+      ],
+      "paperarena_usage": {
+        "queries": 10,
+        "total_wall_seconds": 4770.405999999999,
+        "mean_wall_seconds": 477.04059999999987,
+        "reported_token_subtotal": {
+          "prompt_tokens": 3028382,
+          "completion_tokens": 886210,
+          "total_tokens": 3914592
+        },
+        "mean_reported_token_subtotal_per_item": {
+          "prompt_tokens": 302838.2,
+          "completion_tokens": 88621.0,
+          "total_tokens": 391459.2
+        },
+        "requests_missing_usage": 674,
+        "complete_total_tokens": null
+      }
+    }
+  },
+  "paperarena_overall": {
+    "queries": 30,
+    "total_wall_seconds": 16002.391000000001,
+    "mean_wall_seconds": 533.4130333333334,
+    "reported_token_subtotal": {
+      "prompt_tokens": 8957829,
+      "completion_tokens": 2684703,
+      "total_tokens": 11642532
+    },
+    "mean_reported_token_subtotal_per_item": {
+      "prompt_tokens": 298594.3,
+      "completion_tokens": 89490.1,
+      "total_tokens": 388084.4
+    },
+    "requests_missing_usage": 1491,
+    "complete_total_tokens": null
+  },
+  "cost_reference": {
+    "paperarena": {
+      "currency": "USD",
+      "mean_per_query": 0.0945273631840796,
+      "mean_per_query_display": "$0.0945",
+      "sample_queries": 9,
+      "source": "user-reported cost sample",
+      "same_cohort_as_30_query_token_statistics": false,
+      "complete_historical_bill": null
+    },
+    "web_plans": {
+      "checked_on": "2026-10-13",
+      "ChatGPT": {
+        "example_plan": "Plus",
+        "monthly_usd": 20,
+        "fixed_deep_research_report_price_usd": null,
+        "source": "https://learn.chatgpt.com/docs/pricing"
+      },
+      "Gemini": {
+        "example_plan": "Google AI Pro",
+        "monthly_usd": 19.99,
+        "fixed_deep_research_report_price_usd": null,
+        "source": "https://gemini.google/subscriptions/?currencyCode=USD"
+      }
+    },
+    "comparison_note": "Subscription prices are reference examples, not observed per-query browser costs; the experiment subscriptions were not recorded."
+  },
+  "source_fingerprints": {
+    "agreed_summary": {
+      "sha256": "22376008b78ae50f8b76a39a199e32b84e0de8d1d1e1796ed34cec0161c0a5cf"
+    },
+    "agreed_report": {
+      "sha256": "60c9a83072a5f4182e0c09f13061a9e76b75606d2fb74273bcbcb51eb006ef93"
+    },
+    "v02_usage_audit": {
+      "sha256": "ff0957b6942c361886850d5b5706aa296d1370560a174f87ce0a8851115f478a"
+    },
+    "v05_usage_audit": {
+      "sha256": "ab69b4acdaa1aedfe1a3b25c1a407c74a461f8183c2e02fdc4d09e75573b286b"
+    }
+  },
+  "new_paid_api_calls_for_summary": 0,
+  "new_retrieval_runs_for_summary": 0
+}

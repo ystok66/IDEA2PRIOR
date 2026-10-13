@@ -1,0 +1,966 @@
+# 最匹配“地图应允许人们对社区边界存在分歧”的研究论文
+
+## 核心结论
+
+在核查了 2015–2025 年间关于 **neighbourhood boundary perception、self-defined neighbourhood、fuzzy boundaries、participatory/GIS mapping、platial cartography** 的相关研究后，我认为最强匹配是 **Milana Glebova 的 _Visualising Fuzzy Boundaries of City Neighbourhoods_**。它不是仅仅“研究社区边界是否模糊”，而是直接把问题落在**地图应该怎样表达一个社区的模糊、非硬边界**上：论文明确以改进 neighborhood 作为 place 的“crisp and fuzzy boundaries”及内部结构的**cartographic visualisation**为目标，并实际比较了不同可视化方案。PLATIAL’21 官方议程进一步报告，其实验表明受试者可以识别模糊边界，而且能够显示社区内部细分、同时保留底图可见性的表达方式效果最好。citeturn18view0turn18view1
+
+因此，如果题目的完整含义是：
+
+> **不要让地图假装一个 neighborhood 存在唯一、绝对、所有人都同意的边界，而应让这种不确定性/模糊性在地图本身中有表达空间。**
+
+那么 Glebova 是明显的第一候选。它同时命中了 **地图表示 + neighborhood + 边界 + fuzziness** 四个核心部分，而下面几篇大多只覆盖其中三项。citeturn18view1
+
+不过，我不会把答案说成绝对唯一。如果这里的 “disagreement” 特别强调的是**不同居民各自画出的 neighborhood 不一致**，而不是边界本身的模糊 cartographic representation，那么 Shmool et al.、Finlay et al. 和 Pinchak et al. 都是可信的竞争候选。citeturn20search17turn21view3turn16view3
+
+## 候选排名
+
+| 排名 | 论文 | 作者 | 年份与发表场所 | DOI / 稳定链接 | 与完整想法的匹配 |
+|---|---|---|---|---|---|
+| **1** | **_Visualising Fuzzy Boundaries of City Neighbourhoods_** | **Milana Glebova** | **2022**, *Proceedings of the 3rd International Symposium on Platial Information Science (PLATIAL’21)*, pp. 41–47 | https://doi.org/10.5281/zenodo.5767186 | **直接研究怎样用制图方式表示 city neighbourhood 的 crisp 与 fuzzy boundaries，因此最接近“地图本身应给边界的不确定/争议留出空间”。** citeturn18view0turn18view1 |
+| **2** | **_Developing a GIS-Based Online Survey Instrument to Elicit Perceived Neighborhood Geographies to Address the Uncertain Geographic Context Problem_** | **Jessie L. C. Shmool, Isaac L. Johnson, Zan M. Dodson, Robert Keene, Robert Gradeck, Scott R. Beach, Jane E. Clougherty** | **2018**, *The Professional Geographer*, 70(3), 423–433 | https://doi.org/10.1080/00330124.2017.1416299 | **不是先规定一个官方 neighborhood，而是用 GIS 调查工具获取参与者自己感知的 neighborhood geography，把“不同人会画出不同范围”纳入空间数据生成过程。** citeturn20search0turn20search17 |
+| **3** | **_‘My neighbourhood is fuzzy, not hard and fast’: Individual and contextual associations with perceived residential neighbourhood boundaries among ageing Americans_** | **Jessica Finlay, Joy Jang, Michael Esposito, Leslie McClure, Suzanne Judd, Philippa Clarke** | **2023**, *Urban Studies*, 60(1), 85–108；online-first 2022 | https://doi.org/10.1177/00420980221089582 | **论文最直接支持题目中的“disagreement/fuzziness”前提：neighbourhood 是因人、因地而变的流动社会—空间构造，居民自己就把其边界描述为“fuzzy”，只是论文重点不是如何把这种分歧画到地图上。** citeturn21view3turn19search2 |
+| **4** | **_Activity Locations, Residential Segregation, and the Significance of Residential Neighborhood Boundary Perceptions_** | **Nicolo P. Pinchak, Christopher R. Browning, Catherine A. Calder, Bethany Boettner** | **2021**, *Urban Studies*, 58(13), 2758–2781；online-first 2020 | https://doi.org/10.1177/0042098020966262 | **它直接比较居民自定义边界与 census/egocentric boundaries，并强调即便住得很近的居民，对 neighborhood boundary 的感知也存在显著异质性，因此强烈支持“不应只有一条公认边界”。** citeturn16view2turn16view3 |
+| **5** | **_The spatial dimensions of neighbourhood: how older people define it_** | **Sara Alidoust, Caryl Bosman, Gordon Holden, Heather Shearer, Leigh Shutter** | **2017**, *Journal of Urban Design*, 22(5), 547–567 | https://doi.org/10.1080/13574809.2017.1336057 | **通过访谈和 mapping 研究居民怎样定义自己的 neighbourhood boundaries，并发现感知边界与研究中常用的统计单元存在明显错位，因而反对把单一行政边界当成 lived neighbourhood。** citeturn19search3turn19search13 |
+
+## 第一名为何明显领先
+
+Glebova 的论文几乎可以视为这句 research idea 的技术化版本。PLATIAL’21 官方摘要明确说，该研究试图改善 **“crisp and fuzzy boundaries and internal structure of neighbourhoods as placial features” 的 cartographic visualisation**；换言之，它的问题不是单纯问“人们是否同意 neighborhood 在哪里”，而是进一步问：**当一个 neighborhood 本来就没有一条确定边缘时，地图应该怎么画？** citeturn18view1
+
+这一区别很重要。许多 neighborhood 研究已经说明“居民定义 ≠ census tract”；Glebova 则向前推进了一步，把这种事实转化成了一个**地图设计问题**。官方会议摘要称，研究生成了多种表现 neighborhood structure 的 visualization techniques，并用调查进行了评价；结果显示受试者能够区分 vague 与 crisp segments，而且清楚展示 neighborhood 内部细分、又不完全遮住 basemap 的方案表现较好。citeturn18view1
+
+PLATIAL 官方 proceedings 记录确认作者为 **M. Glebova**、页码为 **41–47**、DOI 为 **10.5281/zenodo.5767186**。citeturn18view0 后来的 GIScience 2023 论文也独立引用了这一工作和同一 DOI，并把它列为关于 place cartographic communication 的相关工作。citeturn17search5
+
+所以这五篇可以按其覆盖题目各组成部分理解为：
+
+| 工作 | Neighborhood | 居民/认知差异 | 非硬边界 / fuzziness | **如何画到地图上** |
+|---|---:|---:|---:|---:|
+| **Glebova** | ✓ | 间接 | **✓ 核心** | **✓ 核心** |
+| **Shmool et al.** | ✓ | **✓** | 间接 | **✓ 数据采集/绘制** |
+| **Finlay et al.** | ✓ | **✓ 核心** | **✓ 核心** | 弱 |
+| **Pinchak et al.** | ✓ | **✓ 核心** | ✓ | 中等 |
+| **Alidoust et al.** | ✓ | ✓ | ✓ | **✓ mapping method** |
+
+这个比较也是我将 Glebova 排在第一、而没有单纯依据标题关键词排序的原因。前三名分别代表了三个略有不同但互相衔接的问题：**怎样表示模糊边界、怎样让居民自己定义边界、为什么这些边界本来就不应该被假定为统一。** citeturn18view1turn20search17turn21view3
+
+## 版本与身份核验
+
+**Glebova 的标题存在一个需要特别说明的拼写差异。** PLATIAL 官方 proceedings 页面和当年的官方 programme 均写作 **_Visualising Fuzzy Boundaries of City Neighbourhoods_**，即英式 *Visualising*；因此这里把它作为正式发表题名。citeturn18view0turn18view1 一些后来文献在参考文献中把标题规范化成了美式拼法 **_Visualizing Fuzzy Boundaries of City Neighbourhoods_**，但 DOI 完全相同，并不是另一篇论文。citeturn17search5
+
+年份也有一个表面上的差异：论文是在 **PLATIAL’21** 上报告，官方 programme 显示该场次在 **2021 年 12 月 16 日**举行；但正式 proceedings 的引用年份为 **2022**，所以按用户要求的“publication year”我采用 **2022**。citeturn18view1turn17search3
+
+此外，这篇 workshop/conference contribution 与 Glebova 2021 年 University of Twente 的 MSc thesis **_Town and gown: visualising university neighbourhoods as places within the urban environment. The example of three universities in Moscow_** 有直接研究延续关系；后续 GIScience 文献同时列出该 thesis 和 PLATIAL 论文。citeturn17search5 因为硕士论文不是用户要求的 journal/conference/workshop publication，我没有把它另占一个排名；也没有找到证据表明之后存在一篇可明确认定为该论文“expanded journal version”的文章，因此没有擅自把别的 fuzzy-place 论文并入这个 family。
+
+**Shmool et al.** 的身份则由 *The Professional Geographer* 的官方卷期索引核实：作者依次为 Jessie L. C. Shmool、Isaac L. Johnson、Zan M. Dodson、Robert Keene、Robert Gradeck、Scott R. Beach、Jane E. Clougherty，刊于 70(3):423–433；DOI 与作者 ORCID 记录一致。citeturn20search17turn20search4
+
+**Finlay et al.** 的 SAGE 官方页面和 PubMed 均确认完整六位作者、DOI、卷期页码。SAGE 明确区分了 **2022 年 5 月 25 日 online-first** 与 **2023 年 1 月 issue publication**，所以表中采用期刊卷期年份 2023。citeturn21view3turn19search2
+
+**Pinchak et al.** 的 PubMed 记录确认四位作者、*Urban Studies* 58(13):2758–2781、DOI，以及 **2020 年 11 月 18 日 online-first / 2021 年卷期发表**。citeturn16view2
+
+**Alidoust et al.** 的作者列表、卷期页码与 DOI 可由 University of Queensland 的研究成果记录以及出版索引交叉核对。citeturn19search13turn19search3
+
+## “分歧”这一点的三种不同解释
+
+这道检索题真正存在的歧义，不在“neighbourhood”这个关键词，而在 **“leave room for disagreement” 到底指什么形式的 disagreement**。
+
+第一种，也是我认为最符合整句话的解释，是**制图表达上的非确定性**：一条地图边界不应该被画成看似精确、实际上并不存在共识的硬线。Glebova 正面处理这种 crisp/fuzzy cartographic distinction，所以排名第一。citeturn18view1
+
+第二种是**不同人的空间定义都应被保留**。Shmool et al. 的出发点就是固定地理单元会产生 uncertain geographic context problem，因此开发 GIS-based survey 来直接 elicitate perceived neighbourhood geographies；这种思路不是把“正确边界”重新估计得更准，而是允许每位受访者贡献自己的地理定义。citeturn20search0turn20search17
+
+第三种是**经验事实上的不一致**。Finlay et al. 明确把 neighbourhood 描述为随 person 与 place 而变化的 fluid social and spatial construct，并在 125 位老年人的访谈中发现 perceived boundaries 是 “fuzzy”；Pinchak et al. 更直接指出，已有自定义边界研究发现，即使地理上相邻的居民之间，boundary perceptions 也存在 substantial heterogeneity。citeturn21view3turn16view3 Alidoust et al. 则显示人们实际感知的 neighborhood boundary 与研究常用 statistical proxy 并不重合。citeturn19search3
+
+因此，这几篇不是同一篇论文的不同版本，也不应该被合并：Glebova 是**cartographic representation**；Shmool 是**GIS elicitation methodology**；Finlay 是**boundary fuzziness and individual/contextual variation**；Pinchak 是**self-defined boundary heterogeneity及其社会分析后果**；Alidoust 是**居民感知边界与统计边界的错位**。它们属于同一个问题链条，但各自提出并回答了不同研究问题。citeturn18view1turn21view3turn16view3turn19search3
+
+## 最终判定
+
+**最可能的目标论文：**
+
+**Milana Glebova. _Visualising Fuzzy Boundaries of City Neighbourhoods_. Proceedings of the 3rd International Symposium on Platial Information Science (PLATIAL’21), 2022, pp. 41–47. DOI: https://doi.org/10.5281/zenodo.5767186.** citeturn18view0
+
+我对它作为**第一匹配**的判断是高置信度的，因为题目的三个稀有组合——**“maps / neighbourhood / 不应有确定边界”**——在这篇论文中不是旁支主题，而正好构成研究对象：**用 cartographic visualisation 表达 city neighbourhood 的 fuzzy boundaries。** citeturn18view1
+
+但不能严谨地声称它是唯一可能答案。若原始 idea 中的 “disagreement” 特指**地图应容纳多个居民彼此不一致的自定义边界**，那么 **Shmool et al. (2018)** 是第二个非常有力的候选；若强调的是**“社区本来就是因人而异、没有 hard-and-fast boundary”这一理论/经验判断**，则 **Finlay et al. (2023)** 甚至在措辞层面与该 idea 极其接近。citeturn20search17turn21view3 因此，现有权威记录支持一个**明确领先但并非无歧义的第一名**，而不支持为了得到“唯一答案”而排除这些实质上也高度匹配的工作。
+
+# 5B002：关于“给数值答案加上现实边界，隐私保护是否取决于边界如何构造？”的论文匹配报告
+
+## 核心判定
+
+我认为这个线索**不能可靠地唯一指向一篇论文**，但可以把候选范围压缩得很窄。最强的两个匹配是：
+
+**首选：William Croft、Jörg-Rüdiger Sack、Wei Shi 的 _Differential Privacy via a Truncated and Normalized Laplace Mechanism_。** 这篇论文几乎逐字对应完整思想：差分隐私机制对数值查询加噪后可能落到查询的“有效范围”之外；一个自然办法是把 Laplace 分布截断到有效范围并重新归一化，但这个**与真实查询结果有关的归一化本身会泄漏额外信息，从而破坏差分隐私保证**，因此必须重新设计噪声尺度。也就是说，隐私能否成立，确实取决于“现实边界是怎样嵌入数值回答机制中的”。citeturn24view2turn22search0
+
+**极接近的次选：Naoise Holohan 等人的 _The Bounded Laplace Mechanism in Differential Privacy_。** 它从“标准 Laplace 机制会给出语义上不可能的数值，例如负计数”出发，研究把机制支持域限制在合理区间内的做法，并证明：如果只是限制支持域、却继续沿用普通 Laplace 机制的参数，通常**不再满足差分隐私**；必须重新校准机制。这个命题与题目中的“privacy protection depend on how we build realistic limits into numerical answers”同样高度吻合。citeturn24view4turn23search0
+
+因此，若 **5B002 必须对应一个单一目标**，我的排序是 **Croft–Sack–Shi 2022 略高于 Holohan et al. 2019**；但两者之间存在真实歧义，不应凭线索强行制造唯一答案。
+
+## 候选论文排名
+
+| 排名 | 论文及作者 | 年份与发表场所 | DOI / 稳定地址 | 与完整研究想法的概念匹配 |
+|---|---|---|---|---|
+| **1** | **_Differential Privacy via a Truncated and Normalized Laplace Mechanism_** — William Croft, Jörg-Rüdiger Sack, Wei Shi | **2022**, *Journal of Computer Science and Technology*, **37(2), 369–388**；同一工作的预印本于 **2019** 上传 arXiv。期刊官方记录确认题名、作者、卷期、页码和 DOI。citeturn24view2turn22search4 | DOI: `10.1007/s11390-020-0193-z`；preprint: `https://arxiv.org/abs/1911.00602` citeturn22search0turn22search20 | **最直接的匹配**：论文明确研究如何把查询的“valid range”嵌入数值差分隐私答案，并指出朴素的“截断 + 数据相关归一化”会泄漏真实答案的信息、破坏 DP，必须根据边界结构重新校准 Laplace 尺度。citeturn24view2 |
+| **2** | **_The Bounded Laplace Mechanism in Differential Privacy_** — Naoise Holohan, Spiros Antonatos, Stefano Braghin, Pól Mac Aonghusa | **2019 在线发表**，*Journal of Privacy and Confidentiality*, **10(1)**；该卷期页面归入 **2020** 的 TPDP 2018 special issue；同一工作的 arXiv 预印本始于 **2018**。citeturn24view4turn23search0 | DOI: `10.29012/jpc.715`；preprint: `https://arxiv.org/abs/1808.10410` citeturn24view4turn23search0 | **几乎并列第一**：论文从负计数等“语义上不可能”的数值答案出发，并证明把噪声机制直接限制到现实可行域、却不改变普通 Laplace 参数时，通常会失去差分隐私，因此“如何构造限制”直接决定隐私保证是否仍成立。citeturn24view4 |
+| **3** | **_Statistical Properties of Sanitized Results from Differentially Private Laplace Mechanism with Univariate Bounding Constraints_** — Fang Liu | **2019**, *Transactions on Data Privacy*, **12(3), 169–195**；同题预印本最早于 **2016** 上传 arXiv。期刊自己的目录及摘要页核实了正式发表信息。citeturn24view1turn25view1turn22search2 | 稳定期刊页：`https://www.tdp.cat/issues16/abs.a316a18.php`；preprint: `https://arxiv.org/abs/1607.08554` citeturn25view1turn22search2 | 论文直接处理比例、相关系数等具有**公开已知现实边界**的统计量，构造 truncated 和 boundary-inflated truncated Laplace 程序，并研究这些边界如何改变发布结果的准确性与统计有效性；因此主题高度吻合，但重点比前两篇更偏统计性质而非“错误构造边界会失去 DP”。citeturn25view1 |
+| **4** | **_The Bounded Gaussian Mechanism for Differential Privacy_** — Bo Chen, Matthew Hale | **2024**, *Journal of Privacy and Confidentiality*, **14(1)**；同一工作于 **2022** 首次上传 arXiv。citeturn24view3turn21search1 | DOI: `10.29012/jpc.850`；preprint: `https://arxiv.org/abs/2211.17230` citeturn24view3turn21search1 | 它把同一问题扩展到 Gaussian mechanism：普通高斯噪声可能产生负年龄、数十米身高之类无效数值，论文因此构造支持域严格位于给定有效区域内的 bounded Gaussian mechanism，在“现实可行数值范围”这一概念上非常直接。citeturn24view3turn21search1 |
+| **5** | **_The Impact of Range Constraints on Utility in the Design of Differentially Private Mechanisms_** — William Lee Croft, Jörg-Rüdiger Sack, Wei Shi | **2020**, *Transactions on Data Privacy*, **13(3), 171–200**。TDP 将其列入 Volume 13 Issue 3；作者团队的机构记录也确认该题名与期刊归属。citeturn22search3turn22search7 | 稳定期刊卷期页：`https://www.tdp.cat/issues16/vol13n03.php` citeturn22search3 | 它直接研究已知查询范围如何被用于设计**range-adherent** 的差分隐私数值机制，让噪声答案严格留在有效范围内；但论文主要优化的是 utility，因此对题目中“边界构造会不会决定隐私是否成立”的命中度低于前四篇。citeturn22search11 |
+
+## 为什么首选是 Croft–Sack–Shi
+
+首选论文的逻辑链与题目中的每一个关键成分都能对应起来，而且不是仅仅共享“privacy”“numerical”“bounds”等关键词。
+
+题目中的 **“numerical answers”** 对应论文中的数据库数值查询回答：机制通过向 query response 添加受控噪声实现差分隐私。作者随后指出，多数此类机制并没有考虑查询本身允许的 **valid range**，所以会产生超出合理范围的答案。citeturn24view2
+
+题目中的 **“realistic limits”** 对应论文要强制执行的 query range constraints。作者考虑的自然做法正是：把常用 Laplace 分布**截断到查询的有效区间，再归一化为概率分布**。这不是一般意义上的“限制敏感度”，而是在最终数值答案空间中加入“什么值在现实中可能”的约束。citeturn24view2turn22search0
+
+最关键的是题目中的 **“Could privacy protection depend on how we build…”**。Croft 等人发现，在截断后进行的归一化是数据相关的，因为归一化常数取决于 Laplace 分布中心，也就是查询真实答案的位置；因此这个步骤会附带泄漏关于真实查询结果的信息，原先的差分隐私保证不再自动成立。作者的解决方法不是取消现实边界，而是根据边界配置重新求能够维持 DP 的最小尺度参数。citeturn24view2
+
+这比泛泛的“边界可改善 utility”强得多：它真正回答的是**同样想让答案落在现实范围内，不同的机制实现方式会导致不同的隐私结果**。因此我把它排在第一。
+
+此外，arXiv 版本自己明确写明它是后来 *Journal of Computer Science and Technology* 文章的 preprint，并给出最终 DOI，所以这里可以可靠地把 **2019 preprint 与 2022 journal article 合并为同一 candidate family**，而不是占两个排名。citeturn22search20
+
+## 为什么 Holohan 等人的论文几乎同样可能
+
+Holohan 等人的论文可能实际上更接近线索中“realistic”这个自然语言词。
+
+它明确从普通 Laplace 分布的无限支持域造成的**语义不可能值**切入，例如计数查询可能返回负数。作者区分了两种表面上类似、数学上却不同的处理方式：一种是把已经生成的越界答案截到边界；另一种是直接令随机机制的支持域有界，也就是不断重新抽样直到结果处于允许区间。citeturn24view4turn23search0
+
+真正使它与谜面高度一致的是其核心结果：
+
+> 对机制的支持域进行限制后，若仍使用标准 Laplace mechanism 的参数，通常不能保持 differential privacy。citeturn24view4
+
+换句话说，**“让数值看起来合理”不是一个隐私中性的设计动作**。如何施加现实约束，以及施加约束后如何重新校准分布，决定了原来的 DP 证明是否还成立。这与题目所问的 “Could privacy protection depend on how we build realistic limits into numerical answers?” 几乎可以视作自然语言改写。citeturn24view4turn23search0
+
+因此，我并不认为证据足以把 Holohan 排除为目标答案。若原始线索中的 “realistic limits” 是对 **semantically impossible values**、**bounding the mechanism support** 的意译，而不是对 **valid range / range constraints** 的意译，那么 Holohan 甚至可能是预期答案。citeturn24view4
+
+还有一个值得说明的书目细节：JPC 的权威文章页标记其 **Published: December 23, 2019**，推荐引用年份也是 2019，但该文章同时隶属于标记为 **Vol. 10 No. 1 (2020)** 的 TPDP 2018 专号。因此最准确的描述是“**2019 在线发表，2020 卷期**”；无论采用哪一种期刊年份口径，都落在题目要求的 2015–2025 范围内。citeturn24view4 DOI 应以期刊元数据给出的 **`10.29012/jpc.715`** 为准。citeturn23search1turn23search8
+
+## 其他候选为何排名较低
+
+Fang Liu 的论文时间更早，并且确实是这一小类问题的重要直接前身。它讨论比例和相关系数等天然有已知边界的统计量，明确说这些 bounding constraints 需要被纳入差分隐私机制，并正式定义 truncated 与 boundary-inflated truncated (BIT) 程序。正式期刊页面确认论文发表于 *Transactions on Data Privacy* 12(3), 169–195；arXiv 记录则显示同题预印本始于 2016。citeturn25view1turn22search2 但它的中心问题主要是边界对 sanitized statistics 的**统计准确性与推断有效性**有什么后果，而不像前两名那样把“边界实现本身是否破坏 DP”作为核心命题，因此排第三。citeturn25view1
+
+Chen 与 Hale 的 2024 年论文则是非常直接的 Gaussian 对应物。作者指出普通 Gaussian mechanism 的无界支持会生成负年龄或极端不现实的身高；把值投影回有效区间虽然作为 post-processing 不会削弱已经建立的 DP，但会在边界处堆积概率、损害准确性，于是他们直接设计 support only on a given region 的 bounded Gaussian mechanism。citeturn21search2turn24view3 它非常符合“给答案现实限制”的半句话，但相较 Croft/Holohan，它的卖点更多是**构造一个适合有界域的机制并降低方差**，而不是揭示一个看似自然的边界操作会意外泄漏隐私，所以排第四。其正式文章页核实了 2024 年、两位作者以及 DOI `10.29012/jpc.850`；arXiv 的 2022 版本是同题同作者预印本，因此也只计作一个 work family。citeturn24view3turn21search1
+
+Croft、Sack、Shi 的 *The Impact of Range Constraints on Utility in the Design of Differentially Private Mechanisms* 与第一名**不能合并**。它不是第一名论文的 conference/preprint version，而是题名、问题设定和方法重点均不同的独立工作：它针对 interactive setting 的一般数值查询设计 range-adherent mechanisms，并使用线性规划寻找效用更优的机制；已知有效范围使返回值始终合法，同时改善 utility 和下游软件兼容性。citeturn22search11 TDP 的卷期记录把它列为 Volume 13 Issue 3, 2020，因此它满足时间限制；只是其中心词是 **utility under range constraints**，没有第一名那种“错误的 normalization 本身破坏 privacy guarantee”的决定性对应关系。citeturn22search3
+
+## 身份核验、版本关系与最终置信度
+
+这里的排序刻意按**完整思想结构**而不是词汇重合度进行。一个容易产生假阳性的邻近方向是“bounded noise”：例如某些论文限制噪声本身的绝对大小，以取得误差上界或 privacy–utility tradeoff；但题目的“realistic limits into numerical answers”更自然地指向**查询答案的语义有效域 / range constraints**。首选几篇恰好都把“答案应当位于合理范围内”作为问题本身，而不只是为了数学误差界而把噪声截断。Croft 的正式论文尤其明确使用 “valid range of the query”“range-adherent” 等表述。citeturn24view2
+
+版本关系也可以较可靠地理清：
+
+**Croft–Sack–Shi 第一名**：arXiv `1911.00602` 于 2019 年出现，预印本页面明确说明它是后来 *Journal of Computer Science and Technology* 正式文章的 preprint；最终正式版本于 2022 年发表，DOI `10.1007/s11390-020-0193-z`。这是**同一工作的一组版本**。citeturn22search20turn22search4
+
+**Holohan et al. 第二名**：arXiv `1808.10410` 于 2018 年出现，题名和四位作者与 JPC 正式文章一致；正式期刊元数据记录 2019 年 12 月在线发表，DOI `10.29012/jpc.715`，并归入 TPDP 2018 专号。这里把 arXiv 和 JPC 文章视为**同一工作 family**。citeturn23search0turn24view4
+
+**Fang Liu 第三名**：2016 年 arXiv `1607.08554` 与 2019 年 TDP 正式论文题名和作者一致，正式版由 TDP 自己的目录、文章摘要页确认，因此合并为**同一候选**。citeturn22search2turn25view1
+
+**Chen–Hale 第四名**：2022 arXiv `2211.17230` 与 2024 JPC 正式论文同题同作者，属于**同一工作 family**。citeturn21search1turn24view3
+
+**Croft–Sack–Shi 第五名**则不应与第一名合并。虽然作者组相同、主题相邻，但它是另一篇题名和研究目标不同的论文；第一名围绕 truncated-and-normalized Laplace 分布中的隐私校准问题，后者围绕 range constraints 下的机制设计与 utility，因此按照题目要求保留为独立候选。citeturn24view2turn22search11
+
+综合这些证据，我会把 **5B002 的最可能目标**写成：
+
+**William Croft, Jörg-Rüdiger Sack, Wei Shi, “Differential Privacy via a Truncated and Normalized Laplace Mechanism,” *Journal of Computer Science and Technology* 37(2), 369–388 (2022), DOI `10.1007/s11390-020-0193-z`.** citeturn24view2turn22search4
+
+但置信度不是足以排除其他候选的“唯一命中”：**Holohan et al., “The Bounded Laplace Mechanism in Differential Privacy” 是实质上的近并列候选**。如果谜面中的核心暗示是“使数值语义合理的 bounded support 可能反而破坏原有 DP”，Holohan 很可能才是预期目标；如果核心暗示是“将已知 valid range 通过 truncation/normalization 建入数值回答时，privacy guarantee 取决于具体构造”，则 Croft–Sack–Shi 是最精确的匹配。citeturn24view4turn24view2
+
+# 5B003：最符合“教学顺序对不同任务的重要性可能不同”的论文
+
+## 判定摘要
+
+这条研究想法存在一个关键歧义：“**order we teach a model**”既可能指**多个任务本身的学习顺序**（task ordering / continual learning），也可能指**单个任务内部训练样本的呈现顺序**（curriculum learning）。按完整语义而不是关键词匹配，我认为最可能的目标是 **Pentina, Sharmanska & Lampert, _Curriculum Learning of Multiple Tasks_ (CVPR 2015)**：它同时明确提出“不同任务之间并非同等相关”，把多个任务依次教给模型，并直接研究“找到最佳任务顺序”这一问题；实验也明确报告任务顺序会改变最终表现。citeturn20academia24turn15search0
+
+不过，不能唯一锁定。若“**matters more for some tasks than others**”主要是在说**课程排序的收益随着任务难度而变化**，那么 **Weinshall, Cohen & Amir (ICML 2018)** 甚至可能是更精确的目标：其论文明确报告，课程学习先显著加快训练，而在**把任务变得更困难时**，才进一步观察到泛化性能改善。citeturn19view3turn22search1
+
+综合排序如下：
+
+| 排名 | 候选 | 我对匹配度的判断 |
+|---|---|---|
+| 1 | **Curriculum Learning of Multiple Tasks** | 最完整地覆盖“多个任务 + 顺序 + 任务间差异/关系” |
+| 2 | **Optimal Task Order for Continual Learning of Multiple Tasks** | 对“哪些任务怎样排序”给出最直接的现代理论答案 |
+| 3 | **Curriculum Learning by Transfer Learning: Theory and Experiments with Deep Networks** | 若“有些任务更受顺序影响”指任务难度差异，这是最强候选 |
+| 4 | **Learning to Learn: How to Continuously Teach Humans and Machines** | 直接实验不同任务课程顺序，并跨模型、数据集比较 |
+| 5 | **On The Power of Curriculum Learning in Training Deep Networks** | 明确研究样本呈现顺序，但“任务间敏感度不同”不是其核心命题 |
+
+## Curriculum Learning of Multiple Tasks
+
+**排名：1**
+
+**准确标题：** *Curriculum Learning of Multiple Tasks*  
+**作者：** Anastasia Pentina; Viktoriia Sharmanska; Christoph H. Lampert  
+**发表年份：** 2015  
+**发表场所：** IEEE Conference on Computer Vision and Pattern Recognition (**CVPR 2015**)  
+**稳定论文页面：** [CVF Open Access](https://openaccess.thecvf.com/content_cvpr_2015/html/Pentina_Curriculum_Learning_of_2015_CVPR_paper.html)  
+**同一工作的预印本：** [arXiv:1412.1353](https://arxiv.org/abs/1412.1353)，首次提交于 2014 年；这是后来 CVPR 2015 论文的预印本版本，而不是另一篇候选工作。CVF 的正式记录确认了标题、三位作者和 CVPR 2015 身份。citeturn15search0turn20academia24
+
+**概念匹配一句话：** 这篇工作从“**并非所有任务都同等相关**”出发，把多个任务按序学习并显式寻找最佳任务课程，最后发现“**任务被解决的顺序会影响总体性能**”，几乎逐项对应“教学顺序的重要性取决于所涉及的任务”。citeturn20academia24
+
+这是我认为的**首选答案**。其关键不只是用了 curriculum learning 这个主题词，而是研究对象正是**任务级顺序**：论文不把所有任务联合一次性训练，而是让知识在相邻任务间传递，再依据泛化界选择任务顺序，以优化所有任务的平均期望分类性能。更重要的是，它的出发点正是任务之间的关系并不均一，因此“某种顺序对哪些任务有利”由任务关系决定。citeturn20academia24
+
+## Optimal Task Order for Continual Learning of Multiple Tasks
+
+**排名：2**
+
+**准确标题：** *Optimal Task Order for Continual Learning of Multiple Tasks*  
+**作者：** Ziyan Li; Naoki Hiratani  
+**发表年份：** 2025  
+**发表场所：** 42nd International Conference on Machine Learning (**ICML 2025**；PMLR 第 267 卷对应该届 ICML)  
+**稳定论文页面：** [arXiv:2502.03350](https://arxiv.org/abs/2502.03350)  
+**正式会议记录：** OpenReview 将该工作标记为 ICML 2025，作者为 Ziyan Li 与 Naoki Hiratani；预印本最初于 2025 年 2 月提交、同年 7 月修订，因此属于同一工作，而非独立 follow-up。citeturn20search2turn20search5turn16search3
+
+**概念匹配一句话：** 论文直接研究“task order 如何影响 continual learning”，并证明最优顺序依赖任务的**相似性和代表性**——即顺序效应并不是对所有任务一视同仁。citeturn20search2
+
+它实际上是对研究想法最字面化的现代版本。作者构造了带潜在因子的 teacher–student 模型，推导出连接**任务相似性、任务顺序和学习性能**的解析表达式，并得到两条排序原则：从较不典型的任务走向较典型的任务，同时让相邻任务尽量不相似；作者又在 Fashion-MNIST、CIFAR-10 和 CIFAR-100 上用 MLP 与 CNN 验证了这些规律。citeturn20search2turn20search19
+
+之所以排在 Pentina 等人之后，是因为如果这个谜题式描述是在指一篇较早的“任务课程”论文，2015 年工作几乎直接建立了这个问题；Li 与 Hiratani 更像是对**为什么任务顺序不同会产生不同效果、如何优化它**的后续理论化答案。Li 与 Hiratani 自己也把 Pentina 等人的工作列为此前研究任务顺序依赖的代表工作。citeturn15search15
+
+## Curriculum Learning by Transfer Learning: Theory and Experiments with Deep Networks
+
+**排名：3**
+
+**准确标题：** *Curriculum Learning by Transfer Learning: Theory and Experiments with Deep Networks*  
+**作者：** Daphna Weinshall; Gad Cohen; Dan Amir  
+**发表年份：** 2018  
+**发表场所：** 35th International Conference on Machine Learning (**ICML 2018**，oral)，Proceedings of Machine Learning Research, vol. 80, pp. 5238–5246  
+**稳定论文页面：** [arXiv:1802.03796](https://arxiv.org/abs/1802.03796)  
+**预印本与正式版关系：** arXiv 记录明确注明 “ICML 2018” 并给出相同工作的会议 reference；Tel Aviv University 的机构出版记录也确认作者、2018 年、PMLR 80 和 5238–5246 页。citeturn19view3turn22search7
+
+**概念匹配一句话：** 如果原意是“**训练样本的教学顺序对困难任务比简单任务更重要**”，那么这篇可能反而是最准确的候选，因为作者明确观察到：任务变难时，curriculum 才带来额外的泛化性能提升。citeturn19view3turn22search1
+
+这里的“order”与前两篇不同：它不是排列若干独立任务，而是按照**样本难度**形成 curriculum。理论部分研究 SGD 下理想课程，证明课程带来的收敛性质与样本难度有关；CNN 实验则通过另一个预训练网络估计样本难度并安排训练顺序。citeturn19view3
+
+真正使它与题目后半句高度吻合的是作者的实验结论：普通情况下最明显的是训练初期收敛更快；**当任务本身被做得更困难时，泛化性能也得到改善**。所以，“顺序重要，但对某些——尤其更难的——任务更加重要”可以说是对该结果非常自然的概括。citeturn19view3turn22search1
+
+## Learning to Learn: How to Continuously Teach Humans and Machines
+
+**排名：4**
+
+**准确标题：** *Learning to Learn: How to Continuously Teach Humans and Machines*  
+**正式版作者：** Parantak Singh; You Li; Ankur Sikarwar; Stan Weixian Lei; Difei Gao; Morgan B. Talbot; Ying Sun; Mike Zheng Shou; Gabriel Kreiman; Mengmi Zhang  
+**发表年份：** 2023  
+**发表场所：** IEEE/CVF International Conference on Computer Vision (**ICCV 2023**)  
+**稳定论文页面：** [CVF Open Access](https://openaccess.thecvf.com/content/ICCV2023/html/Singh_Learning_to_Learn_How_to_Continuously_Teach_Humans_and_Machines_ICCV_2023_paper.html)  
+**同一工作的预印本：** [arXiv:2211.15470](https://arxiv.org/abs/2211.15470)，最早于 2022 年提交，2023 年版本与 ICCV 正式工作对应。CVF 正式记录确认 ICCV 版标题和作者；arXiv 的后期版本使用 Difei Gao 等正式作者信息。citeturn18search13turn20search13
+
+**概念匹配一句话：** 它直接改变“**多个不同任务被依次学习的顺序**”，发现课程顺序持续影响人类和多种 continual-learning 算法的表现，并进一步利用任务/类别之间的特征相似性来设计好顺序。citeturn20search1turn20search13
+
+这篇与用户措辞中的“**teach a model**”尤其契合，因为作者有意把机器学习问题表述成“如何教”人和机器：他们明确区别于只给**单一任务内部样本排序**的传统 curriculum learning，研究的是“multiple distinct tasks”在一个序列中的学习顺序。实验发现 curriculum 对人类和多种机器 continual-learning 算法、多个 benchmark 数据集都产生稳定影响，并提出 Curriculum Designer，根据类别间特征相似性对课程进行排序。citeturn20search1
+
+它低于前三名的原因不是主题不匹配，而是题目中的“**matters more for some tasks than others**”并没有在这篇论文中被压缩成一个与任务难度或任务类型直接对应的单一结论；这里更核心的是“不同 curriculum 的确造成显著差异，并可以依据任务关系设计”。citeturn20search1
+
+## On The Power of Curriculum Learning in Training Deep Networks
+
+**排名：5**
+
+**准确标题：** *On The Power of Curriculum Learning in Training Deep Networks*  
+**作者：** Guy Hacohen; Daphna Weinshall  
+**发表年份：** 2019  
+**发表场所：** International Conference on Machine Learning (**ICML 2019**)  
+**稳定论文页面：** [arXiv:1904.03626](https://arxiv.org/abs/1904.03626)  
+**预印本与会议版关系：** arXiv 记录明确写有 “In proceedings, ICML 2019” 和 “Proc. ICML, 2019”，所以这里把预印本和会议论文视为同一工作，不占两个排名。citeturn19view4
+
+**概念匹配一句话：** 这篇系统研究按**训练样本难度重新排序/非均匀采样**如何影响深度网络，在多种 CNN 架构及 CIFAR-10、CIFAR-100、ImageNet 子集上验证课程效应，因此支持“教学顺序的重要性具有任务/设置依赖性”的宽泛版本，但没有前三四篇那么直接研究任务级顺序。citeturn19view4
+
+作者把 curriculum learning 拆成两个关键问题：怎样按难度排列训练样本，以及怎样构造难度逐渐上升的 mini-batch 序列；他们用 teacher network/transfer learning 或 bootstrapping 估计难度，并比较不同 pacing functions，在多个数据集和架构上看到更快学习及最终测试表现改善。citeturn19view4
+
+因此它是合理候选，但我不会把它排得更高：它非常明确回答了“**order matters**”，却不像 Pentina/Li 那样直接回答“**不同任务之间为什么顺序效应不同**”，也不像 Weinshall 2018 那样直接报告“**任务越难，课程带来的泛化收益才显现出来**”。citeturn19view3turn19view4
+
+## 歧义与排除判断
+
+最主要的歧义可以浓缩为两种读法：
+
+**若 “order we teach” = 任务 A、B、C 本身先教哪个，**那么最可靠的排序是 **Pentina et al. 2015 → Li & Hiratani 2025 → Singh et al. 2023**。Pentina 的摘要同时出现“任务之间并非同等相关”“按顺序处理多个任务”“寻找最佳任务顺序”“顺序影响总体性能”这四个要素，因此我把它列为 5B003 的首选。citeturn20academia24
+
+**若 “order we teach” = 同一个任务中先给模型容易样本还是困难样本，而 “some tasks” = 简单任务与困难任务，**那么 **Weinshall, Cohen & Amir 2018** 是极强的、甚至可能是实际目标的候选，因为其结论非常具体地把 curriculum 的泛化收益与**任务难度增加**联系起来。citeturn22search1
+
+我没有把一些看起来关键词很接近的论文硬塞进前五。例如 **Zixuan Ke, Bing Liu, Xingchang Huang, _Continual Learning of a Mixed Sequence of Similar and Dissimilar Tasks_ (NeurIPS 2020)** 的正式 NeurIPS 记录确实研究“相似任务和不相似任务混合出现的序列”，并对两类任务采用不同的迁移/防遗忘处理；但它的核心问题是**如何处理既相似又不相似的任务序列**，而不是比较或优化不同任务排列，所以它只是机制上相关，不应为了共享 “sequence/tasks” 这些词而取代上面的候选。citeturn21search7turn21search19
+
+同理，**_Multi-task curriculum learning in a complex, visual, hard-exploration domain: Minecraft_** 很契合“依赖关系决定下一个应学任务”这一思想——其摘要明确举出“先会走再会跑”并根据各任务的 learning progress 动态选任务——但我能验证到的记录主要是 2021 arXiv 预印本，未在本次权威记录检索中验证到符合题目要求的 2015–2025 正式 journal/conference/workshop 发表，因此没有把它作为合格的正式候选。citeturn21search0
+
+**最终判断：5B003 最可能对应 _Curriculum Learning of Multiple Tasks_ (Pentina, Sharmanska & Lampert, CVPR 2015)，但并非可以无歧义唯一确定；若线索中的“some tasks than others”特指课程学习对困难任务效果更强，则 _Curriculum Learning by Transfer Learning: Theory and Experiments with Deep Networks_ (Weinshall, Cohen & Amir, ICML 2018) 是同样值得高度怀疑、且在这一细节上更精确的候选。** citeturn20academia24turn22search1
+
+# 5B004：最匹配研究论文检索结果
+
+## 结论
+
+**最可能的目标论文是 Chau Bao Ha 与 Phalangchok Wanphet 的 2016 年论文 _Exploring EFL teachers’ use of written instructions and their subsequent verbal instructions for the same tasks_。**
+
+它与线索的匹配度明显高于其他候选：研究的不是泛泛的“instruction generation”，而是**同一批任务的书面指令与随后由同一教师给出的口头指令之间的关系**；作者明确考察口头表达如何“enhance”书面指令，并把最终目标落在**帮助学生理解任务要求**上。官方期刊记录直接把关键词列为 “written instructions, spoken instructions, directives, teacher talk, mode”，摘要也明确说明比较的是 “written instructions” 与 “subsequent spoken instructions”。citeturn28view0
+
+更关键的是，论文全文所报告的口头指令特征中包括 **information division** 以及 **information emphasis and reorder**：也就是说，教师在说出原本写下来的任务要求时，并非简单保持原有书面次序，而会为了课堂中的理解与强调重新分配、重复和调整信息。这个机制几乎就是题目中“**spoken instructions should be organized around the listener rather than the way they were written**”的经验研究版本。期刊官方摘要虽然没有逐项列出这些微观类别，但确认了口头指令包含多种增强书面指令、最终促进学生理解的特征；作者公开的论文文本索引则明确出现了 “information emphasis and reorder”。citeturn28view0turn19search0
+
+因此，我会把 **Ha & Wanphet (2016)** 判为高置信度第一候选；不过并非绝对唯一，因为如果线索里的 “listener” 是严格意义上的计算语言学“听者模型”，而不是课堂中的学生，那么后面的 pragmatic instruction-generation 工作也有合理竞争力。citeturn27view1turn27view0
+
+## 候选论文排名
+
+| 排名 | 工作 | 年份 / Venue | DOI / 稳定标识 | 对完整想法的匹配 |
+|---|---|---|---|---|
+| **1** | **_Exploring EFL teachers’ use of written instructions and their subsequent verbal instructions for the same tasks_** — **Chau Bao Ha, Phalangchok Wanphet** | **2016**, *Nordic Journal of English Studies*, 15(4), 135–159 | **10.35360/njes.387** | **几乎逐字对应线索的逻辑：研究同一任务从书面指令到教师口头指令的变化，口头版本通过强调、拆分、重复和重排信息来帮助作为听者的学生理解，而不是机械保持书写形式。** citeturn28view0turn19search0 |
+| **2** | **_Crafting Instructions Collaboratively: Student Questions and Dual Addressivity in Classroom Task Instructions_** — **Oliver St. John, Jakob Cromdal** | **2016**, *Discourse Processes*, 53(4), 252–279 | **10.1080/0163853X.2015.1038128** | **把课堂任务指令理解成由教师与学生共同塑造、具有“dual addressivity”的互动产物，因此非常贴近“按听者来组织指令”这一半，但不像第一名那样直接比较书面稿与口头版本。** citeturn26search2turn26search29 |
+| **3** | **_Delivering task instructions in multimodal synchronous online language teaching_** — **Müge Satar, Ciara R. Wigham** | **2020**, *Alsic*, Vol. 23 | **10.4000/alsic.4571** | **把教师给指令建模为动态的 “instructions-as-process”，研究同一任务在实际在线互动中如何通过语言与其他模态逐步交付，因此同样反对把口头指令当成静态书面文本的简单朗读。** citeturn26search1turn26search13 |
+| **4** | **_Define, Evaluate, and Improve Task-Oriented Cognitive Capabilities for Instruction Generation Models_** — **Lingjun Zhao, Khanh Nguyen, Hal Daumé III** | **2023**, *Findings of the Association for Computational Linguistics: ACL 2023*, 3688–3706 | **10.18653/v1/2023.findings-acl.227** | **这里“围绕听者组织”是字面上的模型原则：生成器要预测听者会怎样解释各个候选 utterance，再选择最合适的那个；但它没有书面稿→口头重组这一对照。** citeturn27view1 |
+| **5** | **_Unified Pragmatic Models for Generating and Following Instructions_** — **Daniel Fried, Jacob Andreas, Dan Klein** | **2018**, *NAACL-HLT 2018*, Volume 1 (Long Papers), 1951–1963 | **10.18653/v1/N18-1177** | **其 pragmatic speaker 明确用 listener model 模拟听者对候选指令的解释，再生成更容易被人正确执行的指令，因此高度符合 listener-centered generation，但不涉及把既有书面指令重新组织为口语。** citeturn27view0 |
+
+## 为什么第一名明显领先
+
+Ha 与 Wanphet 的问题设定与线索存在三个同时出现的对应关系，而其余论文通常只覆盖其中一个或两个。
+
+首先是**模态转换**。官方期刊页面说明，研究对象就是 EFL 教师的 **written instructions** 以及针对**相同任务**随后给出的 **spoken instructions**，而且两者来自同一教师。这里不是宽泛比较“书面语言与口语”，而是直接追踪“一份任务要求写出来以后，真正说给学生听时发生了什么”。citeturn28view0
+
+其次是**不忠实于原始书写结构反而可能更有效**。论文分析认为，口头指令具有一组额外特征来增强书面版本；公开论文文本列出的类别包括 communicative functions、partial/full repetition、interactiveness、exemplification、information division，以及最关键的 **information emphasis and reorder**。换言之，说话者不是把原始文本作为不可改变的线性脚本，而会重新安排重要信息。citeturn19search0
+
+最后是**重组的评价标准是听者是否理解**。期刊官方摘要明确指出，这些口头特征最终有助于学生理解任务要求，并称其结果可用于提高教师对于“spoken instructions 如何增强 students’ understanding of the written instructions”的意识。citeturn28view0
+
+把三点合起来：
+
+> written form → spoken delivery → reorder/emphasize/adapt → student understanding
+
+这与题目中的隐含论点：
+
+> “也许口头指令应该围绕**听的人**来组织，而不是继续服从**写的时候**采用的组织方式”
+
+结构上高度一致。这个完整链条是我把它与纯粹的“listener-aware generation”论文拉开排名的主要原因。citeturn28view0turn19search0
+
+## 其他候选为什么仍然成立
+
+**St. John & Cromdal (2016)** 是最重要的课堂互动替代解释。标题本身就把 classroom task instructions 定义为 **“Crafting Instructions Collaboratively”**，并把 **student questions** 与 **dual addressivity** 放在中心，因此它非常符合“不要把指令看作说话者事先写好、然后单向输出的文本，而要围绕接受者和实际互动形成”的想法。出版商 Taylor & Francis 的记录确认作者、题名、期刊及 DOI，2016 年卷期目录也确认其位于 *Discourse Processes* 53(4)。citeturn26search2turn26search29  
+但它缺少第一名最具辨识度的 **written → verbal instructions for the same tasks** 对照，所以排第二而非第一。
+
+**Satar & Wigham (2020)** 则把这一步推进到同步在线视频语言教学。论文研究有经验教师针对同一任务如何交付指令，并提出把它理解为 **task instructions-as-process** 的框架，而不是一个静态的“instruction text”；正式论文由 *Alsic* 于 2020 年发表，DOI 为 10.4000/alsic.4571，HAL 和 Newcastle 的机构记录均与期刊身份相符。citeturn26search1turn26search13turn26search9  
+它甚至在参考文献中直接承接 Ha & Wanphet 的 written/spoken instruction 研究，说明两者处于同一研究问题脉络，但 **它是独立的后续工作，不应与 Ha & Wanphet 合并成同一候选**。citeturn19search16
+
+后两名则代表另一条完全不同的解释路径——**计算语言学中的 pragmatic speaker/listener models**。
+
+Zhao、Nguyen 与 Daumé 的 2023 年论文几乎把 “organized around the listener” 写成算法定义：作者把 pragmatic capability 定义为预测**听者如何解释候选 utterances，然后选择最合适的一个**；在导航指令生成任务中，他们发现模型的这种能力不足，于是加入更好的 listener models，并报告真实人类导航成功率提升 11%。ACL Anthology 对题名、作者、2023 年 Findings ACL 出版信息、页码和 DOI 均有完整记录。citeturn27view1  
+这是一种非常强的概念匹配，但缺少线索中“rather than the way they were written”所暗示的书面→口头转换，因此不能超过前三名。
+
+Fried、Andreas 与 Klein 的 2018 NAACL 论文更早提出了相似思想：pragmatic speaker 用一个 base listener 去**模拟听者如何解释候选描述**，再选择指令；实验证明这种 pragmatic inference 能提高由人类正确理解生成指令的效果。ACL Anthology 确认该工作发表于 NAACL-HLT 2018，页码 1951–1963，DOI 为 10.18653/v1/N18-1177。citeturn27view0  
+其已验证预印本是 **arXiv:1711.04987**，2017 年提交，题名和作者与最终 NAACL 版本一致，因此我把预印本和正式会议论文视为**同一工作家族，而不是两个候选**。citeturn24search4turn27view0
+
+## 版本与身份核验
+
+第一候选的出版身份尤其清楚。*Nordic Journal of English Studies* 官方页面给出的作者是 **Chau Bao Ha** 和 **Phalangchok Wanphet**，发表日期为 **2016-12-31**，卷期为 **15(4)**，页码 **135–159**，DOI **10.35360/njes.387**。这些信息满足题目要求的 2015–2025 正式出版时间窗。citeturn28view0
+
+Zhao et al. 的正式出版版本是 2023 年 *Findings of ACL 2023*；其 **arXiv:2301.05149** 的首个版本实际上于 **2022-12-21** 提交，后于 2023 年形成 ACL 正式版本，因此二者也属于一个候选工作家族，不应重复占位。citeturn26search3turn27view1
+
+Fried et al. 同理：2017 年 arXiv 预印本与 2018 年 NAACL 正式论文对应同一作品。citeturn24search4turn27view0
+
+St. John & Cromdal 的 DOI 中含有 “2015”，而卷期标示为 **2016, 53(4)**；这不是冲突——正式卷期出版年份为 2016，因而仍明确落在指定时间窗内。Taylor & Francis 的文章记录和该卷目录均将正式文献归入 2016 年 *Discourse Processes* 53(4)。citeturn26search2turn26search29
+
+## 最终判定与歧义
+
+对 **5B004**，我的判定是：
+
+**首选答案：**  
+**Chau Bao Ha & Phalangchok Wanphet (2016), _Exploring EFL teachers’ use of written instructions and their subsequent verbal instructions for the same tasks_. Nordic Journal of English Studies, 15(4), 135–159. DOI: 10.35360/njes.387.** citeturn28view0
+
+其优势不是仅仅同时出现 “spoken”“instructions”“listener” 之类的词，而是研究设计本身复现了线索的完整因果结构：**已有书面指令 → 为实际听众口头表达 → 改变信息组织方式 → 改善听众对任务要求的理解**；尤其是全文分析中的 **information emphasis and reorder**，使“rather than the way they were written”这一部分具有很强的辨识力。citeturn19search0turn28view0
+
+我不会把它称为绝对唯一答案。若原始线索中的 **listener** 是故意使用计算语用学术语，而 “spoken” 只是把生成的 utterances 口语化描述，那么 **Zhao et al. (2023)** 和 **Fried et al. (2018)** 都是可信替代项，因为二者都明确让 speaker/generator 根据 listener 的预期解释来选择指令。citeturn27view1turn27view0  
+但若把整句话——尤其是“**rather than the way they were written**”——作为一个整体线索，而不是按共享关键词匹配，**Ha & Wanphet (2016) 是显著最强的候选。**
+
+# 5B005：与“协作程序在不妨碍彼此进展的情况下从错误中恢复”最匹配的论文
+
+## 结论与判定
+
+我认为这里**存在真实歧义，不能可靠地宣称只有一个唯一答案**。这句研究想法可以被至少三种很接近、但技术含义不同的方式理解：一是“多个相互通信的程序发生故障时，只恢复真正受影响的参与者，不让无关参与者重做工作”；二是“参与者可以回滚错误交互，同时仍保证整个会话能够继续取得进展”；三是“回滚应当异步、无中央协调，只沿因果依赖传播”。这三种解释分别非常贴近下面排名前三的论文。citeturn21search1turn18view3turn22view2
+
+**综合整句话而不是关键词重合，我把 Rumyana Neykova 与 Nobuko Yoshida 的 2017 年论文 _Let It Recover: Multiparty Protocol-Induced Recovery_ 排在第一。**它研究的正是“system of interacting processes”如何在失败后恢复，并利用通信协议的因果依赖把故障局部化；尤其关键的是，恢复时“只有受影响的进程被通知”，并且“只重复必要的状态”，这几乎逐项对应“cooperating programs / recover from mistakes / without getting in the way of one another's progress”。citeturn21search1turn15search10
+
+按完整概念匹配度，我的排序是：
+
+**排名 1：** _Let It Recover: Multiparty Protocol-Induced Recovery_  
+**排名 2：** _Rollback Recovery in Session-Based Programming_ / _Checkpoint-based rollback recovery in session programming_（同一工作家族）  
+**排名 3：** _An Asynchronous Scheme for Rollback Recovery in Message-Passing Concurrent Programming Languages_  
+**排名 4：** _Causal Consistency for Reversible Multiparty Protocols_  
+**排名 5：** _From Reversible Computation to Checkpoint-Based Rollback Recovery for Message-Passing Concurrent Programs_。citeturn21search1turn22view0turn18view3turn22view2turn18view2turn18view1
+
+## 最可能匹配：局部化多方协议恢复
+
+**排名：1**
+
+**精确标题：** _Let It Recover: Multiparty Protocol-Induced Recovery_  
+**作者：** Rumyana Neykova; Nobuko Yoshida  
+**年份：** 2017  
+**发表 venue：** 26th ACM International Conference on Compiler Construction (**CC 2017**), pp. 98–108  
+**DOI：** `10.1145/3033019.3033031`。ACM Digital Library 的正式记录以该 DOI 收录此文；Imperial College 的研究组出版物记录也将作者、CC 2017 和页码对应到同一论文。citeturn15search0turn15search1turn15search4
+
+论文的核心问题不是泛泛的“fault tolerance”，而是怎样从一个**相互作用的进程系统**中提取通信因果关系，从而定位故障并计算一个安全的全局恢复状态；其恢复机制明确降低干扰范围——只有受到故障影响的进程需要被通知，而执行上也只有必需的状态需要重新经历。作者还在 Erlang 上实现了运行时框架，用计算出的安全状态重新启动失败进程及其依赖，并报告在协议的一部分可以安全恢复时优于 Erlang 的内建静态恢复策略。citeturn15search10turn21search1
+
+**概念匹配（一句话）：** 这篇论文最直接地回答了“协作程序能否从错误中恢复而尽量不妨碍其他程序继续前进”，因为它依据多方协议的因果依赖**只恢复受影响的进程和必要状态，而不是把整个协作系统一起重启**。citeturn21search1turn15search10
+
+我把它置于首位的关键不是标题里出现了 “recover”，而是其三个概念部件与题意同时吻合：**cooperating programs → interacting processes / multiparty protocol；recover from mistakes → failure localization and safe recovery；without getting in the way → only affected processes are notified and only required states are repeated**。citeturn15search10turn21search1
+
+## 高度匹配：保证进展的会话回滚
+
+**排名：2**
+
+这是一个应当合并为**同一候选工作家族**的 conference/journal 版本，而不是占据两个排名。两版作者完全相同、研究机制和摘要核心一致；2025 年 LMCS 记录还明确把期刊论文归入 “Selected Papers of … FORTE and COORDINATION 2023”，因此把它和 2023 年 COORDINATION 论文作为同一工作家族处理最合理。citeturn22view0turn18view3
+
+**会议版本精确标题：** _Rollback Recovery in Session-Based Programming_  
+**作者：** Claudio Antares Mezzina; Francesco Tiezzi; Nobuko Yoshida  
+**年份：** 2023  
+**venue：** Coordination Models and Languages (**COORDINATION 2023**), LNCS 13908, pp. 195–213  
+**DOI：** `10.1007/978-3-031-35361-1_11`。Springer 的正式记录给出了标题、三位作者、会议、卷号、页码、2023 年和 DOI。citeturn22view0
+
+**期刊版本精确标题：** _Checkpoint-based rollback recovery in session programming_  
+**作者：** Claudio Antares Mezzina; Francesco Tiezzi; Nobuko Yoshida  
+**年份：** 2025  
+**venue：** _Logical Methods in Computer Science_, Volume 21, Issue 1  
+**DOI：** `10.46298/lmcs-21(1:2)2025`  
+**验证预印本：** arXiv `2312.02851`。LMCS 的正式记录给出 2025 年 1 月 10 日发表日期，并直接链接同一工作的 arXiv 来源。citeturn18view3turn17search1
+
+这篇工作的措辞与题目中“mistakes”这一部分尤其接近：作者把动机表述为通信系统进入“不希望的状态”后需要撤销导致该状态的交互，并为语言加入 `commit`、rollback 和 abort；更重要的是，它静态阻止一个参与者的回滚错误地恢复由**另一个参与者**设置的检查点，并正式证明语言具有 error-freedom 和 **progress of a session**。citeturn22view0turn18view3
+
+**概念匹配（一句话）：** 如果题目中的 “mistakes” 指已经发生的错误交互，而 “one another's progress” 指协作会话的形式化 progress 性质，那么这篇论文几乎是字面上的答案：参与者可以安全回滚，同时类型级检查防止越过其他参与者的检查点，并保证会话取得进展。citeturn18view3
+
+它没有排第一，主要是因为恢复仍然围绕一个 session 的参与者进行，而 2017 年 _Let It Recover_ 更明确地把“少干扰其他协作者”落实为**只通知受影响进程、只重做必要状态**；不过，若原始线索中的 “progress” 是在暗示编程语言论文里的形式化 progress theorem，那么本候选与第一名之间的差距非常小。citeturn21search1turn22view0
+
+## 高度匹配：无需中央协调的异步回滚
+
+**排名：3**
+
+**精确标题：** _An Asynchronous Scheme for Rollback Recovery in Message-Passing Concurrent Programming Languages_  
+**作者：** Germán Vidal  
+**年份：** 2024  
+**venue：** Proceedings of the 39th ACM/SIGAPP Symposium on Applied Computing (**SAC ’24**), 8–12 April 2024, Ávila, Spain  
+**DOI：** `10.1145/3605098.3636051`。作者版本的 arXiv HTML 明确标明这是 SAC ’24 正式版本的 author’s version，并给出 ACM DOI；ACM 的检索记录也对应同一个 DOI。citeturn22view2turn20search0
+
+论文考虑的是类似 Erlang/actor model 的消息传递并发程序：进程可以动态产生，只通过发送和接收消息交互，不共享内存；作者加入 `check`、`commit`、`rollback` 三种操作，并要求恢复后全局状态保持因果一致，例如一个已经被回滚掉的 send 不能仍留下对应 receive。citeturn22view2
+
+这里最贴合“without getting in the way”的部分，是作者把实际设计目标明确写成**回滚不需要中央协调**，所有进程交互依靠异步消息传递；文章结论再次强调方案是 purely asynchronous and does not need a central coordination，并把这一点视为可实际通过 source-to-source instrumentation 实现的基础。citeturn22view2
+
+**概念匹配（一句话）：** 如果“不妨碍彼此进展”主要是在说协作进程不应为了某个进程的错误而进行全局同步或依赖中央协调，那么这篇纯异步、无中央协调且只按因果需要传播 rollback 的论文是非常强的匹配。citeturn22view2
+
+值得注意的是，这不是上一候选的另一个版本，而是**独立的后续工作**：Vidal 自己明确把 Mezzina–Tiezzi–Yoshida 的 session-based 方案列为 closely related approach，并指出自己的模型支持动态生成进程、允许不同的 checkpoint 结构，而且目标是完全异步；因此按照用户要求，二者不能合并。citeturn22view2
+
+## 较强匹配：多方协议中的因果一致回退
+
+**排名：4**
+
+**精确标题：** _Causal Consistency for Reversible Multiparty Protocols_  
+**作者：** Claudio Antares Mezzina; Jorge A. Pérez  
+**年份：** 2021  
+**venue：** _Logical Methods in Computer Science_, Volume 17, Issue 4  
+**DOI：** `10.46298/lmcs-17(4:1)2021`  
+**验证预印本：** arXiv `1703.06021`。LMCS 的官方页面记录发表日期为 2021 年 10 月 1 日，并明确列出 arXiv 来源；arXiv 的投稿记录则显示该工作的早期版本始于 2017 年。citeturn18view2turn17search0
+
+这篇论文从双边 session 扩展到真正的 **multiparty / n-party protocols**，支持异步通信、decoupled rollbacks 和高阶抽象传递，并证明其可逆语义满足 causal consistency；作者还用一种 atomic rollback 语义来刻画这些 decoupled rollbacks。citeturn18view2
+
+**概念匹配（一句话）：** 它把多个协作参与者的回退限制在因果结构允许的范围内，并支持解耦回滚，因此很好地表达了“一个参与者撤销错误时，不应无缘无故撤销其他参与者的独立进展”这一思想。citeturn18view2
+
+这里最后半句是根据论文“causally-consistent + decoupled rollbacks”的技术结果作出的概念解释，而不是作者摘要中的逐字主张；也正因为这篇论文主要研究**可逆语义与因果一致性**，而不是明确以“故障发生后的 recovery algorithm”为中心，所以我把它排在前三之后。citeturn18view2
+
+## 补充匹配：消息传递程序的检查点恢复
+
+**排名：5**
+
+**精确标题：** _From Reversible Computation to Checkpoint-Based Rollback Recovery for Message-Passing Concurrent Programs_  
+**作者：** Germán Vidal  
+**发表年份：** 2024  
+**venue：** _Formal Aspects of Component Software_ (**FACS 2023**), LNCS 14485, pp. 103–123  
+**DOI：** `10.1007/978-3-031-52183-6_6`  
+**验证预印本：** arXiv `2309.04873`。这里会议名称是 FACS 2023，但 Springer 将论文的正式 bibliographic year 记为 **2024**，首个在线发表日期为 2024 年 1 月 13 日，因此按出版记录应写 2024，而不是把会议年份误当成 publication year。citeturn18view1
+
+论文直接针对 concurrent and distributed systems 的 fault tolerance：各进程保存检查点，出现 failure 后 rollback recovery 将系统带回一个此前的**一致状态**；具体研究对象是消息传递并发语言，方案把显式 checkpoint 操作与 partially reversible semantics 结合起来。citeturn18view1
+
+**概念匹配（一句话）：** 这篇论文非常直接地解决“协作的消息传递程序如何从失败中回滚到一致状态”，但对“不要妨碍其他程序继续进展”的强调不如前三名明确，因此排在第五。citeturn18view1
+
+这篇论文和上面的 SAC ’24 异步方案也**不是同一版本**：后者明确把本篇列为最接近的既有方法，同时指出本篇依赖可逆语义、逐步撤销并且操作语义并非完全异步，而 SAC ’24 的新贡献正是纯异步、无需中央协调的恢复策略；因此它们应作为两个独立候选，而不能按 conference/journal family 合并。citeturn22view2
+
+## 核验与歧义说明
+
+从“完整想法”的语义来看，**最可能的目标是 _Let It Recover: Multiparty Protocol-Induced Recovery_**。它不是仅仅因为出现了 recovery 或 multiparty 这样的主题词，而是同时满足题目隐含的四层结构：有多个合作/交互进程；其中某处可能意外失败；系统从一个安全状态恢复；恢复范围依据动态通信因果依赖局部化，使没有必要受牵连的进程不被通知、没有必要重做的状态不被重做。citeturn21search1turn15search10
+
+不过，**第二名不能被排除为真正目标**。如果线索里的 “mistakes” 特指已经执行了“错误交互”后需要 undo，而 “progress” 是刻意借用并发语言理论里的 progress property，那么 _Rollback Recovery in Session-Based Programming_ / _Checkpoint-based rollback recovery in session programming_ 更为精准：摘要本身就从 undo interactions leading to an undesired state 出发，而且结论明确证明 session progress，并专门避免一个参与者的 rollback 不当地恢复另一个参与者的 checkpoint。citeturn22view0turn18view3
+
+同理，若 “without getting in the way” 是在暗示“不需要把所有进程同步停下来”，第三名 _An Asynchronous Scheme for Rollback Recovery in Message-Passing Concurrent Programming Languages_ 反而可能是 intended paper，因为它把 **no central coordination** 和 **purely asynchronous** 直接列作设计目标。citeturn22view2
+
+因此，对 **5B005** 最稳妥的检索结论是：**首选 Neykova & Yoshida 2017；Mezzina–Tiezzi–Yoshida 2023/2025 是几乎同等可信的第二解释；Vidal 2024 SAC 是另一种“非阻碍式恢复”的强解释。**前两者尤其值得保留为歧义候选，而不是人为制造一个不存在的唯一答案。citeturn21search1turn18view3turn22view2
+
+# 5B006：重复内容不只是压缩机会，也可以成为检索优势
+
+## 判定结果
+
+我检索到的文献中，**最可能对应这条研究想法的是 Travis Gagie 等人的 _Document retrieval on repetitive string collections_**。它和题目中的完整想法几乎逐项对应：论文先指出，大规模字符串集合往往因为文档彼此相似而具有高度重复性，利用这种重复性能把存储空间降低几个数量级；紧接着它把问题推进到“不能只压缩，还要在这些重复集合上做高效文档检索”，并针对 document listing、top-\(k\) retrieval、document counting，以及 tf-idf 多词查询设计重复性感知的索引。citeturn22view0turn22view2
+
+尤其关键的是，论文自己的论述结构与提示语“**Maybe repeated content could make large documents easier to search, not just smaller to store**”非常接近：作者先讨论利用 repetitiveness 获得数量级的空间缩减，然后明确转向“document retrieval requires much more than retrieving individual documents”，继而提出利用重复性来压缩并组织检索数据结构。citeturn19search1turn22view2
+
+不过，**我不认为证据足以把答案唯一化到只有一篇论文**。2017 年的这篇论文是最强的整体匹配，但 2019 年 Cobas–Navarro 的 document-listing 工作、2019 年 Navarro 的有保证性能版本，以及 r-index 系列都非常直接地体现了“把重复性本身转化为搜索索引优势”。因此下面给出五个候选，并按**完整概念吻合度**而非关键词重叠排序。
+
+## 排名候选
+
+| 排名 | 候选工作 | 书目信息 | DOI | 为什么匹配 |
+|---|---|---|---|---|
+| **1** | **_Document retrieval on repetitive string collections_** | Travis Gagie, Aleksi Hartikainen, Kalle Karhu, Juha Kärkkäinen, Gonzalo Navarro, Simon J. Puglisi, Jouni Sirén；**2017**；*Information Retrieval Journal*, 20, 253–291 | **10.1007/s10791-017-9297-7** | 它明确从“重复性可把存储空间降低几个数量级”出发，进一步用这种重复性构造高度压缩、同时支持 document listing、top-\(k\)、counting 和 tf-idf 多词检索的索引，和题意“重复内容不仅帮助存储，也帮助搜索”最完整地重合。citeturn22view0turn22view2turn22view4 |
+| **2** | **_Fast, Small, and Simple Document Listing on Repetitive Text Collections_** | Dustin Cobas, Gonzalo Navarro；**2019**；*26th International Symposium on String Processing and Information Retrieval (SPIRE 2019)*, LNCS 11811, pp. 482–498 | **10.1007/978-3-030-32686-9_34** | 这篇论文直接利用 **document array 的重复性**做 grammar compression 并预计算答案，实验显示其索引在时间/空间折衷上显著优于已有方案，因此比单纯“压缩重复文档”更直接地把重复性转化成搜索能力。citeturn21academia13turn19search2turn19search4 |
+| **3** | **_Universal Indexes for Highly Repetitive Document Collections_** | Francisco Claude, Antonio Fariña, Miguel A. Martínez-Prieto, Gonzalo Navarro；**2016**；*Information Systems*, 61, 1–23 | **10.1016/j.is.2016.04.002** | 它研究由大量 near-copies 构成、可能达到巨大规模的版本化文档库，并直接利用这种重复规则来压缩 inverted indexes 与 self-indexes；概念非常吻合，但论文报告主要优势是大幅节省索引空间、通常伴随一定查询减速，所以比前两篇稍弱地符合“easier to search”。citeturn20search0turn20search1turn20search15 |
+| **4** | **_Document Listing on Repetitive Collections with Guaranteed Performance_** | Gonzalo Navarro；**2017 conference / 2019 journal**；CPM 2017；扩展版发表于 *Theoretical Computer Science*, 772, 58–72 | **CPM:** 10.4230/LIPIcs.CPM.2017.4；**journal:** 10.1016/j.tcs.2018.11.022 | 它问的是“给定模式，哪些字符串/文档包含它”，并专门针对由少量原型和近似副本构成的重复集合给出同时按重复规模而非总文本规模增长的空间界和有用的最坏情况查询时间界，是“利用重复性来使检索可扩展”的非常纯粹理论化版本。citeturn17view5turn18search4turn18search2 |
+| **5** | **_Optimal-Time Text Indexing in BWT-runs Bounded Space_** → journal extension **_Fully Functional Suffix Trees and Optimal Text Searching in BWT-Runs Bounded Space_** | Travis Gagie, Gonzalo Navarro, Nicola Prezza；**2018 SODA / 2020 JACM**；SODA 2018, pp. 1459–1477；扩展版 *Journal of the ACM*, 67(1), Article 2, pp. 1–54 | **SODA:** 10.1137/1.9781611975031.96；**JACM:** 10.1145/3375890 | 这一工作把文本的重复程度 \(r\)（BWT runs 数）直接变成索引空间参数，并证明可以在由重复性界定的压缩空间内达到最优级别的 count/locate 搜索时间，因此非常贴合“重复本身可以帮助搜索”，只是对象是一般重复文本而非专门的 document retrieval。citeturn17view7turn18search3turn18search14 |
+
+## 最强候选的证据链
+
+第一名不是仅仅因为标题里同时出现了 *repetitive* 和 *retrieval*。Springer 的正式记录显示，该文发表于 **2017 年 4 月 1 日**，刊于 *Information Retrieval Journal* 第 20 卷 253–291 页，作者为 Travis Gagie、Aleksi Hartikainen、Kalle Karhu、Juha Kärkkäinen、Gonzalo Navarro、Simon J. Puglisi 和 Jouni Sirén，DOI 为 **10.1007/s10791-017-9297-7**。因此年份、作者和发表身份都符合用户给出的 2015–2025 限制。citeturn22view0turn22view4
+
+更重要的是其研究逻辑。论文将 repetitive collection 定义为其中许多文档彼此非常相似的集合，并列举 Wikipedia/Wayback Machine 的版本文档、软件版本库以及同物种基因组数据库等场景。作者指出，重复性早已可以用于显著压缩这些数据，但检索的需求远不止“解压/取回某一个版本”。citeturn22view1turn19search1
+
+随后论文真正**把重复性放进检索数据结构本身**：ILCP 在重复集合上呈现可压缩结构，用于 document listing 和 counting；PDL 把预计算文档列表做 grammar compression，在重复集合上对 document listing 与 top-\(k\) retrieval 很有效；甚至一个原本并非为重复数据设计的 counting 数据结构也被证明在重复数据上高度可压缩。最后这些组件还被组合成 tf-idf 排名的 conjunctive/disjunctive multi-term queries。citeturn22view2
+
+这使第一名与一种较弱的命题有重要区别：
+
+> “重复文档很多，所以我们把它们压缩后再搜索。”
+
+第一名实际研究的是更强的命题：
+
+> **“重复性本身会在检索辅助结构中产生可利用的规律，因此我们可以围绕这种规律设计 document-retrieval index。”**
+
+这正是我认为它比普通 compressed index 或 deduplication 论文更符合 5B006 描述的原因。论文的实验也不是纯空间实验：作者报告了在高度重复集合上进行 document listing、top-\(k\) retrieval、counting 和 multi-term retrieval 的实际时间/空间结果。citeturn22view2
+
+## 版本关系与去重
+
+第一名的版本关系值得特别说明，因为不处理这一点会很容易把同一研究线重复填进多个排名。2017 年期刊文章自己明确注明，它**汇总并统一扩展了**此前发表于 **CPM 2013、ESA 2014 和 DCC 2015** 的 preliminary partial versions，并进一步加入此前未处理的多词 top-\(k\) 检索。citeturn22view2turn22view3 因此我没有把其中的 DCC 2015 工作另列为独立候选；虽然 DCC 2015 正好落在题目允许的年份范围内，但官方文章把它明确描述为当前论文的早期部分成果。citeturn22view3
+
+这也解释了一个表面上的题名差异：Springer 2017 的正式标题是 **_Document retrieval on repetitive string collections_**，而文献表中有时可看到较早会议成果采用 *Document retrieval on repetitive collections*、*Document listing on repetitive collections* 等题名。2017 文章不是凭空无关的后续论文，而是作者明确说明的统一期刊化成果。citeturn22view2turn19search1
+
+第四名也存在明确的 conference → journal 关系。Navarro 的 arXiv 扩展稿直接注明：**“A preliminary version of this article appeared in Proc. CPM 2017”**；扩展后的论文最终发表于 2019 年 *Theoretical Computer Science* 772:58–72，DOI **10.1016/j.tcs.2018.11.022**。因此两者被合并为一个候选，而不是占两个名次。citeturn17view5turn18search2
+
+第五名同样按 work family 合并。SIAM 的正式 SODA 记录验证了 2018 年 **_Optimal-Time Text Indexing in BWT-runs Bounded Space_** 的作者、页码与 DOI；Nicola Prezza 的作者 publication record 则明确把 2020 JACM 的 **_Fully Functional Suffix Trees and Optimal Text Searching in BWT-Runs Bounded Space_** 标为该 SODA 2018 论文的 **“Journal extension of”**。ACM 记录确认扩展版位于 JACM 67(1)、Article 2、1–54 页。citeturn17view7turn18search5turn18search14
+
+相反，第二名 **Cobas & Navarro 2019** 虽然明显承接了 2017 年 Gagie 等人和 Navarro 的相关技术线，但它提出了自己新的、基于 grammar-compressed document array 和预计算答案的索引，并有独立 SPIRE 2019 发表记录；因此这是**独立 follow-up**，不能并入第一名或第四名。citeturn21academia13turn19search4
+
+第三名的 2019 reproducibility 论文 **_On the Reproducibility of Experiments of Indexing Repetitive Document Collections_** 也没有被另列。其摘要明确称自己是为了复现“previous/parent work”中的方法和实验而写的 companion paper，因此不是与 2016 **_Universal Indexes…_** 竞争的独立答案。citeturn19academia22turn20search3
+
+## 候选之间的实质区别
+
+这五篇论文实际上对应“重复让搜索更容易”这句话的三个不同解释，因此存在真实的答案歧义，而不是检索噪声。
+
+**若“search”指搜索一个大型文档集合、返回哪些文档相关，第一名最明确。** _Document retrieval on repetitive string collections_ 不仅支持某个 pattern 是否存在，还讨论 listing、top-\(k\)、document frequency/counting 和 tf-idf 排名式多词查询，最接近通常意义上的“搜索文档”。citeturn22view0turn22view2
+
+**若“search”更具体地指“给一个字符串，快速列出所有含它的重复文档”，第二名或第四名可能才是目标。** Cobas–Navarro 2019 是更偏实践的高效方案，其摘要直接称 document listing 为最基本的 document-retrieval problem，并报告在 space/time trade-off 上显著优于已有方案；Navarro 2017/2019 则更理论化，强调在重复集合上同时取得与重复规模相关的空间保证和有用的最坏情况查询时间保证。citeturn21academia13turn17view5
+
+**若“large documents”其实泛指一个巨大的、内部高度重复的 text，而不是“很多相似 documents”，第五名的 r-index family 会非常有竞争力。** SODA 论文明确指出高度重复文本包括 genomic databases、software repositories 和 versioned text collections，并用 BWT runs 数 \(r\) 衡量重复程度，在 \(r\)-bounded space 中解决 count 和 locate，达到 \(O(m+\mathrm{occ})\) 级别的最优搜索时间结果。换句话说，这一研究线把“越有重复 → 越小的有效索引参数”与“仍能极快搜索”直接结合起来。citeturn17view7
+
+第三名则最清楚地呈现另一种解释：**重复文档使“搜索索引”本身更可压缩。** Claude 等人的对象就是 huge repositories of versioned documents / near-copies，并对 inverted lists 使用 run-length、Lempel–Ziv 和 grammar compression；但作者也诚实报告这些大幅空间节省通常以 moderate slowdowns 为代价，而 self-indexes 虽更小却慢几个数量级。正因为如此，我没有仅凭标题把它排在第二名——它非常符合“重复内容 + 搜索索引”，却没有前两篇那么强地体现“重复让搜索本身更容易/更快”。citeturn20search0turn20search1
+
+## 最终判断与置信度
+
+**首选答案：**
+
+**Travis Gagie, Aleksi Hartikainen, Kalle Karhu, Juha Kärkkäinen, Gonzalo Navarro, Simon J. Puglisi, Jouni Sirén. _Document retrieval on repetitive string collections_. Information Retrieval Journal 20, 253–291 (2017). DOI: 10.1007/s10791-017-9297-7.** citeturn22view0turn22view4
+
+我对它作为 **5B006 的最佳匹配给出“高”置信度，但不是唯一答案级别的置信度**。理由并非题名相似，而是论文完整的论证路径几乎就是提示语的展开：大型集合中存在大量 near-copy/repetitive documents → 重复性已经可以极大节省存储 → 但需要的不只是存储/取回单一版本 → 让 document-retrieval structures 本身利用重复性 → 支持 listing、counting、top-\(k\) 和 ranked multi-term search。citeturn19search1turn22view2
+
+若题目线索中的 **“easier to search”特别强调搜索速度而不是搜索索引的空间可扩展性**，则第二名 **_Fast, Small, and Simple Document Listing on Repetitive Text Collections_** 和第五名的 **r-index work family** 应显著提高权重；前者在实验时间/空间折衷上直接胜出，后者则从理论上证明重复性参数化的压缩空间与 optimal-time searching 可以同时实现。citeturn21academia13turn17view7
+
+因此，基于目前能由 Springer、Elsevier/ScienceDirect、SIAM、ACM、Dagstuhl/arXiv 版本说明和作者记录交叉验证的证据，**不存在必须虚构出来的唯一匹配；但第一名明显领先，其余四篇是可以验证、且概念上真正接近而非仅共享“compression/search/repetition”词汇的候选。**
+
+# 5B007：与“降低位置精度后，个人日常轨迹仍容易被认出”最匹配的论文
+
+## 结论
+
+我认为**最可能的目标论文是 Luca Rossi、James Walker、Mirco Musolesi 的 2015 年论文 _Spatio-temporal techniques for user identification by means of GPS mobility data_**。它几乎逐项对应题目中的完整想法，而不仅仅是共享了“location privacy / re-identification”这些关键词：论文先明确指出，人具有规律性的日常活动和一组“重要地点”，因此移动数据本身可以成为身份特征；随后又**主动降低 GPS 坐标的空间分辨率**，测试粗化后的轨迹是否仍具唯一性，结果发现即使只保留少量、非常粗糙的空间点，仍可以识别相当一部分用户。citeturn18view1turn18view0turn18view2
+
+因此，我会把它作为 **Rank 1，且置信度明显高于其余候选**。不过并不能完全断言它是唯一答案：2018 年 Fang 等人的 “daily habitat region” 论文，以及 Pyrgelis 等人的匿名位置泄露论文，也把“降低位置细节/时空精度”和“用户仍可被匹配”直接放在同一个实验问题中，所以这里存在真实的候选歧义，而不宜人为制造一个唯一答案。citeturn18view3turn21view2
+
+## 候选论文排名
+
+| 排名 | 论文与书目信息 | 与研究想法的概念匹配 |
+|---|---|---|
+| **1** | **_Spatio-temporal techniques for user identification by means of GPS mobility data_** — Luca Rossi, James Walker, Mirco Musolesi. **2015**, *EPJ Data Science*, 4:11. **DOI:** `10.1140/epjds/s13688-015-0049-x`. Springer 的正式记录给出 2015-08-05 出版日期、三位作者和期刊信息。citeturn18view1turn17view2 | **最完整的匹配：**论文把人的规律性 routine/significant places 与可识别性直接联系起来，并把 GPS 经纬度截断到更少小数位来进行空间粗化，发现少量低分辨率位置点仍足以唯一识别许多用户。citeturn18view1turn18view2 |
+| **2** | **_Location Privacy in Mobile Big Data: User Identifiability via Habitat Region Representation_** — Luoyang Fang, Xiang Cheng, Liuqing Yang, Haonan Wang. **2018**, *Journal of Communications and Information Networks*, 3, 31–38. **DOI:** `10.1007/s41650-018-0028-z`. Springer 的版本记录给出正式发表日期 2018-10-05。citeturn18view3turn18view4 | 论文把一天的完整移动轨迹压缩为信息量少得多的 **daily habitat region**，用日常活动覆盖区域而非精细轨迹匹配用户，却仍发现用户隐私在“显著减少的时空信息”下受到严重威胁；这与“模糊地点但 routine 仍可认出”非常接近。citeturn18view3turn18view4 |
+| **3** | **_There goes Wally: Anonymously sharing your location gives you away_** — Apostolos Pyrgelis, Nicolas Kourtellis, Ilias Leontiadis, Joan Serrà, Claudio Soriente. **2018**, *2018 IEEE International Conference on Big Data (Big Data)*, pp. 1218–1227. **DOI:** `10.1109/BigData.2018.8622184`; verified preprint **arXiv:1806.02701**. arXiv 明确列出五位作者并注明该稿将发表于 2018 IEEE Big Data。citeturn21view2turn22search4 | 它直接研究匿名位置泄露能否与大规模移动轨迹对应，并专门测试 **spatio-temporal obfuscation** 对匹配效果的影响，同时分析哪些人的移动特征使其尤其容易被识别，因此完整覆盖“模糊后仍能从移动习惯认人”这一思路。citeturn21view2 |
+| **4** | **_The risk of re-identification remains high even in country-scale location datasets_** — Ali Farzanehfar, Florimond Houssiau, Yves-Alexandre de Montjoye. **2021**, *Patterns*, 2(3):100204. **DOI:** `10.1016/j.patter.2021.100204`. Imperial College 的作者稿确认题名与三位作者；正式论文发表于 *Patterns*。citeturn22view0turn17view4 | 其位置数据本身只有约 **1 km 空间分辨率和 1 小时时间分辨率**，但论文仍发现人口尺度数据中的再识别风险很高，并指出进一步降低时空分辨率通常只会缓慢降低风险；它很好地对应“已经很粗的位置仍然很像指纹”。citeturn17view5turn22view0 |
+| **5** | **_Where You Are Is Who You Are: User Identification by Matching Statistics_** — Farid M. Naini, Jayakrishnan Unnikrishnan, Patrick Thiran, Martin Vetterli. **2016**, *IEEE Transactions on Information Forensics and Security*, 11(2), 358–372. **DOI:** `10.1109/TIFS.2015.2498131`; verified preprint **arXiv:1512.02896**.citeturn20search4turn20search7 | 论文把用户行为的统计分布当作“指纹”，在包括 GPS trajectories 在内的数据上从匿名数据中重新匹配用户，并明确把数据 **resolution** 列为影响识别率的关键变量；它与“粗粒度 routine 仍可识别”高度相关，但没有 Rank 1 那样直接进行 GPS 坐标空间粗化实验。citeturn20search4turn20search7 |
+
+## 为什么第一名最像目标描述
+
+题目中的一句话其实包含三个相当具体的语义部件：
+
+**“a person's routine”** 对应的是稳定、重复的个体移动行为，而不仅仅是一次性出现的位置。Rossi、Walker 和 Musolesi 在摘要中明确把隐私问题归因于人们具有规律性的日常活动以及一组稳定的“significant places”；正文还讨论了人们再次回到某地的时间通常也具有规律性。citeturn18view1
+
+**“making shared locations less precise”** 暗示研究者不是单纯删除身份字段，而是**降低坐标精度/空间粒度**。这恰好是 Rossi 等人的一个核心实验：他们逐步减少纬度和经度的小数位，将空间点从精细 GPS 坐标粗化到越来越大的区域，并明确把这个操作描述为降低 resolution、coarsening spatial information，以考察这能否掩盖移动数据用户的身份。citeturn18view0turn18view2
+
+最后，**“still leaves … surprisingly easy to recognize”** 对应的是粗化之后仍然残留很强的唯一性。论文的结果不是泛泛地说“可能存在风险”，而是发现即便只取一小部分非常粗的空间点，仍有相当多用户可以被识别；作者还指出，完整分辨率下某些数据集只需要两个点就能唯一确定接近全部个体，而降低坐标精度虽会降低唯一性，却并不会自动消除这种身份信号。citeturn18view0turn18view2
+
+所以，如果 5B007 的线索是对某篇论文核心发现的自然语言改写，而不是对标题的关键词改写，那么 Rank 1 的对应关系尤其强：
+
+> **regular routine → spatial coarsening → user still identifiable**
+
+这三个环节在同一篇论文里都是显式研究对象。citeturn18view1turn18view2
+
+## 与第二、第三名的区别
+
+**Fang et al. 是最值得警惕的替代答案。** 它甚至可能在“routine”这一侧比一些经典再识别论文更接近线索，因为作者构造的不是若干孤立的位置点，而是每个用户的 **daily habitat region**：把一天的移动覆盖区域用轨迹凸包表示，从而以远少于原始轨迹的信息描述日常移动。随后他们跨两个数据集进行用户匹配，并报告即便时空信息已经大幅减少，用户仍有明显识别风险。citeturn18view3turn18view4  
+它排在第二而不是第一，主要因为题目说的是“locations less precise”，这更自然地对应 Rossi 等人直接修改 **coordinate resolution**；Fang 等人的处理更像对完整每日轨迹进行**语义/几何压缩表示**，而不只是降低坐标精度。这个排序是基于完整语义的推断，而不是书目事实。citeturn18view2turn18view4
+
+**Pyrgelis et al. 则最直接对应“位置被分享出去以后再进行模糊”。** 论文设定正是用户以假名或匿名方式泄露一些位置，攻击者拥有大规模移动轨迹；作者明确提出要测量时空模糊化会把匹配质量降低多少，同时研究哪些移动特征让某些人特别容易被识别。citeturn21view2  
+它之所以排第三，是因为该论文的中心叙事更偏向 **anonymous location leaks + trace matching**，而不是“一个人的日常 routine 在粗粒度表示下仍然有辨识度”本身。论文最终确实说明大规模人类移动高度独特，但题目中的“routine”措辞仍更像前两篇。citeturn21view2
+
+## 版本关系与身份核验
+
+Rank 1 的正式期刊版本和预印本应视为**同一个候选工作，而不是两个排名**。正式版为 Rossi、Walker、Musolesi 在 *EPJ Data Science* 2015 年发表的文章；相应预印本为 **arXiv:1501.06814**。Springer 的版本记录确认正式题名、作者、年份和期刊身份。citeturn18view1turn17view2
+
+Rank 3 同理：**arXiv:1806.02701** 是 Pyrgelis、Kourtellis、Leontiadis、Serrà、Soriente 这项工作的预印本，arXiv 的记录明确注明其将发表于 **2018 IEEE International Conference on Big Data**；会议版本页码为 1218–1227，DOI 为 `10.1109/BigData.2018.8622184`。因此这里没有把预印本和会议论文拆成两个候选。citeturn21view2turn22search4
+
+Rank 5 的 **arXiv:1512.02896** 与后来发表于 *IEEE Transactions on Information Forensics and Security* 的论文也是同一工作。预印本列出的作者为 Farid M. Naini、Jayakrishnan Unnikrishnan、Patrick Thiran 和 Martin Vetterli，并已经包含 GPS trajectories、行为直方图、数据分辨率以及 k-anonymization 等正式论文的核心实验内容。citeturn20search4turn20search7
+
+Rank 4 的 Imperial College 作者稿则与 *Patterns* 2021 年正式文章相对应；作者稿题名和三位作者与正式记录一致，因此没有将机构仓储版本作为另一个独立工作。citeturn22view0turn17view4
+
+## 歧义与最终判断
+
+这道题**有歧义，但不是五五开**。我的判断是：
+
+**最可能：Rossi, Walker & Musolesi (2015)。**  
+关键原因不是它恰好讲“location privacy”，而是题目中最有辨识度的两个短语——“routine”和“less precise locations”——在这篇论文里分别有非常直接的对应：前者是规律性移动与 significant places，后者是通过截断经纬度小数位进行明确的 spatial coarsening；论文还直接验证粗化位置仍保留用户唯一性。citeturn18view1turn18view2
+
+**主要替代：Fang et al. (2018)。**  
+假如题目中的“less precise”不是指坐标小数位精度，而是泛指把完整移动数据压缩为更模糊的每日活动区域，那么这篇论文甚至可能是目标，因为其“daily habitat region + far lesser information + user identification”组合几乎就是“粗略日常活动区域仍能认人”的正式化版本。citeturn18view3turn18view4
+
+**次要替代：Pyrgelis et al. (2018)。**  
+如果“shared locations”特指用户主动分享/泄露的 geotagged locations，而“less precise”特指对这些泄露进行 spatio-temporal obfuscation，那么 _There goes Wally_ 会成为很强的答案。citeturn21view2
+
+Farzanehfar et al. 和 Naini et al. 都是真正相关而非单纯共享关键词的后备候选，但前者主要问的是人口规模数据是否仍可再识别，后者主要问匿名行为统计能否作为指纹；它们没有同时像前三名那样把**位置精度降低、日常移动特征和身份匹配**全部置于中心。citeturn22view0turn17view5turn20search4
+
+因此，对 **5B007** 我会给出的最终识别是：**Rank 1 — _Spatio-temporal techniques for user identification by means of GPS mobility data_ (Rossi, Walker & Musolesi, 2015)**，但保留 **Fang et al. 2018** 作为实质性的第二种解释，而不是声称存在一个已经被唯一证明的答案。
+
+# 5B008：关于“分享有用信息而不消除个人细节的不确定性”的论文匹配
+
+## 结论
+
+我认为 **最可能的目标工作是 Borzoo Rassouli、Fernando E. Rosas 与 Deniz Gündüz 的 _Data Disclosure under Perfect Sample Privacy_**。它不只是讨论泛泛的“隐私—效用权衡”，而是把问题明确拆成两部分：从个人数据样本中提取、披露有用的整体或潜在特征，同时要求披露结果不能帮助接收者进一步推断任何一个具体个人样本。论文甚至将其直观表述为：可以提取并分享数据的全局性质，同时让具体样本保持机密；其“perfect sample privacy”要求发布结果与每一个单独样本独立。citeturn22view2
+
+不过，这个线索**并不能唯一锁定一篇论文**。第二个非常强的候选是 2015 年 ISIT 的 _Fundamental Limits of Perfect Privacy_：它研究的核心问题几乎就是“能否披露非平凡的有用信息，同时对一个私人变量完全不披露信息”，而且明确给出了这种情况何时可能的充要性质。citeturn22view1turn21search7
+
+如果线索中的“someone is still unsure about”是刻意强调“**已有不确定性不能因披露而显著缩小**”，而非通常意义上的统计独立，那么 Ni Ding 与 Farhad Farokhi 的非随机隐私工作也非常值得怀疑；其中直接使用了 **maximum uncertainty reduction（最大不确定性缩减）** 作为隐私泄漏量。citeturn18search1turn20search26
+
+## 匹配标准
+
+我把题目中的三个语义成分分别映射为：
+
+**“useful information could be shared”**：论文必须真正讨论 disclosure、release、query response 或 latent/global feature 的效用，而不是单纯做匿名化定义。
+
+**“personal details”**：被保护对象最好是 individual sample、private variable、sensitive latent variable 或 private dataset，而不是纯粹的通信密钥、成员资格等不同安全目标。
+
+**“someone is still unsure about”**：这是区分候选论文最有价值的部分。它可以有两种技术解释：其一是**完美隐私**，即观察发布结果之后，对私人变量没有获得任何新增统计信息；其二是直接以“uncertainty reduction”或非随机 uncertain variables 描述隐私，使攻击者观察输出后仍面对一组可能的私人取值。_Data Disclosure under Perfect Sample Privacy_ 属于第一种且明确落到个人样本层面；Ding–Farokhi 则非常接近第二种字面解释。citeturn22view2turn18search1
+
+因此，下面的排序不是按标题中是否出现 privacy、utility、uncertainty 等关键词，而是按这三个语义条件整体匹配。
+
+## 候选作品
+
+| 排名 | 作品与书目信息 | DOI / 稳定地址 | 与完整研究想法的概念匹配 |
+|---|---|---|---|
+| **1** | **_Data Disclosure under Perfect Sample Privacy_** — **Borzoo Rassouli, Fernando E. Rosas, Deniz Gündüz**；**2020**；*IEEE Transactions on Information Forensics and Security*, vol. 15, pp. 2012–2025。其可验证预印本为 arXiv:1904.01711，题名和作者与期刊工作一致。论文前身是三位作者的 **_Latent Feature Disclosure under Perfect Sample Privacy_**, 2018 IEEE International Workshop on Information Forensics and Security (WIFS), pp. 1–7；期刊稿把这一“潜在特征披露 + sample privacy”方向扩展到一般、渐近和低复杂度场景，因此这里按一个工作家族处理，而不占两个名次。citeturn22view2turn21search3 | `https://arxiv.org/abs/1904.01711` | **最强匹配：它允许从私人样本集合中披露关于潜在/整体特征的有用信息，同时要求输出不能帮助分析者进一步推断任何单个样本，因此正对应“分享有用内容，但不把仍不确定的个人细节坐实”。** citeturn22view2 |
+| **2** | **_Fundamental Limits of Perfect Privacy_** — **Flavio P. Calmon, Ali Makhdoumi, Muriel Médard**；**2015**；*2015 IEEE International Symposium on Information Theory (ISIT)*, Hong Kong, pp. 1796–1800。MIT 的作者终稿记录与 IEEE 记录均确认作者、会议、年份和 DOI。citeturn22view1turn21search7 | `https://doi.org/10.1109/ISIT.2015.7282765` | **这篇论文直接研究能否披露关于测量变量 \(X\) 的非平凡“useful information”，同时对私人变量 \(S\) 泄露零信息，因此几乎就是问题的最简信息论形式。** citeturn22view1 |
+| **3** | **_Developing Non-Stochastic Privacy-Preserving Policies Using Agglomerative Clustering_** — **Ni Ding, Farhad Farokhi**；**2020**；*IEEE Transactions on Information Forensics and Security*, vol. 15, pp. 3911–3923。预印本 arXiv:1911.04842；IEEE/文献记录确认其 TIFS 2020 期刊版本。citeturn18search1turn20search20turn20search26 | `https://arxiv.org/abs/1911.04842` | **它把发布问题明确写成：发布仍具有 utility 的量化数据 \(\hat X\)，同时最小化关于敏感变量 \(S\) 的“maximum uncertainty reduction”，所以对“不要消除别人对私人细节原有的不确定性”这一措辞尤其贴切。** citeturn18search1 |
+| **4** | **_Optimal Utility-Privacy Trade-Off With Total Variation Distance as a Privacy Measure_** — **Borzoo Rassouli, Deniz Gündüz**；期刊版本 **2020**，*IEEE Transactions on Information Forensics and Security*, vol. 15, pp. 594–603；IEEE Early Access/DOI 注册于 2019。此前有同作者、同题目的 **2018 IEEE Information Theory Workshop (ITW)** 会议版本；由于期刊记录引用该会议工作且题名、作者和模型延续，这里将会议版和后续期刊版视为一个工作家族。citeturn18search2turn18search8turn18search14turn19search2 | `https://doi.org/10.1109/TIFS.2019.2903658` | **它直接把目标定义为“为获得 utility 而披露一部分可用数据，同时保持敏感 latent variables 对接收者的隐私”，因此完整概念高度吻合，只是它允许可控泄漏而不一定要求私人信息完全保持原有不确定性。** citeturn19academia14 |
+| **5** | **_Development and Analysis of Deterministic Privacy-Preserving Policies Using Non-Stochastic Information Theory_** — **Farhad Farokhi**；**2019**；*IEEE Transactions on Information Forensics and Security*, vol. 14, no. 10, pp. 2567–2576。arXiv 与期刊 DOI 记录相互对应。citeturn14search0turn14search10 | `https://doi.org/10.1109/TIFS.2019.2903660` | **它允许用户针对一个“uncertain private dataset”提出查询，然后在最大化隐私的同时约束回答的最坏情况质量，因此正是在研究能否给出仍然有用的回答，而不把不确定的私人数据充分揭示出来。** citeturn14search0turn14search6 |
+
+## 为什么第一名明显更像线索所指
+
+_Data Disclosure under Perfect Sample Privacy_ 有几个非常具体的特征，使它比一般的“privacy–utility trade-off”论文更接近题目。
+
+首先，它保护的不是抽象意义上的数据库整体秘密，而是**具体 individual samples**。论文定义一个私人数据集 \(X^n=(X_1,\ldots,X_n)\)，希望把其中蕴含的潜在特征 \(W\) 分享给分析者；作者给出的例子是患者的生命体征样本 \(X^n\) 和希望远程共享的健康风险指标 \(W\)。患者希望让远端系统得到有用的风险信息，却不希望把原始样本暴露出去而产生额外个人信息推断。citeturn22view2
+
+其次，它对“仍然不确定”的处理比普通匿名化更强。论文对 **perfect sample privacy** 的定义是发布变量 \(Y\) 与每一个 \(X_i\) 都统计独立，即 \(Y\perp X_i\)；作者进一步解释，最高等级的完美隐私意味着，披露以后**不能了解到任何在披露以前本来不知道的个人信息**。换言之，接收者可以得到某些组合、协同或总体信息，但关于具体个人样本的后验知识不因发布而增加。citeturn22view2
+
+第三，它又不是“为了隐私什么都不发”。文章的核心正是所谓 **synergistic disclosure**：输出虽然对每个单独样本都没有信息，却仍可以携带关于潜在变量 \(W\) 的信息。作者明确指出，“让输出与整个 \(X^n\) 独立”会过强，因为那样也就无法传递关于 \(W\) 的信息；因此他们改成逐样本的独立约束，以保留有用的集体信息。citeturn22view2
+
+这与题目中“**useful information**”和“**personal details that someone is still unsure about**”的并置非常有辨识度：不是简单地“少透露一些”，而是想利用**多个个人信息之间的联合结构**分享某种有用结论，同时不解决任何一个具体个人细节。
+
+第二名 _Fundamental Limits of Perfect Privacy_ 则是这一想法更早、更抽象的形式。其官方摘要明确设定“measurement points \(X\)”为 useful information、\(S\) 为 private information，并证明在什么条件下可以披露**非平凡数量的有用信息而完全不披露私人信息**；所以若题目里的“personal details”并不是特指单个数据样本，而只是泛指某个敏感私人变量，那么这篇 2015 ISIT 论文甚至可能是预期答案。citeturn22view1
+
+## 关键歧义
+
+真正的歧义在于题目中的“**still unsure about**”究竟是哪一种数学意义。
+
+如果它意指“分析者披露前对某个个人值存在统计不确定性，披露后也不应获得任何额外知识”，那么 **perfect privacy / perfect sample privacy** 文献最吻合，第一、第二名明显领先。_Fundamental Limits of Perfect Privacy_ 直接要求私人变量与披露信息之间不存在统计依赖；_Data Disclosure under Perfect Sample Privacy_ 又进一步把这一要求落实到每一个个人样本。citeturn22view1turn22view2
+
+如果“unsure”是更字面的**集合式、非概率不确定性**，那么第三名可能反而是预期目标。Ding 与 Farokhi 不要求已知私人数据的概率分布，而把敏感变量视为 bounded, non-probabilistic variables；其一个核心泄漏度量就是观察公开发布数据以后，敏感变量可能取值集合的**最大不确定性缩减**。这比 mutual information、total variation distance 等统计指标更直接对应“原本还没确定的细节不要因为分享的信息而被确定下来”。citeturn18search1
+
+第五名 Farokhi 2019 是这一非随机方向的基础工作：它引入不带概率测度的 **uncertain variables**，让查询者向掌握 uncertain private dataset 的可信代理提交查询，并寻找在“响应质量”约束下最大化隐私的确定性发布策略。citeturn14search0turn14search6 第三名的 Ding–Farokhi 2020 是一篇**独立的后续工作**，它进一步把敏感变量与公开变量分开并构造聚类/量化发布算法，所以不能和 Farokhi 2019 合并成一个候选版本。citeturn18search1turn20search26
+
+## 核验与排除
+
+有一篇论文在自然语言层面其实异常接近线索：Daniel Aranki 与 Ruzena Bajcsy 的 **_Private Disclosure of Information in Health Tele-monitoring_**。它在 2015 年的 arXiv 版本中明确提出 PDI 框架，目标是让主体向预期接收者披露数据时，阻止攻击者由披露数据推断敏感信息，并报告某些情况下可以同时达到 perfect privacy 和对合法接收者的 full utility。citeturn15search0
+
+但我**没有把它列入五个正式候选**，因为检索到的可靠书目记录将其识别为 **CoRR/arXiv abs/1504.07313**；后来的 ACM 论文也以 CoRR 预印本形式引用它，而没有找到可核实的 2015–2025 journal/conference/workshop 正式出版版本。用户给出的条件明确要求目标工作必须有这一类正式发表，因此仅有预印本并不够。citeturn15search5turn15search9
+
+另一个非常重要的思想先驱 **_From the Information Bottleneck to the Privacy Funnel_** 也没有进入候选，因为它发表于 **2014 IEEE Information Theory Workshop**，早于题目要求的 2015–2025 时间窗；后续论文明确把它列作 2014 年 ITW 工作。citeturn22view2turn18search14
+
+综合“正式发表时间”“分享有用信息”“保持私人细节不可进一步推断”以及“个人样本”这几个条件，**5B008 的首选识别应为 _Data Disclosure under Perfect Sample Privacy_；但 _Fundamental Limits of Perfect Privacy_ 是一个无法合理排除的第二答案**。若题目中的“unsure”特意对应技术术语 **uncertainty reduction**，则 _Developing Non-Stochastic Privacy-Preserving Policies Using Agglomerative Clustering_ 是另一条非常有力、而且概念上不同的解释。citeturn22view2turn22view1turn18search1
+
+# 5B009：与“电路本身可能让隐蔽篡改更难”最匹配的论文
+
+## 结论
+
+我认为 **最可能的目标论文是 Xiaotong Cui 等人的 _On the Difficulty of Inserting Trojans in Reversible Computing Architectures_**。它不是泛泛讨论 Hardware Trojan，而是把问题直接放在一种**不同的电路计算范式——可逆电路（reversible circuits）——本身的结构特性**上，研究这些特性如何改变硬件木马的插入、触发和检测难度。作者明确以“reversible circuits 对 hardware Trojans 的 susceptibility”为核心问题；对于 inherently reversible circuits，论文进一步指出，每条线路取 0/1 的概率各为 0.5，因此随机输入的随机性会传播到木马输入，天然有利于激活和发现某些隐蔽木马。这个逻辑与题目中的“**也许某些电路设计在我们添加专门防御之前，本身就让隐蔽篡改更困难**”非常接近。citeturn25search0turn25search2
+
+不过，仅凭这一句研究想法，**不能诚实地声称只有一个唯一答案**。2016 年之后还有一条相当明确的研究线索，不是研究某种特殊计算范式，而是量化一个普通电路/版图**未经安全加固时就已经具有的 Trojan susceptibility**；其中 Salmani–Tehranipoor 2016、Cruz 等 2023、Wei–Zhang–Luo 2024 都是合理候选。citeturn19search0turn17search6turn20search0
+
+我的综合排序是：
+
+| 排名 | 候选工作 | 完整想法匹配度 |
+|---|---|---|
+| **1** | **On the Difficulty of Inserting Trojans in Reversible Computing Architectures** | **很高：直接研究一种电路架构自身的特性是否改变 Trojan 隐蔽插入/检测难度** |
+| **2** | **Vulnerability Analysis of a Circuit Layout to Hardware Trojan Insertion** | **高：不同电路实现/版图在没有额外防御时，本身就有不同的 Trojan 插入脆弱性** |
+| **3** | **TVF: A Metric for Quantifying Vulnerability Against Hardware Trojan Attacks** | **高：直接量化“设计本身对难检测 Trojan 插入有多脆弱”** |
+| **4** | **Rethinking IC Layout Vulnerability: Simulation-Based Hardware Trojan Threat Assessment with High Fidelity** | **中高：重新评估未经加固 IC layout 对实际 Trojan 插入的固有脆弱程度** |
+| **5** | **Design and analysis of hardware Trojans in approximate circuits** | **中等：另一类特殊电路——近似电路——的固有行为会改变 Trojan 的有效性，但结论并非单向地“更安全”** |
+
+## 候选论文
+
+### 最强匹配：可逆电路的结构本身改变 Trojan 难度
+
+**Exact title:** *On the Difficulty of Inserting Trojans in Reversible Computing Architectures*  
+
+**Authors（正式发表版本顺序）:** Xiaotong Cui, Samah Mohamed Saeed, Alwin Zulehner, Robert Wille, Kaijie Wu, Rolf Drechsler, Ramesh Karri. IEEE Computer Society 的卷期记录确认该论文出现在 *IEEE Transactions on Emerging Topics in Computing*, Vol. 8, No. 4, pp. 960–972；DFKI 的作者机构出版记录也给出了同一正式作者序列。citeturn25search9turn22search9
+
+**Publication:** IEEE *Transactions on Emerging Topics in Computing*. IEEE Xplore 将该工作记为 **2018** 年发表/early-access；最终编入 **2020, Vol. 8, No. 4, pp. 960–972**。因此对于年份检索，最准确的写法是“**2018 online publication; 2020 issue publication**”，两者都在题目要求的 2015–2025 范围内。citeturn25search1turn25search9
+
+**DOI:** `10.1109/TETC.2018.2823315`
+
+**Verified preprint:** arXiv:1705.00767，2017-05-02 首次提交，标题相同；预印本作者顺序中 Rolf Drechsler 与 Kaijie Wu 的位置和最终书目记录有所不同，因此这里将它视为**同一 work family 的预印本版本，而不是第二篇候选论文**。citeturn25search0turn22search9
+
+**概念匹配一句话：** 这篇论文不是先假设一个额外安全模块，而是问“**可逆电路这种电路结构自身，对 Hardware Trojan 究竟有何安全含义**”，并利用 inherently reversible circuit 的信号统计/传播特性说明某些 Trojan 会更容易被随机测试触发和暴露，因此最贴近“电路设计本身先天让隐藏篡改更困难”的完整想法。citeturn25search2
+
+这里有一个尤其关键的细节：论文把可逆计算定义为一一对应的 bijective input/output mapping，并明确将研究重点放在 reversible circuits 对 hardware Trojans 的 susceptibility 上；在“不带 ancillary inputs”的 inherently reversible circuit 中，作者指出每条线出现 0 或 1 的概率都是 0.5，输入随机性会传到插入位置的 Trojan 输入，因此随机测试可以直接成为基础检测手段。换言之，这不是仅仅“给普通电路装个 detector”，而是**已有电路范式的固有性质改变了 Trojan 的隐蔽条件**。citeturn25search0turn25search2
+
+这也是为什么我把它明显排在第一，而不是仅仅因为标题中同时出现了 “Trojans” 和 “difficulty”。
+
+### 次强匹配：版图实现本身存在不同的 Trojan 易插入程度
+
+**Exact title:** *Vulnerability Analysis of a Circuit Layout to Hardware Trojan Insertion*  
+
+**Authors:** Hassan Salmani, Mark M. Tehranipoor. citeturn19search0
+
+**Year / venue:** **2016**, *IEEE Transactions on Information Forensics and Security*, Vol. 11, No. 6, pp. 1214–1225. citeturn19search0turn21view0
+
+**DOI:** `10.1109/TIFS.2016.2520910`。该 DOI 可解析到 IEEE Xplore document 7390050。citeturn23view1
+
+**概念匹配一句话：** 论文研究的正是一个 circuit layout 在**还没有谈具体防御机制之前**有多容易给攻击者腾出位置、连接和条件来插入 Hardware Trojan，并且比较一个电路的不同实现所具有的不同 vulnerability，因此非常接近“有些设计天然比另一些设计难篡改”。citeturn19search0
+
+它和第一名的差别很重要：第一名是在问**“可逆电路这种设计范式是否天然改变安全性”**；Salmani–Tehranipoor 则是在问**“给定普通电路实现，它的物理版图自身有多适合攻击者偷偷加入恶意逻辑”**。IEEE 的正式记录确认了题名、作者和 2016 年出版身份，而 DOI 也和后续 hardware-security 文献中的正式引用完全一致。citeturn19search0turn23view1
+
+因此，若 5B009 中 “some circuit designs” 实际指的是**不同 physical-layout implementations**，而不是某种特殊逻辑范式，那么这一篇甚至可能是目标论文。
+
+### 第三匹配：直接把“难以偷偷插入 Trojan”定义成设计脆弱性指标
+
+**Exact title:** *TVF: A Metric for Quantifying Vulnerability Against Hardware Trojan Attacks*  
+
+**Authors:** Jonathan Cruz, Patanjali Slpsk, Pravin Gaikwad, Swarup Bhunia. IEEE Computer Society 的 2023 年卷期目录给出了这四名作者以及 pp. 969–979。citeturn17search34
+
+**Year / venue:** **2023**, *IEEE Transactions on Very Large Scale Integration (VLSI) Systems*, Vol. 31, No. 7, pp. 969–979. citeturn17search34turn24search10
+
+**DOI:** `10.1109/TVLSI.2023.3270866`。IEEE/Computer Society 记录和 DOI 解析均对应 IEEE Xplore document 10121619。citeturn24search10turn23view2
+
+**概念匹配一句话：** TVF 的核心对象就是一个**design 对 Trojan insertion 的 vulnerability**，所以它将“攻击者在这个电路设计里塞进难检测 Trojan 到底有多容易/困难”与“后来加上的防御方案效果如何”区分开来，语义上非常接近题目中的“before we add special defenses”。citeturn17search6turn24search10
+
+这篇的题名本身已经很能说明为什么它进入前三：它不是一篇 Trojan detector 论文，而是试图**给未经特定防御处理的设计本身打一个 Trojan vulnerability 分数**。IEEE 的正式记录确认论文发表于 TVLSI 2023 年第 31 卷第 7 期。citeturn17search6turn17search34
+
+我仍将它排在第一名之后，因为用户给出的想法听起来更像一个**结构性观察——某类 circuit design 天然造成这种效果**，而 TVF 更像一个**通用度量框架**。
+
+### 第四匹配：从“能否真正插进去”重新衡量 IC layout 脆弱性
+
+**Exact title:** *Rethinking IC Layout Vulnerability: Simulation-Based Hardware Trojan Threat Assessment with High Fidelity*  
+
+**Authors:** Xinming Wei, Jiaxi Zhang, Guojie Luo. IEEE Xplore 收录该题名为 2024 IEEE Symposium on Security and Privacy 论文；相关正式文献记录亦给出 X. Wei、J. Zhang、G. Luo 三位作者以及 pp. 3789–3804。citeturn20search0turn21view0
+
+**Year / venue:** **2024**, *2024 IEEE Symposium on Security and Privacy (SP)*, pp. 3789–3804；会议日期为 2024-05-19 至 2024-05-23。citeturn19search1turn21view0
+
+**DOI:** `10.1109/SP54263.2024.00160`，解析至 IEEE Xplore document 10646854。citeturn23view0
+
+**概念匹配一句话：** 这项工作直接“rethinks” IC layout 对 Hardware Trojan 的 vulnerability，并用更高保真的实际插入/仿真评估判断某种现成 layout 到底给攻击者多少机会，因此同样属于“先看设计本身是不是难篡改，再讨论额外防御”的研究方向。citeturn20search0turn19search1
+
+它与 Salmani–Tehranipoor 2016 **不能合并成同一个 candidate**：尽管研究问题有继承关系，Wei–Zhang–Luo 2024 是一篇独立的新工作，而不是 2016 论文的扩展期刊版。后续 security-closure 文献也将两者分别列为不同工作。citeturn21view0
+
+从题意反推，这篇较适合这样一种解释：“很多防 Trojan 方法在设计结束后才加安全措施，但其实不同完成版图的**baseline vulnerability** 已经很不一样。”
+
+### 第五匹配：近似电路的固有误差容忍会改变 Trojan 的效果
+
+**Exact title:** *Design and analysis of hardware Trojans in approximate circuits*  
+
+**Authors:** Yuqin Dou, Chenghua Wang, Chongyan Gu, Máire O’Neill, Weiqiang Liu. citeturn24search1turn24search5
+
+**Year / venue:** **2022**, *Electronics Letters*, Vol. 58, No. 5, pp. 197–199；publisher version 首次在线发表于 2021-12-15，卷期正式年份为 2022。citeturn24search1turn24search5
+
+**DOI:** `10.1049/ell2.12405`. citeturn24search1
+
+**概念匹配一句话：** 这篇论文发现 approximate circuits 的**固有误差容忍特性本身**会改变 Trojan 攻击：普通通过翻转输出进行破坏的 Trojan 可能因为错误仍落在可接受范围而失效，但同样的近似特性也能带来其他安全弱点，因此它与“设计自身改变隐蔽篡改难度”相符，但不是简单的“天然更安全”。citeturn24search1
+
+这一候选尤其值得保留而不是强行排除，因为它确实满足“**不是先添加 security defense，而是电路已有功能特性改变攻击效果**”这一层语义。出版社正文明确解释：approximate circuits 本来就允许一定计算误差，因此传统针对 exact circuit 的 output-flipping Trojan 在 approximate circuit 中有时不会真正破坏功能；与此同时，作者也警告其 inherent errors 可被攻击者利用。citeturn24search1
+
+所以它与第一名同属“**电路范式的既有属性影响 Trojan**”这类答案，但方向要复杂得多：第一名更容易读成“结构给防守方天然优势”，第五名则是“结构改变攻击面，有的攻击更难、有的新攻击反而成为可能”。citeturn25search2turn24search1
+
+## 为什么第一名最像 5B009
+
+题目中的几个措辞组合起来，比单纯搜索关键词更有区分度。
+
+“**some circuit designs**”暗示研究对象很可能不是一种额外安全模块，而是**电路类别/架构本身**；“**make hidden tampering harder**”很自然地映射到 Hardware Trojan 的 stealth、triggering 和 susceptibility；而“**even before we add special defenses**”进一步把专门的 Design-for-Trust countermeasure 与底层电路的已有性质区分开来。第一名的论文恰恰先对比传统电路和 reversible circuits，再研究后者对 hardware Trojans 的 susceptibility，并且明确从 reversible circuit 的 inherent characteristics 推导检测性质。citeturn25search0turn25search2
+
+尤其是论文中的这一逻辑链非常有辨识度：
+
+**可逆函数具有一一双射结构 → inherently reversible circuits 中线路 0/1 概率均衡 → 随机输入的随机性能够传播至任意位置附近的 Trojan 输入 → 某类依赖稀有触发条件保持隐蔽的 Trojan 更容易被测试激活/暴露。** 这些性质首先来自可逆电路，而不是一个外接 Trojan detector；论文之后才进一步提出基于这些结构特征的简单防御。citeturn25search2
+
+因此，研究想法若是对论文内容的高度口语化改写，我会把：
+
+> “Maybe some circuit designs make hidden tampering harder even before we add special defenses.”
+
+理解为近似：
+
+> “Could the inherent characteristics of reversible circuits themselves change their susceptibility to hardware Trojans?”
+
+这几乎正好对应第一名论文的研究问题。其标题甚至直接使用了 **“Difficulty of Inserting Trojans”**。citeturn25search0turn25search1
+
+相比之下，第二至第四名主要研究的是**如何评价已有普通设计/版图的 vulnerability**；它们非常符合“不同 designs 的天然脆弱度不同”，但没有第一名那样鲜明的“某种 circuit architecture 的 intrinsic characteristics 本身产生安全效果”。citeturn19search0turn17search6turn20search0
+
+## 版本关系与身份核验
+
+第一名存在一个需要明确处理的版本问题。**arXiv:1705.00767（2017）与 IEEE TETC 论文是同一工作，不应占两个排名。** arXiv 记录显示该稿于 2017-05-02 提交，当时注释称稿件提交至 International Test Conference 2017 并处于评审状态；之后该工作最终由 IEEE TETC 接收，IEEE Xplore 记录为 2018 publication，最终排入 TETC Vol. 8, No. 4（2020），pp. 960–972。citeturn25search0turn25search1turn25search9
+
+这里还存在一个小的书目差异：2017 arXiv v1 的作者排列为 **… Robert Wille, Rolf Drechsler, Kaijie Wu, Ramesh Karri**，而最终正式出版记录为 **… Robert Wille, Kaijie Wu, Rolf Drechsler, Ramesh Karri**。因此上面的主条目采用**正式发表版作者顺序**，同时把 arXiv 仅作为经验证的同工作预印本。citeturn25search0turn22search9
+
+第二至第五名则没有证据表明彼此之间存在“conference version → expanded journal version”的同工作关系，因此没有为了凑排名而合并。特别是 2016 的 Salmani–Tehranipoor 与 2024 的 Wei–Zhang–Luo 虽然都研究 layout vulnerability，但它们是**独立论文**；后来的研究也分别引用两项工作。citeturn21view0
+
+所有五个候选都满足题目要求的 **2015–2025 inclusive** 正式 journal/conference publication 窗口：分别可按 2018/2020、2016、2023、2024、2022 计。citeturn25search1turn19search0turn17search34turn19search1turn24search5
+
+## 歧义判断
+
+**5B009 最佳答案：_On the Difficulty of Inserting Trojans in Reversible Computing Architectures_，置信度高，但不是可证明唯一。**
+
+我不会把第二至第四名当作仅因出现相同关键词而产生的“主题相似论文”：它们确实共享题目中非常具体的二层结构——**先评价 circuit/layout 自身对 Trojan insertion 的 susceptibility，再与专门防御措施区分**。Salmani–Tehranipoor 2016 尤其明确将 circuit layout 的不同实现作为 vulnerability assessment 对象；TVF 2023 则把“design vulnerability”本身做成指标；Wei–Zhang–Luo 2024 又对这种 layout-level vulnerability assessment 进行了更高保真度的重新审视。citeturn19search0turn17search6turn20search0
+
+但第一名有一个其他候选没有同时具备的特征：它不仅问“这个具体 layout 有多脆弱”，而是问**一种电路计算结构——reversible computing architecture——由于其自身数学/逻辑性质，会不会从根本上改变 Hardware Trojan 的插入与隐蔽性**。这正是“some circuit designs make hidden tampering harder even before we add special defenses”最自然、信息量最大的对应关系。citeturn25search0turn25search2
+
+因此，若必须给 5B009 一个单一解析，我会选：
+
+**Xiaotong Cui, Samah Mohamed Saeed, Alwin Zulehner, Robert Wille, Kaijie Wu, Rolf Drechsler, Ramesh Karri, “On the Difficulty of Inserting Trojans in Reversible Computing Architectures,” IEEE Transactions on Emerging Topics in Computing, DOI `10.1109/TETC.2018.2823315`; online publication 2018, final issue Vol. 8 No. 4, 2020, pp. 960–972; verified same-work preprint arXiv:1705.00767 (2017).** citeturn25search0turn25search1turn25search9
+
+# 5B010：最匹配“无效可能性使精确推理显得昂贵”的论文检索结果
+
+## 判定
+
+我认为 **最可能的目标论文是 Giso H. Dal 与 Peter J. F. Lucas 的 _Weighted Positive Binary Decision Diagrams for Exact Probabilistic Inference_**。它与给出的整句研究想法高度对应，而不只是关键词重合：论文明确指出，贝叶斯网络被编码成布尔形式时会**丢失变量之间原本已有的约束知识**；作者把这些约束恢复成编译器的 background theory，用它改变 Shannon decomposition，从而得到更小的算术电路并降低**精确概率推理**的成本。换言之，一部分“exact reasoning 很贵”确实来自**如何表示和组织状态空间**，尤其是编码后继续携带本来由约束排除的组合。citeturn23search0turn23search2
+
+这个判断还有一个很强的细节支撑：论文并非泛泛讨论“利用结构加速推理”，而是把问题定位到 **encoding phase 丢掉了知识**，再把变量约束作为 theory 加回编译过程；这与“Maybe exact reasoning looks expensive because of how we organize possibilities that can never happen”中“**because of how we organize possibilities**”这一因果表述尤其吻合。其预印本于 **2016 年 10 月 18 日**提交，而正式期刊版发表于 **2017 年**，二者属于同一工作家族。citeturn23search0turn12view0
+
+不过，我不会把它宣称为唯一确定答案。另一个非常可信的解释是 2015 年关于 **Probabilistic Sentential Decision Diagrams（PSDDs）与 structured probability spaces** 的工作：该论文直接把研究对象定义成由复杂逻辑约束决定“**什么才算一个 possible world**”的概率空间，并强调在这种表示上进行高效、精确的概率推理。若原始提示中的重点是“**possibilities that can never happen**”而不是“编码方式导致额外计算”，那么第二候选甚至可能是原目标。citeturn19view1
+
+## 候选论文排名
+
+### 最匹配：Weighted Positive Binary Decision Diagrams for Exact Probabilistic Inference
+
+**精确标题：** *Weighted Positive Binary Decision Diagrams for Exact Probabilistic Inference*  
+**作者：** Giso H. Dal; Peter J. F. Lucas  
+**正式发表年份：** 2017  
+**Venue：** *International Journal of Approximate Reasoning*, Vol. 90, pp. 411–432  
+**DOI：** `10.1016/j.ijar.2017.08.003`  
+**同一工作家族的预印本：** arXiv:1610.05551，2016-10-18，`https://arxiv.org/abs/1610.05551`。预印本与期刊版标题、作者及核心方法一致，应视为同一候选，而不是两个排名。citeturn23search0turn23search2turn12view0
+
+**概念匹配一句话：** 这篇论文几乎逐字实现了提示中的思想——标准 Boolean/WMC 编码会丢掉变量约束，作者把这些约束作为 background theory 恢复到分解过程中，使本来会被表示出来的冗余/不可能组合不再膨胀精确推理电路，从而降低 exact inference 的成本。citeturn23search0turn12view1
+
+为什么我把它排第一：作者首先把 Bayesian-network 概率分布编码为 Boolean normal form，再指出还能通过利用“encoding phase 中丢失的知识”进一步改进；具体方法是用变量间约束优化 Shannon decomposition，并提出 **Weighted Positive Binary Decision Diagrams（WPBDDs）**。citeturn23search0 期刊正文还把这种表示与普通 OBDD 的大小和推理速度作了直接比较，并将约束的紧凑表示视为电路缩减的来源；这比仅仅说“利用稀疏性”“做剪枝”更接近题目提出的**表示本身制造了虚假复杂度**这一思想。citeturn12view1turn12view2
+
+特别重要的是，这里的“不可能”不是简单指概率很小的事件，而是来自离散变量编码的**逻辑约束**：例如多值变量编码成若干 Boolean 变量后，并非所有 Boolean assignments 都对应原模型中的合法状态；若编译过程不知道这些关系，就会以较低效的方式组织搜索/电路空间。论文提出的 positive Shannon decomposition 正是在利用这类 background constraints。citeturn12view0turn12view1
+
+**匹配置信度：很高。**
+
+### 次匹配：Tractable Learning for Structured Probability Spaces: A Case Study in Learning Preference Distributions
+
+**精确标题：** *Tractable Learning for Structured Probability Spaces: A Case Study in Learning Preference Distributions*  
+**作者：** Arthur Choi; Guy Van den Broeck; Adnan Darwiche  
+**年份：** 2015  
+**Venue：** *Proceedings of the Twenty-Fourth International Joint Conference on Artificial Intelligence (IJCAI 2015)*  
+**权威稳定页面：** `https://www.ijcai.org/Abstract/15/405` citeturn19view1
+
+**概念匹配一句话：** 该文把 PSDD 定义为对 structured probability spaces 的 tractable representation，而这些空间恰恰由“哪些世界是可能的”的复杂逻辑约束所规定，因此它通过不把逻辑上不可能的 worlds 当成普通概率状态来组织，从而支持多类高效的 exact queries。citeturn19view1
+
+这是“**possibilities that can never happen**”这一半句最直接的候选。IJCAI 官方摘要明确说，structured probability spaces 具有复杂的逻辑约束，这些约束规定“what constitutes a possible world”；论文随后发展了 PSDD 上的通用概率推理与学习方法，并能精确、高效地回答多种概率查询。citeturn19view1
+
+它之所以排在 WPBDD 后面，是因为这里的核心叙事是“**为受逻辑约束的概率空间设计 tractable representation**”，而不是像 Dal–Lucas 那样明确诊断“现有编码丢失约束知识 → 产生额外推理成本 → 改变表示/分解即可降低成本”。所以，如果 5B010 的关键语义是：
+
+> “很多所谓的复杂性其实是我们把不可能状态也组织进表示以后自己制造出来的”
+
+第一候选更强；如果关键语义是：
+
+> “概率空间本来只包含受约束的 possible worlds，所以应该直接在这种结构化空间上推理”
+
+那么这一候选非常可能就是目标。citeturn23search0turn19view1
+
+这里还有一个时间边界上的重要线索：PSDD 的奠基论文 *Probabilistic Sentential Decision Diagrams* 是 **KR 2014**，超出你指定的 2015–2025 时间窗口，因此我没有把它列入排名；2015 年这篇 IJCAI 工作是在合法时间窗内把 PSDD 明确用于“structured probability spaces + logical constraints + exact reasoning”的重要后续，二者是**不同论文**，不能按你的规则合并成一个 work family。citeturn17search15turn22search4
+
+**匹配置信度：高。**
+
+### 第三候选：Learning the Structure of Probabilistic Sentential Decision Diagrams
+
+**精确标题：** *Learning the Structure of Probabilistic Sentential Decision Diagrams*  
+**作者：** Yitao Liang; Jessa Bekker; Guy Van den Broeck  
+**年份：** 2017  
+**Venue：** *Proceedings of the 33rd Conference on Uncertainty in Artificial Intelligence (UAI 2017)*，pp. 501–510  
+**稳定页面：** `https://proceedings.mlr.press/r15/liang17a.html`。该 PMLR 页面是在 2026 年对原 **UAI 2017** 论文集所作的 reissue；论文原始发表年份仍是 2017，KU Leuven 的机构记录也给出 2017 年 AUAI Press 出版信息。citeturn25view0turn22search2
+
+**概念匹配一句话：** 该工作直接研究如何学习 PSDD 的“组织结构”，使受逻辑约束的概率分布保持高效的精确推理能力，并发现模型大小这一表示属性可作为 tractability 的代理，因此与“推理昂贵可能是表示空间组织得不好”高度一致。citeturn25view0
+
+它与第二候选不是一个应该合并的“会议版/期刊扩展版”关系，而是**独立的后续工作**。论文明确说 PSDD 是针对“probability distributions that are subject to logical constraints”的 tractable representation，同时指出 tractable learning 的目标之一是保证 efficient exact probabilistic inference；作者提出的 **LEARNPSDD** 则专门学习 PSDD 的结构。citeturn25view0
+
+更贴合题意的一点是，作者将 **model size** 明确视为 tractability 的一个 proxy，并指出 PSDD 仍能学习处于逻辑约束之下的概率空间，而这一能力超出了比较对象的一些表示方法。也就是说，同一概率问题是否“难”，与把合法世界怎样组织进电路结构直接相关。citeturn25view0
+
+它排第三而不是第二，是因为论文的核心贡献是 **structure learning algorithm**，而不是首先提出“不要表示不可能世界”这一概念；不过“how we organize possibilities”若特别指“学习更好的 circuit structure”，它会比第二候选更接近。citeturn25view0
+
+**匹配置信度：中高。**
+
+### 第四候选：Tractable Inference in Credal Sentential Decision Diagrams
+
+**精确标题：** *Tractable Inference in Credal Sentential Decision Diagrams*  
+**作者：** Lilith Mattei; Alessandro Antonucci; Denis Deratani Mauá; Alessandro Facchini; Julissa Villanueva Llerena  
+**年份：** 2020  
+**Venue：** *International Journal of Approximate Reasoning*, Vol. 125, pp. 26–48  
+**DOI：** `10.1016/j.ijar.2020.06.005`  
+**同一工作家族的预印本：** arXiv:2008.08524，提交于 2020-08-19，`https://arxiv.org/abs/2008.08524`；arXiv 页面同时注明该工作将发表于 IJAR Vol. 125，因此这里不把预印本另占一个排名。citeturn23search1turn23search3turn23search13
+
+**概念匹配一句话：** 该文的 CSDD 表示会把违反逻辑约束的 states **精确赋予零概率**，同时其主要推理算法相对于 circuit size 保持多项式时间，因此非常直接地体现“把绝不可能发生的状态排除在有效概率空间之外可以保留 tractable exact inference”。citeturn23search1
+
+在所有候选中，它对“**possibilities that can never happen**”的文字对应甚至比第一候选更直白：作者明确说模型对 **states inconsistent with the logical constraints** sharp 地赋予 probability zero；并证明其三类推理可以相对于电路大小在 polynomial time 内完成。citeturn23search1
+
+之所以只排第四，是因为它真正的研究创新是把 PSDD 扩展为 **credal sentential decision diagrams**，用于数据稀少、不可靠或冲突情况下的 imprecise probabilities；“去除不可能状态从而减少精确推理虚假复杂度”更多是其表示基础，而不是论文主要要解决的问题。citeturn23search1
+
+因此，这是一篇**概念语句高度相似、研究主问题稍偏离**的候选。
+
+**匹配置信度：中等。**
+
+### 第五候选：Exact Inference for Relational Graphical Models with Interpreted Functions: Lifted Probabilistic Inference Modulo Theories
+
+**精确标题：** *Exact Inference for Relational Graphical Models with Interpreted Functions: Lifted Probabilistic Inference Modulo Theories*  
+**作者：** Rodrigo de Salvo Braz; Ciaran O’Reilly  
+**年份：** 2017  
+**Venue：** *Proceedings of the 33rd Conference on Uncertainty in Artificial Intelligence (UAI 2017)*，pp. 341–350  
+**稳定页面：** `https://proceedings.mlr.press/r15/braz17a.html`。当前 PMLR 页面注明其为 2026-10-04 reissue，但其记录的原会议论文年份和 UAI 会期均为 2017。citeturn20view0
+
+**概念匹配一句话：** PIMT 不把算术、等式和不等式约束展开成一个无结构的枚举空间，而是在 theory 层面利用这些关系执行 exact probabilistic inference，因此也支持“表面上的推理成本部分来自我们怎样表示受约束的可能状态”这一解释。citeturn20view0
+
+论文将 **Probabilistic Inference Modulo Theories（PIMT）**扩展到 lifted setting，使 exact inference 可以同时利用 random relations/functions、arithmetic、equalities 和 inequalities；换句话说，状态空间中的可行性并不必首先被扁平化成大量原子 Boolean cases，而可以保留高层 theory structure。citeturn20view0
+
+它和第一候选在思想上有一个明显的家族相似性：第一候选明确说自己的 compiler 受到 **Satisfiability Modulo Theories** 启发，把约束作为 background theory；这个候选则直接从 **inference modulo theories** 出发。citeturn23search0turn20view0 但两者作者、方法与论文贡献均不同，所以不能合并为同一 work family。
+
+它排第五，是因为该论文没有像 WPBDD 或 PSDD 工作那样明确把问题表述为“表示了逻辑上不可能的 worlds 导致浪费”；这是根据其“保留并利用 theory constraints”的机制做出的概念推断，而不是论文自己的中心措辞。citeturn20view0
+
+**匹配置信度：中等偏低。**
+
+## 歧义与排除
+
+综合“**exact reasoning**”“**expensive**”“**how we organize possibilities**”以及“**possibilities that can never happen**”这四个语义成分，而不是只按 `constraints / exact inference / decision diagrams` 等共享关键词排名，我得到的排序是：
+
+| 排名 | 工作 | “不可能状态/约束” | “表示方式” | “精确推理成本” | 整体判断 |
+|---|---|---|---|---|---|
+| **1** | **Dal & Lucas, WPBDD, 2017** | 很强 | **很强** | **很强** | **最像完整提示** |
+| **2** | **Choi et al., Structured Probability Spaces, 2015** | **很强** | **很强** | 强 | 若重点在“possible worlds”，可能是真目标 |
+| **3** | **Liang et al., Learning PSDD Structure, 2017** | 强 | **很强** | 强 | 若重点在“组织结构决定 tractability”，很接近 |
+| **4** | **Mattei et al., Credal SDD, 2020** | **很强** | 强 | 中强 | “impossible states = zero probability”最直白 |
+| **5** | **Braz & O’Reilly, PIMT, 2017** | 强 | 强 | 强 | 思想相符，但“不可能 worlds”不是主论点 |
+
+这个排名的关键不是标题相似性，而是**因果结构**。Dal 与 Lucas 的论文最完整地给出：**原模型有约束 → Boolean encoding 丢失这种知识 → 编译器以较差方式组织状态空间 → 把约束作为 background theory 恢复 → arithmetic circuit 变小 → exact inference 变便宜**。这正是我认为 5B010 最可能指向它的原因。citeturn23search0turn12view0turn12view1
+
+第二候选则几乎完美对应另一种读法：**世界集合从一开始就不是完整笛卡尔积，而是由逻辑约束规定哪些 worlds 合法；若概率表示直接尊重这个 support，就能精确、高效地推理。** IJCAI 官方摘要使用的正是“logical constraints on what constitutes a possible world”这一表述，因此我不能合理地把它排除为目标。citeturn19view1
+
+我还检查了 2015 年 NeurIPS 的 *Tractable Learning for Complex Probability Queries*。它明确指出一个查询是否 tractable 取决于概率模型的 **underlying representation**，并提出保证更广泛复杂概率查询高效推理的学习方法；这与“how we organize”非常吻合，但它没有像前五项那样把**逻辑上不可能的状态**放在核心位置，所以没有进入最终前五。citeturn19view2
+
+最后，PSDD 的基础工作 *Probabilistic Sentential Decision Diagrams* 本身发表于 **KR 2014**，虽然它显然是这一思想谱系的重要来源，但严格落在你给定的 **2015–2025 inclusive** 时间窗之外，因此不能把它作为 5B010 的合格答案；我也没有把 2015、2017 的 PSDD 后续论文与它错误合并，因为它们是不同贡献，而非同一论文的会议版/期刊扩展版。citeturn17search15turn22search4
+
+**最终判断：5B010 最值得优先核验的唯一“高置信”候选是 _Weighted Positive Binary Decision Diagrams for Exact Probabilistic Inference_（Dal & Lucas, IJAR 2017, DOI `10.1016/j.ijar.2017.08.003`）；但证据不足以声称唯一确定，_Tractable Learning for Structured Probability Spaces_（Choi, Van den Broeck & Darwiche, IJCAI 2015）构成实质性的第二种解释。** citeturn23search0turn23search2turn19view1

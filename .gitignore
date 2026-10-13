@@ -1,0 +1,49 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+configs/*.local.json
+*.key
+*.pem
+*.p12
+*.pfx
+*.secret
+
+# Generated runs, caches and private release bookkeeping
+outputs/
+runs/
+cache/
+retrieval_cache/
+pdf_cache/
+search_outputs/
+pilot_runs/
+audit/
+.local/
+.pytest_cache/
+.research/
+__pycache__/
+*.py[cod]
+*.log
+*.pdf
+*.zip
+
+# Packaging and editor state
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Dataset JSON, JSONL, prompt TXT, configuration examples and notebooks are source.
+
+# Historical source directories are private even if an OS-held directory remains.
+Idea2Paper*/
+rag/
+reflectors/
+tests_offline/
+tmpx2wm68n_/

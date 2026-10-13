@@ -1,0 +1,9 @@
+# Runtime dependencies; tested versions are recorded in docs/VALIDATION.md.
+smolagents[litellm]>=1.23,<2
+litellm>=1.80.5,<2
+requests>=2.32.5,<3
+loguru>=0.7.3,<1
+PyMuPDF>=1.26.6,<2
+rank-bm25>=0.2.2,<1
+pydantic>=2.12.4,<3
+ddgs>=9.9.3,<10

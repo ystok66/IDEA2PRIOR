@@ -1,0 +1,369 @@
+C001_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 577.157 seconds
+Reported tokens: input=246209, output=80440, total=326649
+
+1. µ-shapes: Delineating urban neighborhoods using volunteered geographic information
+   url: https://doi.org/10.5311/josis.2016.12.240
+   year: 2016
+   venue: Journal of Spatial Information Science
+   coverage_level: 3
+   expert_reason: The paper directly addresses the research question by developing the µ-shapes algorithm, which applies fuzzy-set theory to volunteered geographic information to model neighborhood boundaries with spatial uncertainty rather than crisp edges. Its evaluation is limited to a single case study in Kibera, but its conceptual and technical alignment with non-discrete neighborhood representation is exact.
+2. Patterns of (dis)agreement: revealing differences in perceived neighborhood boundaries in Lisbon
+   url: https://doi.org/10.5194/agile-giss-5-44-2024
+   year: 2024
+   venue: AGILE: GIScience Series
+   coverage_level: 3
+   expert_reason: It investigates how residents perceive and delineate non-administrative traditional neighborhoods, directly analyzing the collective patterns of agreement and disagreement in boundary definitions through participatory mapping. While primarily an empirical study of perceptual variation rather than a computational boundary modeling framework, it matches the core premise perfectly.
+3. Fuzzy Bayesian inference for mapping vague and place-based regions: a case study of sectarian territory
+   url: https://doi.org/10.1080/13658816.2023.2229894
+   year: 2023
+   venue: International Journal of Geographical Information Science
+   coverage_level: 3
+   expert_reason: This paper presents a formal Bayesian inference approach to model vague and socially derived geographic regions as possibility distributions rather than crisp boundaries. Although applied to sectarian territorial division rather than general urban neighborhoods, the methodology provides a direct solution to mapping loose spatial consensus without imposing arbitrary boundaries.
+4. Redefining Neighborhood Boundaries Using Activity Spaces: Bringing Together Soft Spaces and Spatial Analysis to Further the Discussion on Planning in Functional Spaces
+   url: https://doi.org/10.1177/0739456x241252603
+   year: 2024
+   venue: Journal of Planning Education and Research
+   coverage_level: 3
+   expert_reason: The study directly challenges static administrative boundaries by using public participation GIS to model the fuzzy and variable character of functional neighborhoods as aggregate soft spaces. Its primary focus on activity spaces rather than pure cognitive neighborhood naming is its only minor deviation from the core idea.
+5. Home range and habitat: Using platial characteristics to define urban areas from the bottom up
+   url: https://doi.org/10.1111/tgis.12597
+   year: 2019
+   venue: Transactions in GIS
+   coverage_level: 3
+   expert_reason: It examines bottom-up, platial representations of urban space derived from collective and individual WebGIS inputs, contrasting them with rigid administrative boundaries. However, it operationalizes these notions using ecological concepts of home range and habitat rather than explicit fuzzy boundary algorithms.
+
+------------------------------------------------------------------------
+
+C002_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 516.859 seconds
+Reported tokens: input=312172, output=94621, total=406793
+
+1. The Bounded Laplace Mechanism in Differential Privacy
+   url: https://doi.org/10.29012/jpc.715
+   year: 2019
+   venue: Journal of Privacy and Confidentiality
+   coverage_level: 3
+   expert_reason: The paper directly addresses eliminating semantically impossible numerical answers (such as negative counts) by bounding mechanism support, explicitly showing that incorporating these bounds alters differential privacy guarantees and requires recalibrating noise parameters.
+2. Differential Privacy via a Truncated and Normalized Laplace Mechanism
+   url: https://doi.org/10.1007/s11390-020-0193-z
+   year: 2022
+   venue: Journal of Computer Science and Technology
+   coverage_level: 3
+   expert_reason: It investigates preventing out-of-range numerical query responses by truncating noise distributions to valid ranges during generation, revealing that domain-bounded normalization alters privacy leakage and deriving modified scaling parameters to preserve differential privacy.
+3. The Bounded Gaussian Mechanism for Differential Privacy
+   url: https://doi.org/10.48550/arxiv.2211.17230
+   year: 2022
+   venue: Journal of Privacy and Confidentiality
+   coverage_level: 3
+   expert_reason: The authors motivate their bounded Gaussian mechanism by noting that standard private mechanisms produce nonsensical answers like negative ages, formalizing a mechanism whose support is restricted to valid domains while establishing its privacy guarantees.
+4. Bounded and Unbiased Composite Differential Privacy
+   url: https://doi.org/10.1109/sp54263.2024.00108
+   year: 2024
+   venue: 2024 IEEE Symposium on Security and Privacy (SP)
+   coverage_level: 3
+   expert_reason: This work explores generating bounded, unbiased numerical outputs directly via composite probability density functions to avoid invalid values and post-processing bias, deriving optimization algorithms to meet differential privacy constraints without extra leakage overhead.
+5. Learning Numeric Optimal Differentially Private Truncated Additive Mechanisms
+   url: https://arxiv.org/abs/2107.12957
+   year: 2021
+   venue: arXiv.org
+   coverage_level: 3
+   expert_reason: It studies additive mechanisms with hard-bounded, truncated noise distributions for numerical queries, developing methods to learn optimal truncated noise while rigorously evaluating privacy bounds under composition.
+
+------------------------------------------------------------------------
+
+C003_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 842.828 seconds
+Reported tokens: input=434957, output=114584, total=549541
+
+1. When Do Curricula Work?
+   url: https://arxiv.org/abs/2012.03107
+   year: 2020
+   venue: International Conference on Learning Representations
+   coverage_level: 3
+   expert_reason: Directly investigates the empirical value of ordered learning over identical samples, discovering that curricula offer marginal benefit on standard benchmarks but matter substantially under noisy data or constrained budgets.
+2. Analyzing Curriculum Learning for Sentiment Analysis along Task Difficulty, Pacing and Visualization Axes
+   url: https://arxiv.org/abs/2102.09990
+   year: 2021
+   venue: Workshop on Computational Approaches to Subjectivity, Sentiment and Social Media Analysis
+   coverage_level: 3
+   expert_reason: Explicitly analyzes curriculum pacing across task difficulty levels, finding that an easy-to-hard start helps challenging tasks while offering negligible benefit or decrement on easier tasks.
+3. What Makes a Good Curriculum? Disentangling the Effects of Data Ordering on LLM Mathematical Reasoning
+   url: https://doi.org/10.48550/arxiv.2510.19099
+   year: 2025
+   venue: Annual Meeting of the Association for Computational Linguistics
+   coverage_level: 3
+   expert_reason: Evaluates when data ordering and easy-to-hard curricula help, showing that curriculum effectiveness is not universal but depends on task complexity and model capability.
+4. Do Data-based Curricula Work?
+   url: https://doi.org/10.18653/v1/2022.insights-1.16
+   year: 2022
+   venue: Proceedings of the Third Workshop on Insights from Negative Results in NLP
+   coverage_level: 3
+   expert_reason: Empirically tests whether ordering datasets by complexity benefits large language models across multiple NLP tasks, concluding that curricula rarely outperform random sample order.
+5. A Survey on Curriculum Learning
+   url: https://doi.org/10.1109/tpami.2021.3069908
+   year: 2021
+   venue: IEEE Transactions on Pattern Analysis and Machine Intelligence
+   coverage_level: 3
+   expert_reason: Provides a comprehensive survey analyzing 'easier first' versus 'harder first' data presentations, noting task-dependent effectiveness (earlier preprint version: p_4fd95da71a8fd2878425fc22).
+
+------------------------------------------------------------------------
+
+C004_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 644.125 seconds
+Reported tokens: input=338787, output=100579, total=439366
+
+1. Rewriting the Script: Adapting Text Instructions for Voice Interaction
+   url: https://doi.org/10.1145/3563657.3596059
+   year: 2023
+   venue: Proceedings of the 2023 ACM Designing Interactive Systems Conference
+   coverage_level: 3
+   expert_reason: This paper is the exact match for the research idea, investigating why written instructions that work on the page fail when read aloud by voice assistants and proposing eight transformation strategies to restructure spoken guidance around the person performing the task.
+2. ActionaBot: Structuring Metacognitive Conversations towards In-Situ Awareness in How-To Instruction Following
+   url: https://doi.org/10.1145/3719160.3736627
+   year: 2025
+   venue: Proceedings of the 7th ACM Conference on Conversational User Interfaces
+   coverage_level: 3
+   expert_reason: The paper directly addresses transforming static written tutorials into interactive, step-by-step guidance tailored to the user's in-situ awareness and task progress, though it emphasizes metacognitive conversation rather than purely voice-interaction constraints.
+3. “Mango Mango, How to Let The Lettuce Dry Without A Spinner?”: Exploring User Perceptions of Using An LLM-Based Conversational Assistant Toward Cooking Partner
+   url: https://doi.org/10.1145/3757442
+   year: 2025
+   venue: Proceedings of the ACM on Human-Computer Interaction
+   coverage_level: 3
+   expert_reason: It investigates how conversational agents support physical tasks like cooking beyond static recipes, identifying user expectations for instructions to adapt to oral delivery and dynamic human task workflows.
+4. Vid2Coach: Transforming How-To Videos into Task Assistants
+   url: https://doi.org/10.1145/3746059.3747612
+   year: 2025
+   venue: Proceedings of the 38th Annual ACM Symposium on User Interface Software and Technology
+   coverage_level: 3
+   expert_reason: Vid2Coach operationalizes task-oriented assistance by restructuring multi-step instructional content into interactive, context-aware verbal guidance and feedback centered on the performer, though its source media is video rather than static written pages.
+5. An AI-Powered Multimodal Recipe Generation and Voice Cooking Assistant
+   url: https://doi.org/10.22214/ijraset.2025.75265
+   year: 2025
+   venue: International Journal for Research in Applied Science and Engineering Technology
+   coverage_level: 3
+   expert_reason: WhisperChef implements hands-free spoken recipe guidance organized around the cook's real-time actions, though it focuses primarily on multimodal system implementation rather than formal empirical analysis of spoken discourse adaptation.
+
+------------------------------------------------------------------------
+
+C005_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 504.234 seconds
+Reported tokens: input=192276, output=62932, total=255208
+
+1. Looking Back on Recovery Blocks and Conversations
+   url: https://doi.org/10.1109/tse.2025.3533973
+   year: 2025
+   venue: IEEE Transactions on Software Engineering
+   coverage_level: 3
+   expert_reason: The paper directly addresses the domino effect—where error recovery in one interacting process cascades and undoes completed progress in others—and reviews conversations as a coordinated recovery strategy to prevent global rollbacks.
+2. Supporting and Controlling Complex Concurrency in Fault- Tolerant Distributed Systems
+   url: https://arxiv.org/abs/2111.06339
+   year: 2021
+   venue: arXiv.org
+   coverage_level: 3
+   expert_reason: It investigates coordinated atomic (CA) actions for concurrent interacting processes, formulating unified fault-tolerance mechanisms that coordinate error recovery across cooperating activities without triggering system-wide rollback.
+3. Reversible Communicating Processes
+   url: https://doi.org/10.4204/eptcs.203.4
+   year: 2016
+   venue: Electronic Proceedings in Theoretical Computer Science
+   coverage_level: 3
+   expert_reason: It examines reversible communicating processes where backtracking is separated from local state recovery, enabling nested compensations to unwind distributed interactions without enforcing full, coordinated restarts.
+4. From Reversible Computation to Checkpoint-Based Rollback Recovery for Message-Passing Concurrent Programs
+   url: https://doi.org/10.48550/arxiv.2309.04873
+   year: 2023
+   venue: International Workshop on Formal Aspects of Component Software
+   coverage_level: 3
+   expert_reason: It proposes a checkpoint-based rollback recovery strategy for message-passing concurrent programs using partially reversible semantics to restore consistent states without global recomputation.
+5. Checkpoint-based rollback recovery in session programming
+   url: https://doi.org/10.46298/lmcs-21(1:2)2025
+   year: 2025
+   venue: Logical Methods in Computer Science
+   coverage_level: 2
+   expert_reason: It defines a session-programming framework ensuring that participant rollbacks never restore past commits or disrupt other interacting participants' established checkpoints.
+
+------------------------------------------------------------------------
+
+C006_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 524.172 seconds
+Reported tokens: input=312153, output=89830, total=401983
+
+1. Document retrieval on repetitive string collections
+   url: https://doi.org/10.1007/s10791-017-9297-7
+   year: 2017
+   venue: Information Retrieval Journal
+   coverage_level: 2
+   expert_reason: Directly embodies the idea by investigating how repetitiveness in large collections can be exploited not merely to reduce storage footprint, but to enable efficient document retrieval operations such as document listing and ranked top-k search.
+2. Contextual Pattern Matching
+   url: https://doi.org/10.1007/978-3-030-59212-7_1
+   year: 2020
+   venue: Lecture Notes in Computer Science
+   coverage_level: 2
+   expert_reason: Directly tackles search on repetitive collections where traditional pattern matching becomes unhelpful due to redundant occurrences, proposing contextual pattern matching to find distinct information efficiently within compressed space.
+3. Universal indexes for highly repetitive document collections
+   url: https://doi.org/10.1016/j.is.2016.04.002
+   year: 2016
+   venue: Information Systems
+   coverage_level: 2
+   expert_reason: Focuses on exploiting near-copy regularities in massive repetitive document collections to construct compressed indexes that facilitate document retrieval queries, though it emphasizes space reduction over speedups.
+4. Indexing Highly Repetitive String Collections, Part I
+   url: https://doi.org/10.1145/3434399
+   year: 2021
+   venue: ACM Computing Surveys
+   coverage_level: 2
+   expert_reason: Provides a foundational survey on leveraging repetitiveness in massive text collections to build compressed data structures that support direct indexed search rather than passive storage compression.
+5. Concept than Document: Context Compression via AMR-based Conceptual Entropy
+   url: https://doi.org/10.48550/arxiv.2511.18832
+   year: 2025
+   venue: arXiv.org
+   coverage_level: 2
+   expert_reason: Applies the concept to modern long-context retrieval-augmented generation by using conceptual entropy over meaning representation graphs to exploit repetition and isolate informative concepts for improved reasoning accuracy.
+
+------------------------------------------------------------------------
+
+C007_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 686.860 seconds
+Reported tokens: input=267013, output=85070, total=352083
+
+1. Re-Identification Risk versus Data Utility for Aggregated Mobility Research Using Mobile Phone Location Data
+   url: https://doi.org/10.1371/journal.pone.0140589
+   year: 2015
+   venue: PLOS ONE
+   coverage_level: 3
+   expert_reason: The paper directly addresses sharing human mobility data while protecting users' unique routine patterns, evaluating whether spatial generalization (reducing location precision) protects against re-identification when multiple spatio-temporal points are combined.
+2. Effects of Geohashing and K-Means Clustering on Uniqueness in a Mobility Dataset
+   url: https://doi.org/10.1109/sec62691.2024.00042
+   year: 2024
+   venue: 2024 IEEE/ACM Symposium on Edge Computing (SEC)
+   coverage_level: 3
+   expert_reason: The study directly tests whether making locations less precise via spatial generalization (geohashing and clustering) prevents trajectory re-identification, finding that trajectories retain their uniqueness even under coarse resolution.
+3. There goes Wally: Anonymously sharing your location gives you away
+   url: https://doi.org/10.1109/bigdata.2018.8622184
+   year: 2018
+   venue: 2018 IEEE International Conference on Big Data (Big Data)
+   coverage_level: 3
+   expert_reason: It investigates whether spatio-temporal obfuscation sufficiently protects privacy against re-identification attacks when multiple mobility points are observed together.
+4. A Survey and Experimental Study on Privacy-Preserving Trajectory Data Publishing
+   url: https://doi.org/10.1109/tkde.2022.3174204
+   year: 2022
+   venue: IEEE Transactions on Knowledge and Data Engineering
+   coverage_level: 3
+   expert_reason: This survey systematically examines trajectory data publishing and highlights that obfuscating individual locations is often insufficient to prevent de-anonymization when multi-scale spatiotemporal correlations are analyzed together.
+5. Give Me Two Points and I'll Tell You Who You Are
+   url: https://doi.org/10.1109/ivs.2019.8814250
+   year: 2019
+   venue: 2019 IEEE Intelligent Vehicles Symposium (IV)
+   coverage_level: 3
+   expert_reason: The paper evaluates location obfuscation techniques and demonstrates that driver routines and trajectories can still be re-identified with as few as two georeferenced points observed together.
+
+------------------------------------------------------------------------
+
+C008_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 547.391 seconds
+Reported tokens: input=366365, output=106517, total=472882
+
+1. Tunable Measures for Information Leakage and Applications to Privacy-Utility Tradeoffs
+   url: https://doi.org/10.1109/tit.2019.2935768
+   year: 2019
+   venue: IEEE Transactions on Information Theory
+   coverage_level: 3
+   expert_reason: The paper formalizes information leakage via adversarial gain under alpha-loss, specifically evaluating the attacker's gain in inferring sensitive attributes relative to prior beliefs under utility distortion constraints. Its main limitation is that the hard distortion setting renders the optimal mechanism invariant to alpha for alpha > 1.
+2. Rethinking Disclosure Prevention with Pointwise Maximal Leakage
+   url: https://doi.org/10.29012/jpc.893
+   year: 2025
+   venue: Journal of Privacy and Confidentiality
+   coverage_level: 3
+   expert_reason: This work directly questions whether releasing useful data must compromise privacy, formalizing utility via low-entropy features while bounding privacy leakage against adversaries' prior guessing capability via pointwise maximal leakage. However, it relies heavily on the specific partition into low- and high-entropy features.
+3. Statistic Maximal Leakage
+   url: https://doi.org/10.1109/isit57864.2024.10619258
+   year: 2024
+   venue: 2024 IEEE International Symposium on Information Theory (ISIT)
+   coverage_level: 3
+   expert_reason: The paper introduces statistic maximal leakage to quantify leakage about a specific target secret relative to what an adversary could guess from their prior knowledge before observation. A key limitation is that exact metric computation is generally NP-hard outside deterministic release mechanisms.
+4. Differential Privacy as a Mutual Information Constraint
+   url: https://doi.org/10.1145/2976749.2978308
+   year: 2016
+   venue: Proceedings of the 2016 ACM SIGSAC Conference on Computer and Communications Security
+   coverage_level: 3
+   expert_reason: It reframes differential privacy using conditional mutual information, explicitly articulating the adversary's prior knowledge and baseline guessing capacity through conditioning. However, it centers on re-interpreting standard differential privacy rather than creating a context-dependent prior-tailored disclosure framework.
+5. $\alpha$-Information-theoretic Privacy Watchdog and Optimal Privatization Scheme
+   url: https://doi.org/10.1109/isit45174.2021.9518220
+   year: 2021
+   venue: 2021 IEEE International Symposium on Information Theory (ISIT)
+   coverage_level: 3
+   expert_reason: The authors propose alpha-lift to directly quantify privacy risk through the ratio of posterior belief to prior belief, selectively sanitizing only high-risk disclosures to retain utility. However, the evaluation is predominantly confined to the watchdog mechanism setting.
+
+------------------------------------------------------------------------
+
+C009_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 532.391 seconds
+Reported tokens: input=258677, output=85192, total=343869
+
+1. A New Optimal Method for the Secure Design of Combinational Circuits against Hardware Trojans Using Interference Logic Locking
+   url: https://doi.org/10.3390/electronics12051107
+   year: 2023
+   venue: Electronics
+   coverage_level: 3
+   expert_reason: The paper directly addresses using internal logic design—specifically key gates inserted in interference mode across maximum fan-out paths—to inherently prevent hardware Trojan insertion during untrusted manufacturing. Its focus is restricted to combinational circuits and logic locking rather than general verification frameworks.
+2. TroLLoc: Logic Locking and Layout Hardening for IC Security Closure against Hardware Trojans
+   url: https://doi.org/10.48550/arxiv.2405.05590
+   year: 2024
+   venue: arXiv.org
+   coverage_level: 3
+   expert_reason: The work investigates how structural design choices, integrating logic locking with layout hardening, proactively render physical circuits resilient against post-design Trojan insertion rather than relying on post-silicon testing. However, it emphasizes physical layout closure alongside logic locking.
+3. A Novel Low Complexity Logic Encryption Technique for Design-for-Trust
+   url: https://doi.org/10.1109/tetc.2018.2795706
+   year: 2020
+   venue: IEEE Transactions on Emerging Topics in Computing
+   coverage_level: 3
+   expert_reason: It investigates internal logic architecture by modifying rare-triggered nets with lightweight key gates to structurally prevent Trojan insertion during outsourced manufacturing. A potential limitation is its primary reliance on static vulnerability metrics for key-gate replacement.
+4. Cybersecurity Threats Prevention through PUF Based Dynamic Logic Morphing on IoT Edge Devices
+   url: https://doi.org/10.1109/compas67506.2025.11381648
+   year: 2025
+   venue: 2025 IEEE 2nd International Conference on Computing, Applications and Systems (COMPAS)
+   coverage_level: 3
+   expert_reason: The method uses internal logic morphing and PUF responses to make circuits unintelligible and structurally resistant to hardware Trojan insertion at design and fabrication time. Its scope is primarily tailored to resource-constrained IoT edge devices.
+5. Reconfigurable Run-Time Hardware Trojan Mitigation for Logic-Locked Circuits
+   url: https://doi.org/10.1109/dcas61159.2024.10539881
+   year: 2024
+   venue: 2024 IEEE 17th Dallas Circuits and Systems Conference (DCAS)
+   coverage_level: 3
+   expert_reason: It contrasts proactive structural design with post-fabrication testing by configuring internal logic trap states and locking to mitigate inserted hardware Trojans. Its core focus is on runtime reconfigurable mitigation rather than purely static structural deterrence.
+
+------------------------------------------------------------------------
+
+C010_A | PARTIAL | Expert: SUCCEEDED
+Elapsed: 511.469 seconds
+Reported tokens: input=312620, output=97192, total=409812
+
+1. Reasoning with Probabilistic and Deterministic Graphical Models: Exact Algorithms, Second Edition
+   url: https://doi.org/10.2200/s00893ed2v01y201901aim041
+   year: 2019
+   venue: Reasoning with Probabilistic and Deterministic Graphical Models
+   coverage_level: 3
+   expert_reason: This work comprehensively investigates exact inference algorithms that exploit deterministic relations—combinations that cannot occur—alongside probabilistic graphical models to scale reasoning without approximation.
+2. Advanced SMT techniques for weighted model integration
+   url: https://doi.org/10.1016/j.artint.2019.04.003
+   year: 2019
+   venue: Artificial Intelligence
+   coverage_level: 3
+   expert_reason: It addresses scaling exact hybrid inference by using SMT predicate abstraction to prune invalid configurations and drastically reduce the number of enumerated models in weighted model integration.
+3. Probabilistic Inference Modulo Theories
+   url: https://arxiv.org/abs/1605.08367
+   year: 2016
+   venue: International Joint Conference on Artificial Intelligence
+   coverage_level: 3
+   expert_reason: It introduces SGDPLL(T) for exact probabilistic inference parameterized by background logical theories, directly avoiding the intractable instantiation of combinations ruled out by constraints.
+4. SPPL: probabilistic programming with fast exact symbolic inference
+   url: https://doi.org/10.1145/3453483.3454078
+   year: 2021
+   venue: Proceedings of the 42nd ACM SIGPLAN International Conference on Programming Language Design and Implementation
+   coverage_level: 3
+   expert_reason: It provides exact symbolic inference for probabilistic programs by compiling logical constraints and deterministic conditions into compact sum-product expressions.
+5. Scaling up Hybrid Probabilistic Inference with Logical and Arithmetic Constraints via Message Passing
+   url: https://arxiv.org/abs/2003.00126
+   year: 2020
+   venue: International Conference on Machine Learning
+   coverage_level: 3
+   expert_reason: It achieves scalable exact inference over hybrid probability distributions subject to complex logical and arithmetic constraints via factorized message passing.
+
+------------------------------------------------------------------------
