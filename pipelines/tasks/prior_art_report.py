@@ -14,6 +14,7 @@ from typing import Dict, Set, List, Iterable, Sequence, Optional, TYPE_CHECKING
 from collections import Counter
 import re
 
+from pipelines.assessment import effective_levels, valid_level
 from pipelines.state import PipelineState
 from pipelines.tasks.prior_art_types import (
     PriorArtConfig, PriorArtMatch, HIGH_LEVEL_FACET_TYPES
@@ -90,6 +91,8 @@ def get_papers_by_coverage_bucket(
     }
     
     for paper_id, level in coverage_levels.items():
+        if not valid_level(level):
+            continue
         if paper_id not in paper_records:
             continue
         
@@ -325,7 +328,7 @@ def render_high_level_coverage_section_v2(
     """
     lines = []
     lines.append("## High-level Structural Coverage")
-    lines.append("Analysis of core facets based on evidence extraction:")
+    lines.append("Lexical evidence across all retrieved papers; strong denotes the existing matching heuristic, not fulltext confirmation or an LLM overlap bucket.")
     lines.append("")
     
     for facet_id, view in facet_views.items():
@@ -383,6 +386,7 @@ def render_prior_art_report(
     # Evidence functions passed in to avoid circular import
     make_keywords_fn=None,
     find_snippets_fn=None,
+    snapshot=None,
 ) -> str:
     """
     Render a structured Markdown report for the prior-art check.
@@ -426,7 +430,9 @@ def render_prior_art_report(
             scored_papers = [m for m in scored_papers if not is_excluded_paper(
                 state.papers.get(m.paper_id, {}), config
             )]
-        coverage_by_id = {m.paper_id: m.coverage_level for m in scored_papers}
+        coverage_by_id = effective_levels(state, scored_papers, coverage_levels, snapshot)
+    elif snapshot is not None:
+        coverage_by_id = effective_levels(state, scored_papers, coverage_levels, snapshot)
     
     # Build paper_records lookup from state.papers if not provided
     if not paper_records:
@@ -633,14 +639,27 @@ def render_prior_art_report(
     
     # 7. Facet-Level Gap Analysis (Issue 4: Use FacetCoverageStats)
     lines.append("## 6. Facet-Level Gap Analysis")
-    lines.append("Coverage of each facet in papers with partial or high overlap:")
+    lines.append("Facet evidence below distinguishes corpus-wide lexical matches from abstract-level model labels.")
     lines.append("")
     lines.append("> **Note**: 'Not found' means the facet was not clearly identified in retrieved papers. ")
     lines.append("> This may indicate a gap OR that relevant work exists but was not retrieved.")
     lines.append("")
     
     # Issue 4: Use FacetCoverageStats when available
-    if facet_views:
+    if snapshot is not None:
+        searched_ids = set(snapshot.get("idea_spec", {}).get("pattern_facet_ids", []))
+        for index, facet in enumerate(facets, 1):
+            fid = f"F{index}"
+            if fid in searched_ids:
+                stats = (facet_coverage or {}).get(fid)
+                any_count = stats.count_any if stats else 0
+                strong_count = stats.count_strong if stats else 0
+                lines.append(f"- **{fid}: {facet}**: {any_count} retrieved papers with lexical matches, including {strong_count} above the heuristic strength threshold. This does not establish same-paper fulltext coverage.")
+            else:
+                label_count = sum(1 for item in snapshot["entries"].values()
+                    if item["status"] == "succeeded" and fid in item["abstract_assessment"]["facet_labels"])
+                lines.append(f"- **{fid}: {facet}**: facet-pattern evidence unavailable; {label_count} abstract-level model labels. Absence of a pattern is not a novelty finding.")
+    elif facet_views:
         for facet_id, view in facet_views.items():
             if facet_id.startswith("F"):  # Only core facets F1-F4
                 count_any = view.stats.count_any
@@ -652,7 +671,7 @@ def render_prior_art_report(
                     )
     else:
         # Fallback to old LLM-based counting
-        relevant_matches = [m for m in scored_papers if m.coverage_level >= 2]
+        relevant_matches = [m for m in scored_papers if getattr(m, "scoring_status", "succeeded") == "succeeded" and valid_level(m.coverage_level) and m.coverage_level >= 2]
         for i, facet in enumerate(facets, 1):
             label = f"F{i}"
             count = sum(1 for m in relevant_matches if label in m.covered_facet_labels)
@@ -663,6 +682,18 @@ def render_prior_art_report(
                 )
     
     lines.append("")
+    if snapshot is not None:
+        lines.append("## Assessment status and evidence provenance")
+        lines.append("")
+        lines.append(f"Snapshot: `{snapshot['snapshot_id']}`")
+        lines.append("Facet labels are abstract assessments unless separately supported; lexical evidence and summaries are not independent fulltext confirmations.")
+        for pid, item in snapshot["entries"].items():
+            decision = item["final"]
+            if item["status"] != "succeeded" or decision["coverage_level"] is None:
+                lines.append(f"- **Pending/unassessed**: {state.papers[pid].title} (`{pid}`); status={item['status']}; reason={item['error'] or 'not selected for scoring'}")
+            else:
+                lines.append(f"- `{pid}`: level={decision['coverage_level']}; basis={decision['source']}; refinement={item['fulltext_assessment']['status']}")
+        lines.append("")
     lines.append("---")
     lines.append("**⚠️ Disclaimer**: This is an automated prior-art check based on paper metadata and LLM analysis. ")
     lines.append("Results may contain errors due to: incomplete retrieval, LLM hallucination, or extraction failures. ")

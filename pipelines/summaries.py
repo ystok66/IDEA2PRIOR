@@ -39,6 +39,8 @@ class IntroRwSummary:
     contribution_bullets: List[str]
     positioning_bullets: List[str]
     bullets_with_snippets: List[Dict[str, str]]
+    status: str = "success"
+    error: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -56,10 +58,11 @@ class IntroRwSummary:
             contribution_bullets=data.get("contribution_bullets", []),
             positioning_bullets=data.get("positioning_bullets", []),
             bullets_with_snippets=data.get("bullets_with_snippets", []),
+            status=data.get("status", "success"), error=data.get("error"),
         )
     
     @classmethod
-    def empty(cls, paper_id: str, title: str, year: int) -> "IntroRwSummary":
+    def empty(cls, paper_id: str, title: str, year: int, status="empty", error=None) -> "IntroRwSummary":
         """Create an empty summary (fallback for parse failures)."""
         return cls(
             paper_id=paper_id,
@@ -70,6 +73,7 @@ class IntroRwSummary:
             contribution_bullets=[],
             positioning_bullets=[],
             bullets_with_snippets=[],
+            status=status, error=error,
         )
 
 

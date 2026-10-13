@@ -18,6 +18,8 @@ from pipelines.sections import PaperSections, load_paper_sections
 from pipelines.summaries import IntroRwSummary, save_intro_rw_summaries_jsonl
 from pipelines.llm_config import get_litellm_config
 from pipelines.tasks.prior_art_fulltext import extract_intro_rw_blocks
+from pipelines.tasks.prior_art_utils import ordered_parallel_map
+from pipelines.runtime import invoke_model, atomic_write_jsonl
 
 
 def _extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
@@ -58,6 +60,18 @@ def _extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
             pass
     
     return None
+
+
+def _validate_summary_response(response):
+    data = _extract_json_from_response(response.content if hasattr(response, "content") else str(response))
+    if not isinstance(data, dict) or type(data.get("is_survey")) is not bool:
+        raise ValueError("is_survey must be a JSON boolean")
+    for field in ("domain_overview_bullets", "contribution_bullets", "positioning_bullets"):
+        if not isinstance(data.get(field), list) or any(not isinstance(v, str) for v in data[field]):
+            raise ValueError(f"{field} must be a list of strings")
+    if not isinstance(data.get("bullets_with_snippets"), list) or any(not isinstance(v, dict) for v in data["bullets_with_snippets"]):
+        raise ValueError("bullets_with_snippets must be a list of objects")
+    return True
 
 
 def summarize_intro_rw_for_paper(
@@ -183,7 +197,7 @@ INTRODUCTION + RELATED WORK TEXT:
         light_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
         
         messages = [{"role": "user", "content": prompt}]
-        response = light_model(messages)
+        response = invoke_model(light_model, messages, stage="intro_rw_summary", task_id=paper_id, validate_response=_validate_summary_response)
         
         # Extract text from response
         if hasattr(response, "content"):
@@ -195,7 +209,7 @@ INTRODUCTION + RELATED WORK TEXT:
         
     except Exception as e:
         logger.error(f"[IntroRwSummarizer] LLM call failed for {paper_id}: {e}")
-        return IntroRwSummary.empty(paper_id, title, year)
+        return IntroRwSummary.empty(paper_id, title, year, status="failed", error=str(e))
     
     # 5. Parse JSON response
     data = _extract_json_from_response(response_text)
@@ -205,15 +219,23 @@ INTRODUCTION + RELATED WORK TEXT:
             f"[IntroRwSummarizer] Failed to parse JSON for {paper_id}. "
             f"Response preview: {response_text[:300]}..."
         )
-        return IntroRwSummary.empty(paper_id, title, year)
+        return IntroRwSummary.empty(paper_id, title, year, status="failed", error="Invalid JSON response")
     
     # 6. Build IntroRwSummary
     try:
+        if not isinstance(data, dict) or type(data.get("is_survey")) is not bool:
+            raise ValueError("is_survey must be a JSON boolean")
+        for field in ("domain_overview_bullets", "contribution_bullets", "positioning_bullets"):
+            if not isinstance(data.get(field), list) or any(not isinstance(v, str) for v in data[field]):
+                raise ValueError(f"{field} must be a list of strings")
+        if not isinstance(data.get("bullets_with_snippets"), list) or any(
+                not isinstance(v, dict) for v in data["bullets_with_snippets"]):
+            raise ValueError("bullets_with_snippets must be a list of objects")
         summary = IntroRwSummary(
             paper_id=paper_id,
             title=title,
             year=year,
-            is_survey=bool(data.get("is_survey", False)),
+            is_survey=data["is_survey"],
             domain_overview_bullets=list(data.get("domain_overview_bullets", [])),
             contribution_bullets=list(data.get("contribution_bullets", [])),
             positioning_bullets=list(data.get("positioning_bullets", [])),
@@ -231,7 +253,7 @@ INTRODUCTION + RELATED WORK TEXT:
         
     except Exception as e:
         logger.error(f"[IntroRwSummarizer] Failed to build summary for {paper_id}: {e}")
-        return IntroRwSummary.empty(paper_id, title, year)
+        return IntroRwSummary.empty(paper_id, title, year, status="failed", error=str(e))
 
 
 def _summarize_single_paper(
@@ -304,6 +326,8 @@ def _summarize_single_paper(
     
     elapsed = time.time() - start_time
     
+    if summary.status == "failed":
+        return (paper_id, summary, "error")
     # Check if we got actual content
     if summary.contribution_bullets or summary.domain_overview_bullets:
         logger.info(f"[IntroRwSummarizer] Summarized {paper_id} in {elapsed:.1f}s")
@@ -345,7 +369,6 @@ def summarize_intro_rw_for_block3(
     """
     import time
     import os
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     
     # Get max_workers from environment if not specified
     env_workers = os.getenv("INTRO_RW_MAX_WORKERS")
@@ -366,47 +389,41 @@ def summarize_intro_rw_for_block3(
         f"with max_workers={max_workers}..."
     )
     
-    start_time = time.time()
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
-        future_to_paper = {
-            executor.submit(
-                _summarize_single_paper,
+    start_time = time.monotonic()
+    statuses = []
+
+    def summarize_task(task):
+        i, paper_info = task
+        try:
+            return _summarize_single_paper(
                 paper_info,
                 task_root,
                 topic,
                 idea_description,
                 i,
                 total_papers,
-            ): paper_info
-            for i, paper_info in enumerate(papers)
-        }
-        
-        # Collect results as they complete
-        for future in as_completed(future_to_paper):
-            paper_info = future_to_paper[future]
+            )
+        except Exception as e:
             paper_id = paper_info.get("paper_id") or paper_info.get("id", "unknown")
-            
-            try:
-                result_id, summary, status = future.result()
-                
-                if status == 'success' and summary is not None:
-                    summaries.append(summary)
-                    successful += 1
-                elif status == 'no_sections':
-                    skipped_no_sections += 1
-                else:  # 'no_text' or 'empty_bullets'
-                    skipped_no_text += 1
-                    
-            except Exception as e:
-                logger.error(f"[IntroRwSummarizer] Thread failed for {paper_id}: {e}")
-                skipped_no_text += 1
-    
-    elapsed = time.time() - start_time
+            logger.error(f"[IntroRwSummarizer] Thread failed for {paper_id}: {e}")
+            return paper_id, None, "failed"
+
+    for result_id, summary, status in ordered_parallel_map(list(enumerate(papers)), summarize_task, max_workers):
+        statuses.append({"paper_id": result_id, "status": status, "error": getattr(summary, "error", None)})
+        if status == "success" and summary is not None:
+            summaries.append(summary)
+            successful += 1
+        elif status == "no_sections":
+            skipped_no_sections += 1
+        else:
+            skipped_no_text += 1
+
+    elapsed = time.monotonic() - start_time
     
     # Save to JSONL
-    out_path = save_intro_rw_summaries_jsonl(task_root, summaries)
+    out_path = Path(task_root) / "synthesis" / "intro_rw_summaries.jsonl"
+    atomic_write_jsonl(out_path, [summary.to_dict() for summary in summaries])
+    atomic_write_jsonl(out_path.with_name("intro_rw_summary_status.jsonl"), statuses)
     
     logger.info(
         f"[IntroRwSummarizer] Completed in {elapsed:.1f}s: {successful} summarized, "

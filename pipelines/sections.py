@@ -9,6 +9,7 @@ from dataclasses import dataclass, asdict
 from typing import List, Optional, Dict, Any
 import json
 from pathlib import Path
+from pipelines.runtime import atomic_write_json
 
 
 # Valid section roles
@@ -120,8 +121,7 @@ def save_paper_sections(task_root: str, paper_sections: PaperSections) -> Path:
     safe_id = _sanitize_paper_id(paper_sections.paper_id)
     out_path = out_dir / f"{safe_id}.sections.json"
     
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(paper_sections.to_dict(), f, ensure_ascii=False, indent=2)
+    atomic_write_json(out_path, paper_sections.to_dict())
     
     return out_path
 

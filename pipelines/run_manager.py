@@ -17,11 +17,17 @@ import json
 import os
 import re
 import shutil
+import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from loguru import logger
+from pipelines.runtime import (
+    LLMRuntime, RunLedger, atomic_write_bytes, atomic_write_json, append_jsonl,
+    redact, secret_values,
+)
 
 
 class RunManager:
@@ -40,6 +46,8 @@ class RunManager:
         topic: str,
         timestamp: Optional[str] = None,
         base_dir: Optional[Path] = None,
+        resume_run_dir: Optional[Path] = None,
+        shared_pdf_cache_dir: Optional[Path] = None,
     ):
         """
         Initialize RunManager.
@@ -48,6 +56,9 @@ class RunManager:
             topic: Research topic (will be slugified for directory name)
             timestamp: Optional timestamp string (defaults to current time)
             base_dir: Base directory for runs (defaults to project root)
+            shared_pdf_cache_dir: Optional exact-byte parsed-page cache shared
+                across runs. Downloaded PDFs and source bindings remain local
+                to base_dir; this directory never resolves a remote document.
         """
         self.topic = topic
         self.timestamp = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -63,18 +74,41 @@ class RunManager:
         self.topic_slug = self._slugify(topic)
         
         # Build run ID and paths
-        self.run_id = f"{self.timestamp}_{self.topic_slug}"
+        self.run_id = f"{self.timestamp}_{self.topic_slug}_{uuid.uuid4().hex[:12]}"
         self.run_dir = self.base_dir / "runs" / self.run_id
+        self._resuming = resume_run_dir is not None
+        if resume_run_dir is not None:
+            self.run_dir = Path(resume_run_dir).resolve()
+            if not self.run_dir.is_dir():
+                raise ValueError("Explicit resume directory does not exist")
+            self.run_id = self.run_dir.name
+            saved_config = self.run_dir / "config.json"
+            if saved_config.is_file():
+                previous = json.loads(saved_config.read_text(encoding="utf-8"))
+                if previous.get("topic", topic) != topic:
+                    raise ValueError("Resume topic differs from the saved run")
+                self.timestamp = previous.get("timestamp", self.timestamp)
+                self.topic_slug = previous.get("topic_slug", self.topic_slug)
+            if base_dir is None:
+                self.base_dir = self.run_dir.parent.parent
         
         # Subdirectories
         self.md_reports_dir = self.run_dir / "md_reports"
         self.pdfs_dir = self.run_dir / "pdfs"
         self.parsed_dir = self.run_dir / "parsed"
         
-        # Global PDF cache (shared across runs)
+        # Source-bound PDF bytes stay with base_dir. Only exact-byte parsed pages
+        # may use the separately selected shared cache.
         self.pdf_cache_dir = self.base_dir / "pdf_cache"
+        self.pdf_pages_cache_dir = (
+            Path(shared_pdf_cache_dir).resolve()
+            if shared_pdf_cache_dir is not None else self.pdf_cache_dir
+        )
         
         self._initialized = False
+        self._initialize_lock = threading.RLock()
+        self._runtime = None
+        self._secrets = ()
     
     @staticmethod
     def _slugify(text: str, max_length: int = 50) -> str:
@@ -93,22 +127,30 @@ class RunManager:
         Returns:
             Path to the run directory
         """
-        if self._initialized:
-            return self.run_dir
-        
-        # Create all directories
-        self.run_dir.mkdir(parents=True, exist_ok=True)
-        self.md_reports_dir.mkdir(exist_ok=True)
-        self.pdfs_dir.mkdir(exist_ok=True)
-        self.parsed_dir.mkdir(exist_ok=True)
-        
-        # Ensure global PDF cache exists
-        self.pdf_cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        self._initialized = True
+        with self._initialize_lock:
+            if self._initialized:
+                return self.run_dir
+            # Never silently merge two new runs, including identical timestamps.
+            self.run_dir.mkdir(parents=True, exist_ok=self._resuming)
+            self.md_reports_dir.mkdir(exist_ok=True)
+            self.pdfs_dir.mkdir(exist_ok=True)
+            self.parsed_dir.mkdir(exist_ok=True)
+            self.pdf_cache_dir.mkdir(parents=True, exist_ok=True)
+            self.pdf_pages_cache_dir.mkdir(parents=True, exist_ok=True)
+            self._initialized = True
         logger.info(f"[RunManager] Created run directory: {self.run_dir}")
         
         return self.run_dir
+
+    @property
+    def runtime(self) -> LLMRuntime:
+        """The run's single in-process coordinator; share across all workers."""
+        self.create_run_directory()
+        with self._initialize_lock:
+            if self._runtime is None:
+                self._runtime = LLMRuntime(RunLedger(self.run_dir))
+                self._runtime.ledger.secrets = self._secrets
+            return self._runtime
     
     def save_config(self, config: Dict[str, Any]) -> Path:
         """
@@ -126,15 +168,19 @@ class RunManager:
         
         # Add run metadata
         full_config = {
+            **config,
             "run_id": self.run_id,
             "timestamp": self.timestamp,
             "topic": self.topic,
             "topic_slug": self.topic_slug,
-            **config
         }
-        
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(full_config, f, indent=2, ensure_ascii=False)
+        self._secrets = tuple(set(self._secrets + secret_values(full_config)))
+        if self._resuming and config_path.exists():
+            previous = json.loads(config_path.read_text(encoding="utf-8"))
+            if previous != redact(full_config, self._secrets):
+                raise ValueError("Resume config differs; use a new run for changed inputs/config")
+        atomic_write_json(config_path, redact(full_config, self._secrets))
+        self.runtime.ledger.write_manifest(full_config)
         
         logger.debug(f"[RunManager] Saved config to {config_path}")
         return config_path
@@ -157,8 +203,7 @@ class RunManager:
             "payload": payload
         }
         
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        append_jsonl(log_path, redact(entry, self._secrets))
     
     def get_pdf_path(self, paper_id: str) -> Path:
         """
@@ -263,8 +308,7 @@ class RunManager:
         
         report_path = self.get_report_path(filename)
         
-        with open(report_path, "w", encoding="utf-8") as f:
-            f.write(content.replace("\\n", "\n"))
+        atomic_write_bytes(report_path, content.replace("\\n", "\n").encode("utf-8"))
         
         logger.info(f"[RunManager] Saved report to {report_path}")
         return report_path

@@ -12,34 +12,15 @@
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 
-from .graph_storages.base import BaseGraphStorage
-from .graph_storages.nebula_graph import NebulaGraph
-from .graph_storages.neo4j_graph import Neo4jGraph
-from .key_value_storages.base import BaseKeyValueStorage
-from .key_value_storages.in_memory import InMemoryKeyValueStorage
-from .key_value_storages.json import JsonStorage
-from .key_value_storages.redis import RedisStorage
-from .vectordb_storages.base import (
-    BaseVectorStorage,
-    VectorDBQuery,
-    VectorDBQueryResult,
-    VectorRecord,
-)
-from .vectordb_storages.milvus import MilvusStorage
-from .vectordb_storages.qdrant import QdrantStorage
+from importlib import import_module
 
-__all__ = [
-    'BaseKeyValueStorage',
-    'InMemoryKeyValueStorage',
-    'JsonStorage',
-    'RedisStorage',
-    'VectorRecord',
-    'BaseVectorStorage',
-    'VectorDBQuery',
-    'VectorDBQueryResult',
-    'QdrantStorage',
-    'MilvusStorage',
-    'BaseGraphStorage',
-    'Neo4jGraph',
-    'NebulaGraph',
-]
+_EXPORTS = {'BaseGraphStorage': ('.graph_storages.base', 'BaseGraphStorage'), 'NebulaGraph': ('.graph_storages.nebula_graph', 'NebulaGraph'), 'Neo4jGraph': ('.graph_storages.neo4j_graph', 'Neo4jGraph'), 'BaseKeyValueStorage': ('.key_value_storages.base', 'BaseKeyValueStorage'), 'InMemoryKeyValueStorage': ('.key_value_storages.in_memory', 'InMemoryKeyValueStorage'), 'JsonStorage': ('.key_value_storages.json', 'JsonStorage'), 'RedisStorage': ('.key_value_storages.redis', 'RedisStorage'), 'BaseVectorStorage': ('.vectordb_storages.base', 'BaseVectorStorage'), 'VectorDBQuery': ('.vectordb_storages.base', 'VectorDBQuery'), 'VectorDBQueryResult': ('.vectordb_storages.base', 'VectorDBQueryResult'), 'VectorRecord': ('.vectordb_storages.base', 'VectorRecord'), 'MilvusStorage': ('.vectordb_storages.milvus', 'MilvusStorage'), 'QdrantStorage': ('.vectordb_storages.qdrant', 'QdrantStorage')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

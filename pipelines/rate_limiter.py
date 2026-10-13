@@ -30,7 +30,7 @@ class SimpleRateLimiter:
     Each call to wait_for_slot() independently computes its own wait time.
     """
 
-    def __init__(self, max_calls: int, period: float) -> None:
+    def __init__(self, max_calls: int, period: float, *, clock=time.monotonic, sleep=time.sleep) -> None:
         """
         Initialize the rate limiter.
         
@@ -38,12 +38,16 @@ class SimpleRateLimiter:
             max_calls: Maximum number of calls allowed within the period
             period: Time window in seconds
         """
+        if isinstance(max_calls, bool) or not isinstance(max_calls, int) or max_calls <= 0 or period <= 0:
+            raise ValueError("max_calls and period must be positive")
         self.max_calls = max_calls
         self.period = period
+        self._clock = clock
+        self._sleep = sleep
         self._lock = threading.Lock()
         self._timestamps: Deque[float] = deque()
 
-    def wait_for_slot(self) -> None:
+    def wait_for_slot(self, *, max_wait_seconds=None) -> None:
         """
         Block the current thread until a new request is allowed.
 
@@ -54,11 +58,12 @@ class SimpleRateLimiter:
         
         Thread-safe: multiple threads can call this concurrently.
         """
+        started = self._clock()
         while True:
             with self._lock:
-                now = time.time()
+                now = self._clock()
                 # Drop timestamps older than `period`
-                while self._timestamps and (now - self._timestamps[0]) > self.period:
+                while self._timestamps and (now - self._timestamps[0]) >= self.period:
                     self._timestamps.popleft()
 
                 if len(self._timestamps) < self.max_calls:
@@ -69,10 +74,14 @@ class SimpleRateLimiter:
                 # At capacity: compute minimal sleep time until oldest expires
                 oldest = self._timestamps[0]
                 sleep_for = self.period - (now - oldest) + 0.001  # Small buffer
+                if max_wait_seconds is not None:
+                    remaining = max_wait_seconds - (now - started)
+                    if sleep_for > remaining:
+                        raise TimeoutError("Provider pacing exceeds the remaining request budget")
 
             # Sleep outside the lock to avoid blocking other threads
             if sleep_for > 0:
-                time.sleep(sleep_for)
+                self._sleep(sleep_for)
             # Loop will re-check and append once a slot is free
 
 
@@ -82,13 +91,14 @@ class SimpleRateLimiter:
 # These are module-level singletons shared by all threads.
 # All HTTP requests to these services MUST go through these limiters.
 
-# OpenAlex: Official limit is 10 QPS, using 8 QPS for safety margin
+# Legacy local pacing settings, not verified account/service quotas.
 openalex_rate_limiter = SimpleRateLimiter(max_calls=8, period=1.0)
 
-# Semantic Scholar: Official limit is 1 req/s, using 1 per 2s for safety
+# Semantic Scholar legacy local pacing.
 s2_rate_limiter = SimpleRateLimiter(max_calls=1, period=2.0)
 
-# LLM (liaobots): No hard limit, 20/s is a local safety threshold
+# Legacy LLM pacing, not proof of a provider quota. New request admission is
+# coordinated by pipelines.runtime.RequestScheduler with explicit RPM/TPM.
 llm_rate_limiter = SimpleRateLimiter(max_calls=20, period=1.0)
 
 # PDF downloads: 5/s to avoid hammering arbitrary PDF hosts

@@ -12,14 +12,15 @@
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 
-from .base import BaseKeyValueStorage
-from .in_memory import InMemoryKeyValueStorage
-from .json import JsonStorage
-from .redis import RedisStorage
+from importlib import import_module
 
-__all__ = [
-    'BaseKeyValueStorage',
-    'InMemoryKeyValueStorage',
-    'JsonStorage',
-    'RedisStorage',
-]
+_EXPORTS = {'BaseKeyValueStorage': ('.base', 'BaseKeyValueStorage'), 'InMemoryKeyValueStorage': ('.in_memory', 'InMemoryKeyValueStorage'), 'JsonStorage': ('.json', 'JsonStorage'), 'RedisStorage': ('.redis', 'RedisStorage')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

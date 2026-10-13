@@ -12,14 +12,15 @@
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 
-from .base import BaseGraphStorage
-from .graph_element import GraphElement
-from .nebula_graph import NebulaGraph
-from .neo4j_graph import Neo4jGraph
+from importlib import import_module
 
-__all__ = [
-    'BaseGraphStorage',
-    'GraphElement',
-    'Neo4jGraph',
-    'NebulaGraph',
-]
+_EXPORTS = {'BaseGraphStorage': ('.base', 'BaseGraphStorage'), 'GraphElement': ('.graph_element', 'GraphElement'), 'NebulaGraph': ('.nebula_graph', 'NebulaGraph'), 'Neo4jGraph': ('.neo4j_graph', 'Neo4jGraph')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

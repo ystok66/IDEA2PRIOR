@@ -12,7 +12,11 @@ These functions are used by the main prior_art_check orchestrator.
 
 from __future__ import annotations
 
+from pipelines.clients.http_transport import get as http_get
+from pipelines.clients.s2_ids import paper_id_path
+
 import json
+import copy
 import math
 import os
 import re
@@ -24,6 +28,9 @@ from loguru import logger
 from smolagents import LiteLLMModel
 
 from pipelines.state import PipelineState, Paper
+from pipelines.identity import upsert_paper, paper_from_openalex
+from pipelines.runtime import invoke_model, get_runtime
+from contextvars import copy_context
 from pipelines.clients import SemanticScholarClient
 from pipelines.llm_config import get_litellm_config
 from tools.openalex_search import OpenAlexWorksSearchTool
@@ -40,6 +47,12 @@ from pipelines.tasks.prior_art_utils import is_excluded_paper
 # =============================================================================
 # LLM Seed Papers and Query Generation
 # =============================================================================
+
+def invoke_expert_retrieval(model, messages):
+    """Explicit SDK execution timeout; scheduler queueing is accounted separately."""
+    timeout = getattr(get_runtime(), 'retrieval_policy', {}).get('expert_retrieval_timeout_seconds', 120.0)
+    return invoke_model(model, messages, stage='retrieval',
+                        request_parameters={'timeout': timeout, 'num_retries': 0})
 
 def seed_papers_from_llm(
     agent,
@@ -107,7 +120,7 @@ Constraints:
 JSON:
 """
     messages = [{"role": "user", "content": prompt}]
-    resp = expert_model(messages)
+    resp = invoke_expert_retrieval(expert_model, messages)
     text = extract_text_from_llm_response(resp)
 
     # Parse JSON safely; fallback to empty list on error.
@@ -165,21 +178,10 @@ def extract_arxiv_id_from_url(url: str) -> Optional[str]:
     if not url:
         return None
     
-    # Match arxiv IDs in URLs
-    patterns = [
-        r'arxiv\.org/abs/(\d{4}\.\d{4,5})',
-        r'arxiv\.org/pdf/(\d{4}\.\d{4,5})',
-        r'arxiv\.org/abs/(\d{4}\.\d{4,5})v\d+',
-        r'arxiv\.org/pdf/(\d{4}\.\d{4,5})v\d+',
-        # Old format: arxiv.org/abs/cs/0001001
-        r'arxiv\.org/abs/([a-z-]+/\d{7})',
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, url, re.IGNORECASE)
-        if match:
-            return match.group(1)
-    
+    match = re.search(r'arxiv\.org/(?:abs|pdf)/((?:\d{4}\.\d{4,5}|[a-z-]+/\d{7})(?:v\d+)?)', url, re.I)
+    if match:
+        return match.group(1)
+
     return None
 
 
@@ -203,19 +205,19 @@ def validate_via_semantic_scholar(
     api_key = os.getenv("Semantic_Scholar_API_key")
     
     # For arXiv IDs, prepend ARXIV:
-    if paper_id and re.match(r'^\d{4}\.\d{4,5}$', paper_id):
+    if paper_id and re.match(r'^\d{4}\.\d{4,5}(?:v\d+)?$', paper_id):
         paper_id = f"ARXIV:{paper_id}"
     
-    url = f"{base_url}/paper/{paper_id}"
+    url = f"{base_url}/paper/{paper_id_path(paper_id)}"
     params = {
-        "fields": "title,year,venue,abstract,citationCount,externalIds,paperId"
+        "fields": "title,year,venue,abstract,citationCount,externalIds,paperId,authors"
     }
     headers = {}
     if api_key:
         headers["x-api-key"] = api_key
     
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=15)
+        response = http_get(url, params=params, headers=headers, timeout=15)
         if response.status_code == 404:
             logger.debug(f"[ValidateSeed-S2] Paper not found: {paper_id}")
             return None
@@ -226,6 +228,9 @@ def validate_via_semantic_scholar(
         external_ids = data.get("externalIds", {})
         doi = external_ids.get("DOI")
         arxiv_id = external_ids.get("ArXiv")
+        requested_arxiv = paper_id.removeprefix("ARXIV:")
+        if paper_id.startswith("ARXIV:") and re.search(r"v\d+$", requested_arxiv):
+            arxiv_id = requested_arxiv
         
         paper = Paper(
             title=data.get("title", ""),
@@ -235,6 +240,7 @@ def validate_via_semantic_scholar(
             doi=doi,
             citation_count=data.get("citationCount"),
             s2_id=data.get("paperId"),
+            authors=[a.get("name", "") for a in data.get("authors", [])],
         )
         
         # Store arxiv_id if available
@@ -299,20 +305,8 @@ def validate_via_openalex_title_match(
         
         logger.debug(f"[ValidateSeed-OA] Matched '{title[:40]}...' with overlap {best_overlap:.2f}")
         
-        doi = best_match.get("doi")
-        if doi and "doi.org/" in doi:
-            doi = doi.split("doi.org/")[-1]
-            
-        return Paper(
-            title=best_match.get("title", ""),
-            year=best_match.get("year"),
-            venue=best_match.get("venue"),
-            openalex_id=best_match.get("openalex_id"),
-            doi=doi,
-            citation_count=best_match.get("cited_by_count"),
-            abstract=best_match.get("abstract"),  # Now includes abstract from OpenAlex
-        )
-        
+        return paper_from_openalex(best_match, source="validated_openalex_seed")
+
     except Exception as e:
         logger.debug(f"[ValidateSeed-OA] Error for '{title[:40]}...': {e}")
         return None
@@ -321,6 +315,7 @@ def validate_via_openalex_title_match(
 def validate_llm_seeds_via_openalex(
     seeds: List[Dict[str, str]],
     max_workers: int = 4,
+    cfg=None,
 ) -> List[Paper]:
     """
     Multi-source seed validation: tries arXiv URL, Semantic Scholar, then OpenAlex.
@@ -337,6 +332,9 @@ def validate_llm_seeds_via_openalex(
         seeds: List of seed paper dicts (with 'title', optionally 'url', 'doi', 'arxiv_id')
         max_workers: Number of parallel threads
     """
+    from pipelines.clients.scholarly import replacement_enabled, validate_seeds
+    if replacement_enabled(cfg):
+        return validate_seeds(seeds, cfg)
     from pipelines.tasks.prior_art_utils import run_parallel
 
     def _validate_single_seed(seed: Dict[str, str]) -> Optional[Paper]:
@@ -389,13 +387,13 @@ def validate_llm_seeds_via_openalex(
             params = {
                 "query": title,
                 "limit": 3,
-                "fields": "title,year,venue,abstract,citationCount,externalIds,paperId"
+                "fields": "title,year,venue,abstract,citationCount,externalIds,paperId,authors"
             }
             headers = {}
             if api_key:
                 headers["x-api-key"] = api_key
             
-            response = requests.get(search_url, params=params, headers=headers, timeout=15)
+            response = http_get(search_url, params=params, headers=headers, timeout=15)
             if response.status_code == 200:
                 data = response.json()
                 papers = data.get("data", [])
@@ -417,6 +415,8 @@ def validate_llm_seeds_via_openalex(
                                 doi=external_ids.get("DOI"),
                                 citation_count=p.get("citationCount"),
                                 s2_id=p.get("paperId"),
+                                arxiv_id=external_ids.get("ArXiv"),
+                                authors=[a.get("name", "") for a in p.get("authors", [])],
                             )
                             logger.info(f"[ValidateSeed] ✓ Validated via S2 search: {p_title[:50]}...")
                             return paper
@@ -489,7 +489,7 @@ Respond with ONLY valid JSON, no backticks:
 """
     
     messages = [{"role": "user", "content": prompt}]
-    resp = expert_model(messages)
+    resp = invoke_expert_retrieval(expert_model, messages)
     text = extract_text_from_llm_response(resp)
     
     try:
@@ -566,7 +566,7 @@ JSON:
 """
     
     messages = [{"role": "user", "content": prompt}]
-    resp = light_model(messages)
+    resp = invoke_model(light_model, messages, stage="retrieval")
     text = extract_text_from_llm_response(resp)
     
     try:
@@ -619,7 +619,7 @@ def merge_seeds(
     serpapi_seeds: List[Dict[str, str]],
 ) -> List[Dict[str, str]]:
     """
-    Merge LLM-memory seeds with SerpAPI seeds, deduplicating by title.
+    Merge source proposals, deduplicating exact payloads without title identity assumptions.
     
     Args:
         llm_seeds: Seeds from LLM memory
@@ -628,35 +628,18 @@ def merge_seeds(
     Returns:
         Merged and deduplicated list of seeds
     """
-    def normalize_title(t: str) -> str:
-        return " ".join(t.lower().split())
-    
-    by_title = {}
-    
-    # Add LLM seeds first (priority)
-    for s in llm_seeds:
-        key = normalize_title(s.get("title", ""))
-        if key and key not in by_title:
-            by_title[key] = s.copy()
-    
-    # Add SerpAPI seeds, merging info if duplicate
-    for s in serpapi_seeds:
-        key = normalize_title(s.get("title", ""))
-        if not key:
+    # Seed proposals are unvalidated. Same title does not establish identity,
+    # and merging their fields can create a hybrid paper that neither source gave.
+    # Remove exact duplicate payloads only; validated papers use the registry.
+    merged, seen = [], set()
+    for seed in [*llm_seeds, *serpapi_seeds]:
+        if not str(seed.get("title") or "").strip():
             continue
-        if key not in by_title:
-            by_title[key] = s.copy()
-        else:
-            # Merge: fill in missing info
-            existing = by_title[key]
-            if not existing.get("year") and s.get("year"):
-                existing["year"] = s["year"]
-            if not existing.get("venue") and s.get("venue"):
-                existing["venue"] = s["venue"]
-            if not existing.get("url") and s.get("url"):
-                existing["url"] = s["url"]
-    
-    return list(by_title.values())
+        key = json.dumps(seed, sort_keys=True, ensure_ascii=False)
+        if key not in seen:
+            merged.append(dict(seed))
+            seen.add(key)
+    return merged
 
 
 def seed_papers_from_web_search(
@@ -713,29 +696,20 @@ def seed_papers_from_web_search(
     # Group results into chunks for LLM parsing (avoid too long prompts)
     MAX_RESULTS_PER_LLM_CALL = 30
     
-    all_candidates = []
-    for start_idx in range(0, len(normalized), MAX_RESULTS_PER_LLM_CALL):
-        chunk = normalized[start_idx:start_idx + MAX_RESULTS_PER_LLM_CALL]
-        
-        # Format for LLM
-        combined_for_llm = {"web_results": [
-            {
-                "title": r.get("title", ""),
-                "link": r.get("link", ""),
-                "snippet": r.get("snippet", ""),
-                "source_mode": r.get("source_mode", ""),
-            }
-            for r in chunk
-        ]}
-        
-        # Parse with light LLM
-        candidates = parse_web_results_with_llm(
-            idea_description=idea_description,
-            web_results=combined_for_llm,
-            max_papers=15,
-        )
-        all_candidates.extend(candidates)
-    
+    # Freeze original 30-result membership before scheduling; aggregate by ordinal.
+    batches = [{"web_results": [{k: r.get(k, "") for k in
+                ("title", "link", "snippet", "source_mode")}
+               for r in normalized[i:i + MAX_RESULTS_PER_LLM_CALL]]}
+               for i in range(0, len(normalized), MAX_RESULTS_PER_LLM_CALL)]
+    def parse_batch(item):
+        ordinal, payload = item
+        return parse_web_results_with_llm(idea_description, payload, 15,
+                                          task_id=f"web_batch_{ordinal}")
+    from pipelines.tasks.prior_art_utils import run_parallel
+    results = run_parallel(list(enumerate(batches)), parse_batch,
+                           max_workers=cfg.max_workers_web_batches, desc="WebBatches")
+    all_candidates = [candidate for batch in results if batch for candidate in batch]
+
     # 4. Convert to seed format
     seeds = serpapi_candidates_to_seeds(all_candidates)
     
@@ -753,6 +727,7 @@ def parse_web_results_with_llm(
     idea_description: str,
     web_results: Dict[str, List[Dict[str, str]]],
     max_papers: int = 15,
+    task_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Use light LLM to extract paper candidates from unified web search results.
@@ -798,7 +773,7 @@ JSON:
 """
     
     messages = [{"role": "user", "content": prompt}]
-    resp = light_model(messages)
+    resp = invoke_model(light_model, messages, stage="web_parsing", task_id=task_id)
     text = extract_text_from_llm_response(resp)
     
     try:
@@ -885,7 +860,7 @@ Constraints:
 JSON:
 """
     messages = [{"role": "user", "content": prompt}]
-    resp = expert_model(messages)
+    resp = invoke_expert_retrieval(expert_model, messages)
     text = extract_text_from_llm_response(resp)
 
     try:
@@ -942,7 +917,8 @@ TASK: Generate {max_queries} short, diversified search queries suitable for Goog
 Guidelines:
 - Keep each query SHORT (3-8 words, like search engine queries)
 - Cover different angles: task/problem, method, technique, application
-- Include at least 1-2 queries with recent keywords or year hints (2023, 2024)
+- Cover recent terminology where relevant; the API applies the configured recent window {cfg.recent_year_start}-{cfg.recent_year_end}
+- Do not add calendar years to query text; year restrictions are separate API parameters
 - Avoid long natural language sentences
 - Do NOT use quotes or boolean operators
 
@@ -956,7 +932,7 @@ Output strictly valid JSON list of strings:
     
     try:
         messages = [{"role": "user", "content": prompt}]
-        resp = expert_model(messages)
+        resp = invoke_expert_retrieval(expert_model, messages)
         text = extract_text_from_llm_response(resp)
         
         queries = json.loads(text)
@@ -987,9 +963,62 @@ def retrieve_candidates_with_buckets(
     Returns dict of paper_id -> Paper for deduplication.
     """
     from tools.openalex_search import OpenAlexWorksSearchTool
+
+    from pipelines.clients.scholarly import replacement_enabled, discover
+    if replacement_enabled(cfg):
+        registry = PipelineState(intent=state.intent.model_copy(deep=True))
+        scopes = [('main', year_start, year_end, 15)]
+        recent_start, recent_end = max(year_start, cfg.recent_year_start), min(year_end, cfg.recent_year_end)
+        if recent_start <= recent_end:
+            scopes.append(('recent', recent_start, recent_end, 10))
+        if not cfg.optimize_scholarly_requests:
+            for query in seed_queries:
+                for bucket, start, end, limit in scopes:
+                    for paper in discover(query, (start, end), limit, cfg):
+                        if not is_excluded_paper(paper, cfg):
+                            upsert_paper(registry, paper, source=f'{bucket}:{paper.retrieval_source}')
+            return registry.papers
+        # All buckets use discover's same provider fields and relevance ordering.
+        # Fetch a shared scope once at its largest limit, then retain each
+        # bucket's original per-provider rank boundary and provenance.
+        planned_limits = {}
+        for query in seed_queries:
+            for _, start, end, limit in scopes:
+                key = (query, start, end)
+                planned_limits[key] = max(limit, planned_limits.get(key, 0))
+        fetched = {}
+        for query in seed_queries:
+            for bucket, start, end, limit in scopes:
+                key = (query, start, end)
+                if key not in fetched:
+                    fetched[key] = discover(query, (start, end), planned_limits[key], cfg)
+                for original in fetched[key]:
+                    paper = original.model_copy(deep=True)
+                    hits = [record for record in paper.source_records
+                            if record.get('source') == 'retrieval_hit'
+                            and record.get('query') == query
+                            and record.get('requested_years') == [start, end]]
+                    if planned_limits[key] != limit:
+                        eligible_hits = [hit for hit in hits
+                                         if type(hit.get('rank')) is int and 0 < hit['rank'] <= limit]
+                        if not eligible_hits:
+                            continue
+                        # Keep the actual transport limit separate from the
+                        # original bucket's rank limit in the audit trail.
+                        paper.source_records = [record for record in paper.source_records
+                                                if record not in hits]
+                        for hit in eligible_hits:
+                            hit = copy.deepcopy(hit)
+                            hit['fetched_limit'] = planned_limits[key]
+                            hit['retrieval_limit'] = limit
+                            paper.source_records.append(hit)
+                    if not is_excluded_paper(paper, cfg):
+                        upsert_paper(registry, paper, source=f'{bucket}:{paper.retrieval_source}')
+        return registry.papers
     
     openalex = OpenAlexWorksSearchTool()
-    all_papers: Dict[str, Paper] = {}
+    registry = PipelineState(intent=state.intent.model_copy(deep=True))
+    all_papers = registry.papers
     
     k_main = 15  # Papers per query for main bucket
     k_recent = 10  # Papers per query for recent bucket
@@ -1016,10 +1045,8 @@ def retrieve_candidates_with_buckets(
             
             new_main = 0
             for p in main_papers:
-                paper_key = p.openalex_id or p.doi or p.title
-                if paper_key and paper_key not in all_papers:
-                    all_papers[paper_key] = p
-                    new_main += 1
+                _, created = upsert_paper(registry, p, source=p.retrieval_source or "openalex")
+                new_main += int(created)
             
             logger.info(f"[Block1] Query '{query[:40]}...' main: parsed={len(main_papers)}, new={new_main}")
             
@@ -1048,10 +1075,8 @@ def retrieve_candidates_with_buckets(
                 
                 new_recent = 0
                 for p in recent_papers:
-                    paper_key = p.openalex_id or p.doi or p.title
-                    if paper_key and paper_key not in all_papers:
-                        all_papers[paper_key] = p
-                        new_recent += 1
+                    _, created = upsert_paper(registry, p, source=p.retrieval_source or "openalex")
+                    new_recent += int(created)
                 
                 logger.info(f"[Block1] Query '{query[:40]}...' recent: parsed={len(recent_papers)}, new={new_recent}")
                 
@@ -1106,26 +1131,8 @@ def _parse_openalex_results(
         if not title:
             continue
         
-        # Extract OpenAlex ID (strip URL prefix if present)
-        openalex_id = item.get("openalex_id", "")
-        if openalex_id and openalex_id.startswith("https://openalex.org/"):
-            openalex_id = openalex_id.replace("https://openalex.org/", "")
-        
-        # Extract DOI (strip URL prefix if present)
-        doi = item.get("doi", "")
-        if doi and doi.startswith("https://doi.org/"):
-            doi = doi.replace("https://doi.org/", "")
-        
-        paper = Paper(
-            title=title,
-            year=item.get("year"),
-            venue=item.get("venue"),
-            citation_count=item.get("cited_by_count", 0),
-            doi=doi if doi else None,
-            openalex_id=openalex_id if openalex_id else None,
-            retrieval_source=f"block1_{bucket}_{query_id}",
-        )
-        
+        paper = paper_from_openalex(item, source=f"block1_{bucket}_{query_id}")
+
         # Excluded paper check (blind evaluation)
         if cfg and is_excluded_paper(paper, cfg):
             excluded_count += 1
@@ -1173,7 +1180,7 @@ def refine_queries_llm(
     paper_context = "\n".join(f"- {t}" for t in paper_titles[:10])
     facet_text = "\n".join(f"- {f}" for f in facets) if facets else "N/A"
     
-    prompt = f"""You are refining search queries to find MORE relevant papers, especially RECENT ones (2023-2024).
+    prompt = f"""You are refining search queries to find MORE relevant papers, especially within the configured recent window {cfg.recent_year_start}-{cfg.recent_year_end}.
 
 Research topic: {topic}
 Idea: {idea[:400]}
@@ -1188,7 +1195,8 @@ TASK: Generate {cfg.max_refine_queries} additional SHORT search queries that:
 1. Cover angles NOT well-represented in the papers above
 2. Use synonyms or alternative terminology
 3. Include recent buzzwords (foundation models, diffusion, etc. if applicable)
-4. Target recent papers (add year hints like "2024" if helpful)
+4. Keep calendar years out of query text; the API applies the configured year range
+5. Keep each query to 3-8 words
 
 Output strictly valid JSON list of strings:
 ["query1", "query2", ...]
@@ -1200,7 +1208,7 @@ Output strictly valid JSON list of strings:
     
     try:
         messages = [{"role": "user", "content": prompt}]
-        resp = heavy_model(messages)
+        resp = invoke_model(heavy_model, messages, stage="query_refinement")
         text = extract_text_from_llm_response(resp)
         
         queries = json.loads(text)
@@ -1381,7 +1389,7 @@ def lexical_filter_neighbors(
             for paper in neighbors
         }
         
-        for future in as_completed(future_to_paper):
+        for future in future_to_paper:
             paper = future_to_paper[future]
             try:
                 score = future.result()
@@ -1425,6 +1433,11 @@ def expand_corpus_via_citation_graph(
     strong_cues: Optional[List[str]] = None,
     max_seed_papers: int = 5,
     max_workers: int = 4,
+    idea_description: Optional[str] = None,
+    facets: Optional[List[str]] = None,
+    search_queries: Optional[List[str]] = None,
+    research_query: Optional[str] = None,
+    run_mgr=None,
 ) -> None:
     """
     Expand the candidate corpus by traversing the citation graph.
@@ -1434,8 +1447,10 @@ def expand_corpus_via_citation_graph(
     - fetch their references (earlier work),
     - fetch their citations (later work).
     
-    NEW: Applies lexical filtering to neighbors using idea_keywords,
-    keeping only top-K relevant papers per seed (cfg.topk_neighbors_after_lexical).
+    By default, unique neighbors are semantically scored in LLM batches using
+    the original idea, search queries, facets, and organized keywords. Valid
+    positive scores have a per-seed top-K; uncertain/failed evidence is retained
+    unassessed. The explicit lexical mode preserves the original baseline.
 
     This ensures:
     - Citation-expanded papers are at least somewhat relevant
@@ -1452,35 +1467,52 @@ def expand_corpus_via_citation_graph(
         max_workers: Parallel threads for S2 API calls
     """
     from pipelines.tasks.prior_art_utils import run_parallel
+
+    filter_mode = getattr(cfg, "citation_neighbor_filter", "llm")
+    if filter_mode not in {"llm", "lexical"}:
+        raise ValueError("Unknown citation neighbor filter mode")
     
     logger.info(f"[CitationGraph] Expanding corpus via citation graph...")
     logger.info(f"[CitationGraph] Config: max_neighbors_per_seed={cfg.max_neighbors_per_seed}, "
-                f"topk_neighbors_after_lexical={cfg.topk_neighbors_after_lexical}")
+                f"positive_neighbors_per_seed={cfg.topk_neighbors_after_lexical}, filter={filter_mode}")
 
-    # 1. Pick seed papers (partial or high overlap, sorted by citations)
+    # Staged retrieval uses match order; only the legacy branch uses citations.
     seed_candidates = [
         m for m in matches 
-        if m.coverage_level >= 2 and state.papers[m.paper_id].citation_count
+        if m.scoring_status == "succeeded" and m.coverage_level is not None
+        and m.coverage_level >= 2
+        and (cfg.staged_retrieval or state.papers[m.paper_id].citation_count)
+        and (not cfg.staged_retrieval or state.papers[m.paper_id].identity_status != 'conflict')
     ]
-    seed_candidates.sort(
+    if cfg.staged_retrieval:
+        from pipelines.tasks.candidate_selection import match_order
+        seed_candidates.sort(key=match_order)
+    else:
+        seed_candidates.sort(
         key=lambda m: state.papers[m.paper_id].citation_count or 0,
         reverse=True
-    )
+        )
     seeds = seed_candidates[:max_seed_papers]
     
-    if not seeds:
-        logger.info("[CitationGraph] No seed papers found (coverage_level >= 2).")
+    crossref_groups, crossref_resolved, crossref_audit = [], {}, {}
+    if getattr(cfg, 'enable_crossref_references', False):
+        if filter_mode != 'llm':
+            raise ValueError('Crossref references require semantic citation scoring')
+        from pipelines.tasks.crossref_reference_expansion import build_crossref_reference_groups
+        crossref_groups, crossref_resolved, crossref_audit = build_crossref_reference_groups(state, cfg, run_mgr)
+    if not seeds and not crossref_groups:
+        logger.info("[CitationGraph] No S2 seeds or resolved Crossref references found.")
         return
 
     logger.info(f"[CitationGraph] Using {len(seeds)} seed papers for expansion.")
 
     # Thread lock for safe writes to state.papers
-    state_lock = threading.Lock()
+    # Workers return data; the coordinator owns ordered state mutation.
     
     # Pre-compute per-side limit
     per_side_limit = cfg.max_neighbors_per_seed // 2
 
-    def _expand_single_seed(match: PriorArtMatch) -> int:
+    def _expand_single_seed(match: PriorArtMatch) -> list:
         """
         Expand citations/references for a single seed paper.
         
@@ -1498,10 +1530,14 @@ def expand_corpus_via_citation_graph(
         logger.info(f"[CitationGraph] Expanding from seed: {paper.title[:60]}...")
 
         # Determine S2 paper ID
-        s2_id = paper.s2_id or paper.doi
+        if cfg.staged_retrieval:
+            from pipelines.clients.scholarly import s2_lookup_id
+            s2_id = s2_lookup_id(paper.s2_id or paper.doi or paper.arxiv_id)
+        else:
+            s2_id = paper.s2_id or paper.doi
         if not s2_id:
             logger.warning(f"[CitationGraph] No S2/DOI for paper {paper.title[:40]}, skipping.")
-            return 0
+            return []
 
         # Fetch references (older papers) - up to per_side_limit
         references = local_s2_client.get_references(
@@ -1523,23 +1559,13 @@ def expand_corpus_via_citation_graph(
                     f"fetched {len(references)} refs + {len(citations)} cites = {len(all_neighbors)} total")
         
         if not all_neighbors:
-            return 0
+            return []
         
-        # Apply lexical filter to keep only relevant neighbors
-        filtered_neighbors = lexical_filter_neighbors(
-            neighbors=all_neighbors,
-            cfg=cfg,
-            idea_keywords=idea_keywords,
-            strong_cues=strong_cues,
-        )
-
-        # Thread-safe write to state.papers
-        with state_lock:
-            for neighbor_dict in filtered_neighbors:
-                if _add_s2_paper_to_state(neighbor_dict, state, cfg=cfg):
-                    count += 1
-        
-        return count
+        if filter_mode == "lexical":
+            return lexical_filter_neighbors(
+                neighbors=all_neighbors, cfg=cfg,
+                idea_keywords=idea_keywords, strong_cues=strong_cues)
+        return all_neighbors
 
     # Use parallel executor with per-request rate limiting at client layer
     results = run_parallel(
@@ -1548,8 +1574,62 @@ def expand_corpus_via_citation_graph(
         max_workers=max_workers,
         desc="CitationGraph",
     )
-    
-    new_paper_count = sum(r for r in results if isinstance(r, int))
+
+    # The DOI-only Crossref fallback may be identified by a fetched S2 neighbor.
+    # Align strong identities before the shared scorer so that work is judged once.
+    if crossref_resolved:
+        from pipelines.clients import scholarly
+        from pipelines.tasks.citation_neighbor_filter import _key
+        from pipelines.tasks.crossref_reference_expansion import align_crossref_neighbor_groups
+        results, crossref_groups, crossref_resolved, conflicts = align_crossref_neighbor_groups(
+            results, crossref_groups, crossref_resolved)
+        if run_mgr is not None:
+            from pipelines.runtime import atomic_write_json
+            crossref_audit['cross_source_identity_conflicts'] = conflicts
+            atomic_write_json(run_mgr.run_dir / 'crossref_reference_expansion.json', crossref_audit)
+    results.extend(crossref_groups)
+
+    if filter_mode == "llm":
+        from pipelines.tasks.citation_neighbor_filter import filter_citation_neighbor_groups
+        description = (idea_description or state.intent.extra_constraints.get("idea_description")
+                       or state.intent.topic)
+        results = filter_citation_neighbor_groups(
+            results, cfg, description, facets=facets or (), run_mgr=run_mgr,
+            search_queries=search_queries or (), relevance_keywords=idea_keywords,
+            research_query=research_query or state.intent.topic)
+
+    new_paper_count, registration_decisions = 0, []
+    for neighbors in results:
+        for neighbor in neighbors or []:
+            key = _key(neighbor) if crossref_resolved else None
+            resolved = crossref_resolved.get(key)
+            if resolved is None:
+                new_paper_count += int(_add_s2_paper_to_state(neighbor, state, cfg))
+                continue
+            paper = resolved.model_copy(deep=True)
+            assessment = neighbor.get('citation_filter_assessment')
+            if assessment is not None:
+                paper.source_records.append({'source': 'citation_neighbor_assessment', **assessment})
+            if is_excluded_paper(paper, cfg):
+                continue
+            # Earlier groups may have registered a matching strong alias. Check
+            # identity again before upsert, whose merge contract is not title-based.
+            from pipelines.identity import paper_aliases
+            existing_ids = {pid for alias in paper_aliases(paper)
+                            for pid in state.paper_aliases.get(alias, []) if pid in state.papers}
+            if any(state.papers[pid].identity_status == 'conflict'
+                   or not scholarly.title_matches(paper.title, state.papers[pid].title)
+                   or scholarly._metadata_conflicts(paper, state.papers[pid]) for pid in existing_ids):
+                registration_decisions.append({'canonical_key': key, 'action': 'identity_conflict_at_registration'})
+                continue
+            registered_id, created = upsert_paper(state, paper, source='crossref_reference')
+            new_paper_count += int(created)
+            registration_decisions.append({'canonical_key': key, 'paper_id': registered_id,
+                                           'action': 'registered' if created else 'merged_existing'})
+    if run_mgr is not None and getattr(cfg, 'enable_crossref_references', False):
+        from pipelines.runtime import atomic_write_json
+        crossref_audit['registration_decisions'] = registration_decisions
+        atomic_write_json(run_mgr.run_dir / 'crossref_reference_expansion.json', crossref_audit)
     logger.info(f"[CitationGraph] Added {new_paper_count} new papers from citation graph.")
 def _add_s2_paper_to_state(
     s2_paper: Dict[str, Any], 
@@ -1571,15 +1651,9 @@ def _add_s2_paper_to_state(
         return False
 
     # Check if already exists (by S2 ID or DOI)
-    external_ids = s2_paper.get("externalIds", {})
+    external_ids = s2_paper.get("externalIds") or {}
     doi = external_ids.get("DOI")
     arxiv_id = external_ids.get("ArXiv")
-
-    # Build canonical key (prefer DOI, fallback to S2 ID)
-    canonical_key = doi if doi else f"S2:{paper_id}"
-
-    if canonical_key in state.papers:
-        return False
 
     # Create Paper object
     paper = Paper(
@@ -1588,15 +1662,19 @@ def _add_s2_paper_to_state(
         venue=s2_paper.get("venue"),
         abstract=s2_paper.get("abstract"),
         s2_id=paper_id,
+        authors=[a.get("name", "") for a in (s2_paper.get("authors") or [])],
         doi=doi,
         arxiv_id=arxiv_id,
         citation_count=s2_paper.get("citationCount")
     )
+    assessment = s2_paper.get("citation_filter_assessment")
+    if assessment is not None:
+        paper.source_records.append({"source": "citation_neighbor_assessment", **assessment})
     
     # Excluded paper check (blind evaluation)
     if cfg and is_excluded_paper(paper, cfg):
         logger.debug(f"[ExcludedPaper] Skipping excluded paper from citation graph: {paper.title[:40]}...")
         return False
 
-    state.papers[canonical_key] = paper
-    return True
+    _, created = upsert_paper(state, paper, source="citation_graph")
+    return created

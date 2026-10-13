@@ -17,14 +17,12 @@ implemented later, or delegated to separate helper modules.
 
 from __future__ import annotations
 
-import json
 from typing import List, Optional, Tuple
 
 from loguru import logger
 
 from pipelines.state import Intent, PipelineState
 from pipelines.exploration_loop import run_exploration_loop
-from tools.opposition_generator import generate_opposition_standalone
 
 
 def build_benchmark_intent(
@@ -54,7 +52,6 @@ def run_benchmark_landscape(
     years: Optional[Tuple[int, int]] = None,
     venues: Optional[List[str]] = None,
     max_rounds: int = 2,
-    max_papers: int = 50,
 ) -> str:
     """
     High-level entry point for the "benchmark landscape" task.
@@ -90,21 +87,12 @@ def run_benchmark_landscape(
         agent=agent,
         state=state,
         max_rounds=max_rounds,
-        max_papers=max_papers,
     )
 
     logger.info(
         f"[BenchmarkLandscape] Exploration finished with "
         f"{len(state.papers)} papers."
     )
-    
-    # Debug: Log paper count and keys
-    if len(state.papers) == 0:
-        logger.warning(f"[BenchmarkLandscape] WARNING: state.papers is empty after exploration!")
-        logger.warning(f"[BenchmarkLandscape] State object: {state}")
-        logger.warning(f"[BenchmarkLandscape] State papers dict: {state.papers}")
-    else:
-        logger.info(f"[BenchmarkLandscape] Papers in state: {list(state.papers.keys())[:5]}...")
 
     # 3) Analyze the final state to extract benchmark information.
     #    This step should:
@@ -119,34 +107,18 @@ def run_benchmark_landscape(
     # In later versions, we can:
     #    - Use a RAG-style QA over parsed PDFs.
     #    - Add structured dataset/metric extraction.
-    try:
-        logger.info(f"[BenchmarkLandscape] About to render report. Papers in state: {len(state.papers)}")
-        report = render_benchmark_report(state, agent)
-        logger.info(f"[BenchmarkLandscape] Report generated successfully ({len(report)} characters)")
-        return report
-    except Exception as e:
-        logger.error(f"[BenchmarkLandscape] Failed to generate report: {e}")
-        import traceback
-        traceback.print_exc()
-        # Return a minimal report even if generation fails
-        return f"# Benchmark Landscape: {state.intent.topic}\n\nError generating full report: {str(e)}\n\nPapers discovered: {len(state.papers)}"
+    report = render_benchmark_report(state)
+
+    return report
 
 
-def render_benchmark_report(state: PipelineState, agent=None) -> str:
+def render_benchmark_report(state: PipelineState) -> str:
     """
     Render a human-readable benchmark landscape report from the final state.
 
     This function should be pure: it only reads from `state` and returns
     a Markdown string.
-    
-    Args:
-        state: PipelineState with papers and metadata
-        agent: Optional agent instance for opposition generation
     """
-    logger.info(f"[RenderReport] Starting render. Papers in state: {len(state.papers)}")
-    if len(state.papers) == 0:
-        logger.warning(f"[RenderReport] WARNING: state.papers is empty! State object: {state}")
-    
     lines = []
     lines.append(f"# Benchmark Landscape: {state.intent.topic}")
     lines.append("")
@@ -192,57 +164,6 @@ def render_benchmark_report(state: PipelineState, agent=None) -> str:
             lines.append(f"   - DOI: [{paper.doi}](https://doi.org/{paper.doi})")
         elif paper.openalex_id:
             lines.append(f"   - OpenAlex ID: {paper.openalex_id}")
-        
-        # Include abstract if available
-        if paper.abstract:
-            abstract_preview = paper.abstract[:300] + "..." if len(paper.abstract) > 300 else paper.abstract
-            lines.append(f"   - Abstract: {abstract_preview}")
-        
-        # Include PDF status if available
-        if paper.pdf_url:
-            lines.append(f"   - PDF: [Available]({paper.pdf_url})")
-        elif paper.local_pdf_path:
-            lines.append(f"   - PDF: Downloaded locally")
-        
-        # Generate opposition analysis if agent is available
-        # Skip opposition generation if it fails quickly to avoid blocking report generation
-        if agent is not None:
-            try:
-                # Prepare content for opposition generation
-                content_parts = [paper.title]
-                if paper.abstract:
-                    content_parts.append(paper.abstract)
-                content = "\n".join(content_parts)
-                
-                if not content or len(content.strip()) < 10:
-                    logger.debug(f"Skipping opposition for paper '{paper.title}': insufficient content")
-                else:
-                    # Generate opposition with timeout protection
-                    logger.debug(f"Generating opposition for paper '{paper.title}'...")
-                    opposition = generate_opposition_standalone(
-                        content=content,
-                        context=state.intent.topic,
-                        focus_areas="methodology, assumptions, evidence, limitations",
-                        max_tokens=800  # Keep analysis brief
-                    )
-                    
-                    if opposition and not opposition.startswith("❌"):
-                        # Format as markdown directly (not JSON)
-                        lines.append(f"   - **Opposition Analysis:**")
-                        lines.append("")
-                        # Add the opposition analysis as markdown, with proper indentation
-                        for line in opposition.split('\n'):
-                            if line.strip():
-                                # Indent the content for readability
-                                lines.append(f"     {line}")
-                            else:
-                                lines.append("")
-                    else:
-                        logger.warning(f"Opposition generation returned error for paper '{paper.title}'")
-            except Exception as e:
-                logger.warning(f"Failed to generate opposition for paper '{paper.title}': {e}")
-                # Don't add anything - just skip opposition for this paper
-        
         lines.append("")
 
     lines.append("")

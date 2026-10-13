@@ -12,20 +12,15 @@
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 
-from .alpaca import AlpacaItem
-from .conversation_models import (
-    ShareGPTConversation,
-    ShareGPTMessage,
-    ToolCall,
-    ToolResponse,
-)
-from .sharegpt import HermesFunctionFormatter
+from importlib import import_module
 
-__all__ = [
-    'ShareGPTMessage',
-    'ShareGPTConversation',
-    'HermesFunctionFormatter',
-    'AlpacaItem',
-    'ToolCall',
-    'ToolResponse',
-]
+_EXPORTS = {'AlpacaItem': ('.alpaca', 'AlpacaItem'), 'ShareGPTConversation': ('.conversation_models', 'ShareGPTConversation'), 'ShareGPTMessage': ('.conversation_models', 'ShareGPTMessage'), 'ToolCall': ('.conversation_models', 'ToolCall'), 'ToolResponse': ('.conversation_models', 'ToolResponse'), 'HermesFunctionFormatter': ('.sharegpt', 'HermesFunctionFormatter')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

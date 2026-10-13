@@ -1,11 +1,17 @@
 import fitz  # PyMuPDF
 from typing import List, Dict, Any, Optional
 import re
+from threading import RLock
 from smolagents import Tool
 from loguru import logger
 
 # Import section data structures
 from pipelines.sections import Section, PaperSections
+
+# PyMuPDF does not support concurrent threaded document access. All access in
+# this parser is serialized; network acquisition and pure text work stay parallel.
+_PYMUPDF_LOCK = RLock()
+PARSER_VERSION = "pages-sections-v2"
 
 
 # Regex pattern to detect section headings
@@ -90,13 +96,11 @@ class PdfParserTool(Tool):
 
     def forward(self, pdf_path: str, chunk_size: int = 500) -> str:
         try:
-            # Convert Path to string if needed
-            pdf_path_str = str(pdf_path)
-            if not pdf_path_str.endswith(".pdf"):
+            if not pdf_path.endswith(".pdf"):
                 return "Error: File must be a PDF."
             
             # 1. Extract text pages
-            pages = self._extract_text_pymupdf(pdf_path_str)
+            pages = self._extract_text_pymupdf(pdf_path)
             
             # 2. Create chunks
             chunks = self._simple_chunk_from_pages(pages, chunk_size)
@@ -110,14 +114,28 @@ class PdfParserTool(Tool):
             return f"Error parsing PDF: {str(e)}"
 
     def _extract_text_pymupdf(self, pdf_path: str) -> List[Dict]:
-        """Extract text from PDF using PyMuPDF."""
-        doc = fitz.open(pdf_path)
-        pages = []
-        for i, page in enumerate(doc):
-            text = page.get_text("text")
-            pages.append({"page": i + 1, "text": text})
-        doc.close()
-        return pages
+        """Read complete page text once, with serialized native-library access."""
+        with _PYMUPDF_LOCK:
+            with fitz.open(pdf_path) as doc:
+                if not doc.is_pdf:
+                    raise ValueError("Downloaded content is not a PDF")
+                return [{"page": i + 1, "text": page.get_text("text")}
+                        for i, page in enumerate(doc)]
+
+    def parse_artifacts(self, pdf_path: str, paper_id: str, title: str,
+                        year: int, chunk_size: int = 1000, pages=None):
+        """Derive original chunks and sections from one immutable page snapshot.
+
+        `pages` may be supplied from a content-verified cache. Neither downstream
+        algorithm edits it. Empty sections are a parse failure, not success.
+        """
+        if pages is None:
+            pages = self._extract_text_pymupdf(pdf_path)
+        if not pages:
+            raise ValueError("PDF contains no pages")
+        chunks = self._simple_chunk_from_pages(pages, chunk_size)
+        sections = self.parse_sections(pdf_path, paper_id, title, year, pages=pages)
+        return pages, chunks, sections
 
     def _simple_chunk_from_pages(self, pages: List[Dict], chunk_size: int) -> List[Dict]:
         """Simple chunking strategy."""
@@ -170,6 +188,7 @@ class PdfParserTool(Tool):
         paper_id: str,
         title: str,
         year: int,
+        pages: Optional[List[Dict]] = None,
     ) -> PaperSections:
         """
         Parse a PDF into structured sections with semantic role labels.
@@ -192,7 +211,8 @@ class PdfParserTool(Tool):
         """
         try:
             # 1. Extract pages
-            pages = self._extract_text_pymupdf(pdf_path)
+            if pages is None:
+                pages = self._extract_text_pymupdf(pdf_path)
             
             if not pages:
                 logger.warning(f"[PdfParser] No pages extracted from {pdf_path}")

@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Set, Any, Optional, Tuple
@@ -32,6 +33,8 @@ from rank_bm25 import BM25Okapi
 from pipelines.state import PipelineState, Paper
 from pipelines.run_manager import RunManager
 from pipelines.llm_config import get_litellm_config
+from pipelines.runtime import invoke_model, atomic_write_jsonl, atomic_write_json
+from pipelines.tasks.prior_art_utils import ordered_parallel_map
 
 from pipelines.tasks.prior_art_types import (
     PriorArtConfig,
@@ -221,19 +224,53 @@ def build_method_experiment_snippets(
         return
     
     task_root = Path(run_mgr.run_dir)
-    
+    def empty_output(reason):
+        folder = task_root / "synthesis"
+        atomic_write_jsonl(folder / "method_exp_snippets.jsonl", [])
+        atomic_write_jsonl(folder / "method_exp_batch_status.jsonl", [])
+        if not (folder / "method_exp_corpus_status.jsonl").exists():
+            atomic_write_jsonl(folder / "method_exp_corpus_status.jsonl", [])
+        atomic_write_json(folder / "method_exp_status.json", {"status": reason})
+
     # Get Block3 paper IDs (papers with fulltext)
-    paper_ids = [pid for pid, p in state.papers.items() if p.chunks]
+    paper_ids = sorted(pid for pid, p in state.papers.items() if p.chunks)
     if not paper_ids:
         logger.warning("[1.3] No papers with fulltext found, skipping.")
+        empty_output("NO_MATERIAL")
         return
     
     logger.info(f"[1.3] Building Method/Experiment snippets for {len(paper_ids)} papers, {len(facets)} facets...")
+
+    # BM25 uses the entire state's existing chunk corpus, not only this round's
+    # selected refinement papers. Close missing section dependencies first.
+    from pipelines.tasks.prior_art_scoring import enrich_papers_with_fulltext
+    from pipelines.sections import load_paper_sections
+    missing_sections = []
+    section_states = []
+    for pid in paper_ids:
+        try:
+            parsed = load_paper_sections(task_root, pid)
+            if not parsed or not parsed.sections:
+                missing_sections.append(pid)
+        except (OSError, ValueError, TypeError, KeyError):
+            missing_sections.append(pid)
+    if missing_sections:
+        enrich_papers_with_fulltext(state, missing_sections,
+                                   max_workers=config.max_workers_pdf, run_mgr=run_mgr)
+    for pid in paper_ids:
+        try:
+            parsed = load_paper_sections(task_root, pid)
+            status = "parsed" if parsed and parsed.sections else "missing"
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            status = "parse_error"
+        section_states.append({"paper_id": pid, "status": status})
+    atomic_write_jsonl(task_root / "synthesis" / "method_exp_corpus_status.jsonl", section_states)
     
     # Step 1: Load paragraphs from Method/Experiment sections
     paragraphs = _load_method_and_experiment_paragraphs(task_root, paper_ids)
     if not paragraphs:
         logger.warning("[1.3] No Method/Experiment paragraphs found.")
+        empty_output("NO_MATCHING_SECTIONS")
         return
     
     logger.info(f"[1.3] Loaded {len(paragraphs)} paragraphs from Method/Experiment sections.")
@@ -243,6 +280,7 @@ def build_method_experiment_snippets(
     
     # Step 3: For each facet, search and filter
     all_snippets: List[MethodExpSnippet] = []
+    batch_statuses = []
     max_paras = (
         config.debug_max_paragraphs_per_facet 
         if config.debug_mode 
@@ -269,6 +307,8 @@ def build_method_experiment_snippets(
             facet_label=facet,
             candidates=candidates,
             config=config,
+            task_prefix=f"facet_{i}",
+            audit_records=batch_statuses,
         )
         
         # Deduplicate per (paper_id, facet_label)
@@ -279,13 +319,17 @@ def build_method_experiment_snippets(
     output_path = task_root / "synthesis" / "method_exp_snippets.jsonl"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    with open(output_path, "w", encoding="utf-8") as f:
-        for snip in all_snippets:
+    objects = []
+    for snip in all_snippets:
             obj = {
                 "paper_id": snip.paper_id,
                 "facet_label": snip.facet_label,
                 "section_role": snip.section_role,
                 "section_heading": snip.section_heading,
+                "section_id": snip.section_id,
+                "paragraph_id": snip.paragraph_id,
+                "page_start": snip.page_start,
+                "page_end": snip.page_end,
                 "loc": snip.loc,
                 "bullet": snip.bullet,
                 "snippet": snip.snippet,
@@ -294,7 +338,10 @@ def build_method_experiment_snippets(
                     "llm_relevance": snip.llm_relevance,
                 }
             }
-            f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+            objects.append(obj)
+    atomic_write_jsonl(output_path, objects)
+    atomic_write_jsonl(output_path.with_name("method_exp_batch_status.jsonl"), batch_statuses)
+    atomic_write_json(output_path.with_name("method_exp_status.json"), {"status": "SUCCEEDED" if all(x["status"] == "succeeded" for x in batch_statuses) else "INCOMPLETE", "batches": len(batch_statuses)})
     
     logger.info(f"[1.3] Wrote {len(all_snippets)} snippets to {output_path}")
 
@@ -316,23 +363,20 @@ def _load_method_and_experiment_paragraphs(
         sections_path = sections_dir / f"{safe_pid}.sections.json"
         
         if not sections_path.exists():
-            # Try other patterns
-            for f in sections_dir.glob(f"*{safe_pid[-20:]}*.json"):
-                sections_path = f
-                break
-        
-        if not sections_path.exists():
             continue
         
         try:
             with open(sections_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            if data.get("paper_id") != pid:
+                logger.warning(f"[1.3] Section identity mismatch for {pid}; refusing fuzzy association")
+                continue
         except Exception as e:
             logger.debug(f"[1.3] Failed to load sections for {pid}: {e}")
             continue
         
         sections = data.get("sections", [])
-        for sec in sections:
+        for section_index, sec in enumerate(sections):
             role = sec.get("role", "").lower()
             if role not in {"method", "experiment", "methods", "experiments", "methodology"}:
                 continue
@@ -362,6 +406,9 @@ def _load_method_and_experiment_paragraphs(
                     section_role=role,
                     section_heading=heading,
                     para_id=i,
+                    section_id=f"section_{section_index}",
+                    page_start=sec.get("start_page"),
+                    page_end=sec.get("end_page"),
                     text=para_text.strip(),
                     token_count=len(para_text.split()),
                     prev_para_text=prev_text[:500] if prev_text else "",
@@ -433,7 +480,8 @@ def _make_bm25_query_for_facet(
         # Dict case: iterate over categories
         for category, features in idea_features.items():
             if isinstance(features, (set, list)):
-                for feat in list(features)[:5]:  # Limit features
+                ordered_features = sorted(features, key=str) if isinstance(features, set) else features
+                for feat in ordered_features[:5]:  # Keep the original per-category limit
                     query_parts.append(str(feat).lower())
     elif isinstance(idea_features, (tuple, list)):
         # Tuple/list case: iterate directly
@@ -468,6 +516,8 @@ def _llm_filter_and_summarize_paragraphs(
     facet_label: str,
     candidates: List[Tuple[Paragraph, float]],
     config: PriorArtConfig,
+    task_prefix: str = "facet",
+    audit_records: Optional[List[Dict[str, Any]]] = None,
 ) -> List[MethodExpSnippet]:
     """
     Use LLM-light to filter paragraphs for relevance and generate bullets.
@@ -480,16 +530,9 @@ def _llm_filter_and_summarize_paragraphs(
     snippets: List[MethodExpSnippet] = []
     batch_size = 10
     
-    model_id, api_base, api_key = get_litellm_config("light")
-    from smolagents import LiteLLMModel
-    model = LiteLLMModel(
-        model_id=model_id,
-        api_base=api_base,
-        api_key=api_key,
-    )
-    
+    tasks = []
     for i in range(0, min(len(candidates), 30), batch_size):  # Max 30 candidates
-        batch = candidates[i:i+batch_size]
+        batch = tuple(candidates[i:i+batch_size])
         
         # Build prompt
         para_texts = []
@@ -519,42 +562,80 @@ Output a JSON array with one object per paragraph. Each object must have exactly
 - "relevance_score": 0.0 to 1.0 (0 if not relevant)
 
 Output ONLY the JSON array, no other text."""
+        tasks.append((i // batch_size, batch, prompt))
 
+    def process_batch(task):
+        batch_index, batch, prompt = task
+        batch_snippets = []
+        status = {"facet": facet_label, "task_id": f"{task_prefix}/batch_{batch_index}",
+                  "expected_paragraphs": len(batch), "returned_paragraphs": 0,
+                  "status": "failed", "errors": []}
         try:
+            model_id, api_base, api_key = get_litellm_config("light")
+            from smolagents import LiteLLMModel
+            model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
             messages = [{"role": "user", "content": prompt}]
-            response = model(messages)
+            response = invoke_model(model, messages, stage="method_exp_snippets", task_id=status["task_id"])
             # LiteLLMModel returns string directly
             resp_text = response if isinstance(response, str) else extract_text_from_llm_response(response)
             # Use list parser since we expect a JSON array
-            results = parse_json_list_with_repair(resp_text) or []
+            results = parse_json_list_with_repair(resp_text)
+            if not isinstance(results, list):
+                raise ValueError("paragraph judgment must be a JSON array")
+            seen = set()
             
             for item in results:
-                if not isinstance(item, dict):
+                if not isinstance(item, dict) or type(item.get("para_num")) is not int:
+                    status["errors"].append("invalid paragraph object or number")
                     continue
-                if not item.get("relevant", False):
+                para_num = item["para_num"] - 1
+                if para_num < 0 or para_num >= len(batch) or para_num in seen:
+                    status["errors"].append("out-of-range or duplicate paragraph number")
                     continue
-                
-                para_num = item.get("para_num", 1) - 1
-                if para_num < 0 or para_num >= len(batch):
+                score = item.get("relevance_score")
+                if (type(item.get("relevant")) is not bool or
+                    type(score) not in (int, float) or not math.isfinite(score) or not 0 <= score <= 1 or
+                    not isinstance(item.get("bullet"), str) or not isinstance(item.get("snippet"), str)):
+                    status["errors"].append(f"invalid schema for paragraph {para_num + 1}")
+                    continue
+                seen.add(para_num)
+                if not item["relevant"]:
                     continue
                 
                 para, bm25_score = batch[para_num]
                 
-                snippets.append(MethodExpSnippet(
+                batch_snippets.append(MethodExpSnippet(
                     paper_id=para.paper_id,
                     facet_label=facet_label,
                     section_role=para.section_role,
                     section_heading=para.section_heading,
-                    loc=f"{para.section_role}_para_{para.para_id}",
-                    bullet=item.get("bullet", "")[:500],
-                    snippet=item.get("snippet", para.text[:300]),
+                    loc=f"{para.section_id}_{para.section_role}_para_{para.para_id}",
+                    section_id=para.section_id,
+                    paragraph_id=para.para_id,
+                    page_start=para.page_start,
+                    page_end=para.page_end,
+                    bullet=item["bullet"],
+                    snippet=item["snippet"],
                     bm25_score=bm25_score,
-                    llm_relevance=item.get("relevance_score", 0.5),
+                    llm_relevance=score,
                 ))
+            status["returned_paragraphs"] = len(seen)
+            status["missing_para_nums"] = sorted(set(range(1, len(batch) + 1)) - {i + 1 for i in seen})
+            status["status"] = "succeeded" if len(seen) == len(batch) and not status["errors"] else "partial"
                 
         except Exception as e:
             logger.warning(f"[1.3] LLM filter failed for batch: {e}")
-            continue
+            status["errors"].append(str(e))
+        return batch_snippets, status
+
+    # No per-batch quota/dedup: merge the original batch order first, then the
+    # caller applies the existing facet-wide policy exactly once.
+    for batch_snippets, status in ordered_parallel_map(
+        tasks, process_batch, config.max_workers_snippet_batches
+    ):
+        snippets.extend(batch_snippets)
+        if audit_records is not None:
+            audit_records.append(status)
     
     return snippets
 
@@ -622,21 +703,24 @@ def select_key_papers_and_dump_intro_rw_full(
     candidates = _build_key_paper_candidates(state, config)
     if not candidates:
         logger.warning("[1.4] No candidates for key paper selection.")
+        atomic_write_json(task_root / "synthesis/key_papers_selection.json", {"status": "NO_CANDIDATES", "buckets": {}, "per_paper_roles": {}})
         return
     
     # Build candidate pools
-    top_cited_pool = sorted(candidates, key=lambda x: x.get("citation_count", 0), reverse=True)[:config.key_paper_top_cited_k]
-    latest_pool = sorted(candidates, key=lambda x: x.get("year", 0), reverse=True)[:config.key_paper_latest_k]
+    top_cited_pool = sorted(candidates, key=lambda x: (-(x.get("citation_count") or 0), x["paper_id"]))[:config.key_paper_top_cited_k]
+    latest_pool = sorted(candidates, key=lambda x: (-(x.get("year") or 0), x["paper_id"]))[:config.key_paper_latest_k]
     survey_pool = [c for c in candidates if c.get("is_survey", False)][:config.key_paper_survey_k]
     
     logger.info(f"[1.4] Candidate pools: top_cited={len(top_cited_pool)}, latest={len(latest_pool)}, survey={len(survey_pool)}")
     
     # Use LLM to select key papers (or simple heuristic in debug mode)
+    selection_audit = {}
     buckets = _select_key_papers_with_llm(
         agent=agent,
         top_cited_pool=top_cited_pool,
         latest_pool=latest_pool,
         survey_pool=survey_pool,
+        audit=selection_audit,
         topic=state.intent.topic if state.intent else "unknown topic",
         config=config,
     )
@@ -655,6 +739,7 @@ def select_key_papers_and_dump_intro_rw_full(
         "topic": state.intent.topic if state.intent else "unknown",
         "generated_at": datetime.now().isoformat() + "Z",
         "generator_version": "v0.1",
+        "selection_audit": selection_audit,
         "selection_policy": {
             "top_cited_k": config.key_paper_top_cited_k,
             "latest_k": config.key_paper_latest_k,
@@ -668,8 +753,7 @@ def select_key_papers_and_dump_intro_rw_full(
     synthesis_dir.mkdir(parents=True, exist_ok=True)
     
     selection_path = synthesis_dir / "key_papers_selection.json"
-    with open(selection_path, "w", encoding="utf-8") as f:
-        json.dump(selection_obj, f, indent=2, ensure_ascii=False)
+    atomic_write_json(selection_path, selection_obj)
     
     logger.info(f"[1.4] Wrote key papers selection to {selection_path}")
     
@@ -695,8 +779,7 @@ def select_key_papers_and_dump_intro_rw_full(
         if intro_rw_obj:
             safe_pid = pid.replace("/", "_").replace(":", "_")
             output_path = intro_rw_dir / f"{safe_pid}.json"
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(intro_rw_obj, f, indent=2, ensure_ascii=False)
+            atomic_write_json(output_path, intro_rw_obj)
             exported += 1
     
     logger.info(f"[1.4] Exported {exported} Intro+RW full JSON files to {intro_rw_dir}")
@@ -749,11 +832,14 @@ def _select_key_papers_with_llm(
     survey_pool: List[Dict],
     topic: str,
     config: PriorArtConfig,
+    audit: Optional[Dict] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
     Use heavy LLM to select primary and alternates for each bucket.
     Falls back to simple heuristic selection if LLM fails.
     """
+    audit = audit if audit is not None else {}
+    audit.update(status="FALLBACK", error=None)
     # Simple heuristic selection (works for both debug and fallback)
     buckets = {
         "top_cited": {
@@ -773,6 +859,7 @@ def _select_key_papers_with_llm(
     # In debug mode, use simple heuristic
     if config.debug_mode:
         logger.info("[1.4] Using heuristic key paper selection (debug mode)")
+        audit["status"] = "DEBUG_HEURISTIC"
         return buckets
     
     # Try LLM-based selection for better results
@@ -823,15 +910,28 @@ Output a JSON object with this exact structure:
 Output ONLY the JSON, no other text."""
 
         messages = [{"role": "user", "content": prompt}]
-        response = model(messages)
+        response = invoke_model(model, messages, stage="key_paper_selection", task_id="selection")
         resp_text = response if isinstance(response, str) else extract_text_from_llm_response(response)
         result = parse_json_with_repair(resp_text)
         
-        if isinstance(result, dict) and "top_cited" in result:
+        pools = {"top_cited": top_cited_pool, "latest": latest_pool, "survey": survey_pool}
+        if not isinstance(result, dict) or set(result) != set(pools):
+            raise ValueError("Key selection must include the three declared pools")
+        for name, pool in pools.items():
+            allowed = {p["paper_id"] for p in pool[:5]}
+            choice = result[name]
+            if (not isinstance(choice, dict) or choice.get("primary") not in allowed | {None}
+                    or not isinstance(choice.get("alternates"), list)
+                    or len(choice["alternates"]) > 2
+                    or any(not isinstance(pid, str) or pid not in allowed for pid in choice["alternates"])):
+                raise ValueError("Key selection references invalid candidates or schema")
+        if isinstance(result, dict):
+            audit["status"] = "SUCCEEDED"
             logger.info("[1.4] Successfully used LLM for key paper selection")
             return result
         
     except Exception as e:
+        audit["error"] = str(e)
         logger.warning(f"[1.4] LLM selection failed, using heuristic: {e}")
     
     return buckets

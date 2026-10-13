@@ -12,22 +12,15 @@
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 
-from .base import (
-    BaseVectorStorage,
-    VectorDBQuery,
-    VectorDBQueryResult,
-    VectorDBStatus,
-    VectorRecord,
-)
-from .milvus import MilvusStorage
-from .qdrant import QdrantStorage
+from importlib import import_module
 
-__all__ = [
-    'BaseVectorStorage',
-    'VectorDBQuery',
-    'VectorDBQueryResult',
-    'QdrantStorage',
-    'MilvusStorage',
-    'VectorRecord',
-    'VectorDBStatus',
-]
+_EXPORTS = {'BaseVectorStorage': ('.base', 'BaseVectorStorage'), 'VectorDBQuery': ('.base', 'VectorDBQuery'), 'VectorDBQueryResult': ('.base', 'VectorDBQueryResult'), 'VectorDBStatus': ('.base', 'VectorDBStatus'), 'VectorRecord': ('.base', 'VectorRecord'), 'MilvusStorage': ('.milvus', 'MilvusStorage'), 'QdrantStorage': ('.qdrant', 'QdrantStorage')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

@@ -11,18 +11,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
-from .auto_retriever import AutoRetriever
-from .base import BaseRetriever
-from .bm25_retriever import BM25Retriever
-from .cohere_rerank_retriever import CohereRerankRetriever
-from .vector_retriever import VectorRetriever
-from .simple_vector_retriever import SimpleVectorRetriever
 
-__all__ = [
-    'BaseRetriever',
-    'VectorRetriever',
-    'AutoRetriever',
-    'BM25Retriever',
-    'CohereRerankRetriever',
-    "SimpleVectorRetriever",
-]
+from importlib import import_module
+
+_EXPORTS = {'AutoRetriever': ('.auto_retriever', 'AutoRetriever'), 'BaseRetriever': ('.base', 'BaseRetriever'), 'BM25Retriever': ('.bm25_retriever', 'BM25Retriever'), 'CohereRerankRetriever': ('.cohere_rerank_retriever', 'CohereRerankRetriever'), 'VectorRetriever': ('.vector_retriever', 'VectorRetriever'), 'SimpleVectorRetriever': ('.simple_vector_retriever', 'SimpleVectorRetriever')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

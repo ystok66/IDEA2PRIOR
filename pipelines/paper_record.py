@@ -28,6 +28,11 @@ class SectionRecord:
     text: str                  # Raw section text
     sentences: List[str] = field(default_factory=list)  # Simple sentence split
     role: str = "other"        # intro/related_work/method/experiments/conclusion/background/other
+    section_id: str = ""
+    original_role: str = ""
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+    document_version: Optional[str] = None
     
     def __post_init__(self):
         """Split text into sentences if not provided, and infer role."""
@@ -348,6 +353,7 @@ def is_in_domain_for_topic(record: PaperRecord, topic: str = "monocular_3d_detec
 def paper_to_paper_record(
     paper: "Paper",
     sections: Optional[List[SectionRecord]] = None,
+    paper_id: Optional[str] = None,
 ) -> PaperRecord:
     """
     Convert a Paper object (from pipelines.state) to PaperRecord.
@@ -360,7 +366,7 @@ def paper_to_paper_record(
         PaperRecord with fields filled from Paper
     """
     # Build paper_id from available identifiers
-    paper_id = (
+    paper_id = paper_id or getattr(paper, 'paper_id', None) or (
         paper.openalex_id or 
         paper.doi or 
         paper.arxiv_id or 
@@ -382,7 +388,7 @@ def paper_to_paper_record(
         s2_id=paper.s2_id,
         url_pdf=getattr(paper, "pdf_url", None),
         abstract=paper.abstract,
-        sections=sections or [],
+        sections=sections if sections is not None else section_records_from_paper(paper),
         retrieval_source=getattr(paper, "retrieval_source", ""),
         raw_meta={
             "fulltext_path": getattr(paper, "fulltext_path", None),
@@ -394,6 +400,19 @@ def paper_to_paper_record(
     tag_domains(record)
     
     return record
+
+
+def section_records_from_paper(paper) -> List[SectionRecord]:
+    """Adapt published sections explicitly, preserving original locations/roles."""
+    records = []
+    for i, sec in enumerate(getattr(paper, 'parsed_sections', []) or []):
+        original = sec.get('role', 'other')
+        records.append(SectionRecord(name=sec.get('heading', ''), text=sec.get('text', ''),
+            role={'experiment': 'experiments', 'methods': 'method'}.get(original, original),
+            original_role=original, section_id=sec.get('section_id') or f'section_{i}',
+            page_start=sec.get('page_start', sec.get('start_page')), page_end=sec.get('page_end', sec.get('end_page')),
+            document_version=getattr(paper, 'document_version', None) or getattr(paper, 'content_hash', None)))
+    return records
 
 
 def tag_all_papers(records: List[PaperRecord]) -> None:

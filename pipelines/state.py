@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Literal
+from typing import Any, Dict, List, Optional, Tuple, Literal
 from pydantic import BaseModel
 
 
@@ -37,15 +37,39 @@ class Paper(BaseModel):
     year: Optional[int] = None
     venue: Optional[str] = None
     abstract: Optional[str] = None
+    authors: List[str] = []
+    paper_id: Optional[str] = None
+    entity_id: Optional[str] = None
+    document_version: Optional[str] = None
+    parser_version: Optional[str] = None
+    content_hash: Optional[str] = None
+    aliases: List[str] = []
+    source_records: List[Dict[str, Any]] = []
+    field_conflicts: Dict[str, List[Any]] = {}
 
     # IDs from different APIs
     openalex_id: Optional[str] = None
     s2_id: Optional[str] = None      # Semantic Scholar ID
     doi: Optional[str] = None
+    preprint_doi: Optional[str] = None
+    external_doi: Optional[str] = None  # May be preprint; type not yet verified.
+    publication_doi: Optional[str] = None
     arxiv_id: Optional[str] = None
 
     # Enriched metadata
     citation_count: Optional[int] = None
+    citation_count_source: Optional[str] = None
+    publication_date: Optional[str] = None
+    publication_year_source: Optional[str] = None
+    publication_dates: Dict[str, Any] = {}
+    preprint_published: Optional[str] = None
+    preprint_updated: Optional[str] = None
+    journal_reference: Optional[str] = None
+    identity_status: str = 'unverified'
+    publication_status: str = 'unverified'
+    metadata_agency: Optional[str] = None
+    publication_type: Optional[str] = None
+    preprint_metadata_dates: Dict[str, Any] = {}
     fields_of_study: List[str] = []
     tags: List[str] = []  # method family / task / modality tags
     method_families: List[str] = []  # detected method families (Transformer, CNN, YOLO, etc.)
@@ -56,6 +80,8 @@ class Paper(BaseModel):
     # Pointers to local / remote resources (optional)
     pdf_url: Optional[str] = None
     local_pdf_path: Optional[str] = None
+    pdf_origin: Optional[str] = None  # explicit_local | remote_cache
+    pdf_source_binding: Dict[str, Any] = {}
     gemini_file_uri: Optional[str] = None  # for Gemini File API
     pdf_resolve_failed: bool = False  # True if PDF URL resolution already attempted and failed
     has_fulltext: bool = False  # True if fulltext was successfully parsed (PDF sections available)
@@ -65,11 +91,16 @@ class Paper(BaseModel):
     # - "downloaded": PDF successfully downloaded  
     # - "not_found": PDF URL resolution returned no URL
     # - "error": Download or resolution failed due to network/other error
-    pdf_status: Literal["not_attempted", "downloaded", "not_found", "error"] = "not_attempted"
+    pdf_status: Literal["not_attempted", "resolved", "downloaded", "not_found", "error"] = "not_attempted"
     # - "not_attempted": Default, sections parsing not yet tried
     # - "parsed": Sections successfully extracted from PDF
     # - "parse_error": PDF downloaded but section parsing failed
     section_status: Literal["not_attempted", "parsed", "parse_error"] = "not_attempted"
+    pages_status: str = "not_attempted"
+    chunks_status: str = "not_attempted"
+    sections_status: str = "not_attempted"
+    parsed_sections: List[Dict[str, Any]] = []
+    is_survey: Optional[bool] = None
     
     # Retrieval metadata
     retrieval_source: Optional[str] = None  # e.g., "block1_main_q0", "citation_graph"
@@ -99,6 +130,9 @@ class PipelineState(BaseModel):
 
     # Papers currently known to the system (keyed by a canonical ID)
     papers: Dict[str, Paper] = {}
+    paper_aliases: Dict[str, List[str]] = {}
+    identity_conflicts: List[Dict[str, Any]] = []
+    idea_spec: Dict[str, Any] = {}
 
     # Local citation graph over the current paper set
     citation_edges: List[CitationEdge] = []

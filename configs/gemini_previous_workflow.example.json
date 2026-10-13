@@ -1,0 +1,26 @@
+{
+  "profiles": {
+    "gemini_retrieval": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite-preview",
+      "api_key_env": "GEMINI_API_KEY"
+    },
+    "gemini_expert": {
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "api_key_env": "GEMINI_API_KEY"
+    }
+  },
+  "roles": {
+    "heavy": "gemini_retrieval",
+    "light": "gemini_retrieval",
+    "expert": "gemini_expert"
+  },
+  "mode": "retrieval_eval",
+  "years": [2015, 2025],
+  "max_rounds": 1,
+  "request_timeout_seconds": 120,
+  "max_output_tokens": 8192,
+  "expert_max_output_tokens": 16384,
+  "search": {"enable_duckduckgo": true, "enable_serpapi": false}
+}

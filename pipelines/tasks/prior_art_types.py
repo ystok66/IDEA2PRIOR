@@ -71,7 +71,7 @@ class PriorArtMatch:
         method_similarity: 0-1 similarity of method/approach
     """
     paper_id: str
-    coverage_level: int  # 0 = none, 1 = adjacent, 2 = partial, 3 = high
+    coverage_level: Optional[int]  # None = unassessed/failed, not "no overlap".
     # Raw facet labels like ["F1", "F3"] for reliable counting
     covered_facet_labels: List[str] = field(default_factory=list)
     # Human-readable facet descriptions (mapped from labels)
@@ -85,6 +85,13 @@ class PriorArtMatch:
     refined_coverage_level: Optional[int] = None
     task_similarity: float = 0.0  # 0-1 how similar the task/problem is
     method_similarity: float = 0.0  # 0-1 how similar the method/approach is
+    scoring_status: str = "succeeded"
+    scoring_error: Optional[str] = None
+    abstract_coverage_level: Optional[int] = None
+    abstract_notes: str = ""
+    refinement_status: str = "not_run"
+    refinement_error: Optional[str] = None
+    refinement_snippets: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -104,6 +111,33 @@ class PriorArtConfig:
     
     # ========== Abstract Scoring Limits ==========
     # Maximum papers to send to LLM scoring
+    execution_mode: str = 'full_report'  # full_report | retrieval_eval
+    retrieval_eval_fulltext_limit: int = 5  # Fixed attempts, without replacement.
+    retrieval_eval_pdf_text_mode: str = 'snippets'  # snippets | full_text
+    retrieval_eval_pdf_max_snippets: int = 6
+    retrieval_eval_pdf_snippet_chars: int = 1800
+    # Top-5-only optimizations; disable individually for frozen-input comparisons.
+    retrieval_eval_skip_report_evidence: bool = True
+    retrieval_eval_parallel_seed_discovery: bool = True
+    retrieval_eval_expert_compact_input: bool = True
+    retrieval_eval_expert_max_output_tokens: int = 16384
+    optimize_scholarly_requests: bool = False
+    shared_http_connections: bool = False
+    shared_pdf_cache_dir: Optional[str] = None  # Content-addressed parsed pages only.
+    retrieval_backend: str = 'legacy_openalex'
+    enable_openalex: bool = True
+    enable_arxiv_search: bool = False  # ID lookup and PDF resolution remain available.
+    expert_retrieval_timeout_seconds: float = 120.0
+    s2_batch_size: int = 100
+    http_max_wait_seconds: float = 120.0
+    # Opt-in relevance funnel; the legacy path remains reproducible.
+    staged_retrieval: bool = False
+    retriever_protect_top_k: int = 5
+    protected_candidate_ratio: float = 0.25
+    missing_abstract_reserve: int = 10
+    metadata_shortlist_size: int = 50
+    metadata_boundary_buffer: int = 10
+    citation_new_candidate_limit: int = 50
     max_abstract_scoring_initial: int = 80
     max_abstract_scoring_after_citation: int = 100
     
@@ -137,6 +171,22 @@ class PriorArtConfig:
     # ========== LLM Scoring Parallelization ==========
     max_workers_llm_scoring: int = 20  # Parallel workers for score_papers_with_abstract_only
     max_workers_llm_prefilter: int = 4 # Parallel workers for llm_relevance_prefilter
+    max_workers_fulltext_refine: int = 4
+    max_workers_snippet_batches: int = 4
+    max_workers_web_batches: int = 4
+    overlap_pdf_keywords: bool = True
+    overlap_refine_method: bool = False
+    max_in_flight_requests: int = 4
+    max_pending_requests: int = 32
+    llm_requests_per_minute: Optional[int] = None
+    llm_tokens_per_minute: Optional[int] = None
+    max_total_attempts: Optional[int] = None
+    resume_same_task: bool = False
+    reuse_llm_across_stages: bool = False
+    domain_profile: Optional[str] = None
+    facet_pattern_overrides: Dict[str, List[str]] = field(default_factory=dict)
+    required_facet_ids: List[str] = field(default_factory=list)
+    selection_policy_version: str = "legacy_observed_v1"
     
     # ========== Merged LLM Calls ==========
     enable_merged_llm_calls: bool = True  # If True, merge facet extraction + scoring into one LLM call
@@ -169,7 +219,14 @@ class PriorArtConfig:
     # ========== Citation Graph Expansion ==========
     # Maximum neighbors to fetch from S2 API per seed (references + citations combined)
     max_neighbors_per_seed: int = 200
-    # How many neighbors to keep after lexical filtering (per seed)
+    # Semantic is the default; lexical preserves the original comparison baseline.
+    citation_neighbor_filter: str = "llm"
+    citation_neighbor_batch_size: int = 20
+    # Saved Crossref references are opt-in; the default uses five S2 seeds.
+    enable_crossref_references: bool = False
+    # Positive-score budget per seed. Semantic unknowns remain unassessed and
+    # bypass this cap; the existing global citation budget still applies.
+    # Retain the old field name for compatibility with saved profiles.
     topk_neighbors_after_lexical: int = 15
     
     # ========== Evidence Extraction ==========
@@ -246,6 +303,9 @@ class Paragraph:
     # Context for better understanding
     prev_para_text: str = ""
     next_para_text: str = ""
+    section_id: str = ""
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
 
 
 @dataclass
@@ -265,6 +325,10 @@ class MethodExpSnippet:
     snippet: str  # Original text excerpt (1-3 sentences)
     bm25_score: float = 0.0
     llm_relevance: float = 0.0
+    section_id: str = ""
+    paragraph_id: int = 0
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
 
 
 # =============================================================================

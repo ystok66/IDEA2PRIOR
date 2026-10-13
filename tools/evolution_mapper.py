@@ -17,6 +17,65 @@ from .semantic_scholar_tool import SemanticScholarTool
 from .database_search import DatabaseSearch
 
 
+class OrderedMembershipList(list):
+    """List order/serialization with constant-time membership for graph IDs.
+
+    Mutating the public list through normal list methods keeps the index coherent.
+    The scientific traversal still iterates the original ordered list.
+    """
+    def __init__(self, values=()):
+        super().__init__(values)
+        self._members = set(self)
+
+    def __contains__(self, value):
+        try:
+            return value in self._members
+        except TypeError:
+            return super().__contains__(value)
+
+    def append(self, value):
+        self._members.add(value)
+        super().append(value)
+
+    def extend(self, values):
+        for value in list(values):
+            self.append(value)
+
+    def insert(self, index, value):
+        super().insert(index, value)
+        self._members.add(value)
+
+    def __setitem__(self, index, value):
+        super().__setitem__(index, value)
+        self._members = set(self)
+
+    def __delitem__(self, index):
+        super().__delitem__(index)
+        self._members = set(self)
+
+    def pop(self, index=-1):
+        value = super().pop(index)
+        self._members = set(self)
+        return value
+
+    def remove(self, value):
+        super().remove(value)
+        self._members = set(self)
+
+    def clear(self):
+        super().clear()
+        self._members.clear()
+
+    def __iadd__(self, values):
+        self.extend(values)
+        return self
+
+    def __imul__(self, count):
+        super().__imul__(count)
+        self._members = set(self)
+        return self
+
+
 @dataclass
 class PaperNode:
     """Paper node data structure"""
@@ -24,8 +83,8 @@ class PaperNode:
     title: str
     year: Optional[int]
     citation_count: int = 0
-    references: List[str] = field(default_factory=list)  # IDs of papers referenced by this paper
-    citations: List[str] = field(default_factory=list)  # IDs of papers that cite this paper
+    references: List[str] = field(default_factory=OrderedMembershipList)  # IDs of papers referenced by this paper
+    citations: List[str] = field(default_factory=OrderedMembershipList)  # IDs of papers that cite this paper
     authors: List[str] = field(default_factory=list)
     venue: str = ""
     abstract: str = ""
@@ -36,7 +95,7 @@ class CitationNetwork:
     
     def __init__(self):
         self.papers: Dict[str, PaperNode] = {}
-        self.edges: List[Tuple[str, str]] = []  # (from_paper_id, to_paper_id) means from cites to
+        self.edges: List[Tuple[str, str]] = OrderedMembershipList()  # ordered directed edges
     
     def add_paper(self, paper_data: Dict[str, Any]) -> None:
         """Add paper node"""
@@ -195,6 +254,8 @@ class EvolutionMapper(Tool):
         self.database_search = database_search
         self.output_dir = Path(output_dir) if output_dir else None
         self.network_cache: Dict[str, Dict[str, Any]] = {}
+        self.errors = []
+        self.last_tool_status = "NOT_RUN"
     
     def setup(self):
         """Setup method called before first use"""
@@ -254,9 +315,13 @@ class EvolutionMapper(Tool):
                             # In practice, DatabaseSearch returns statistics, not paper list
                             # We'll rely more on Semantic Scholar
                         except Exception as e:
+                            from paperarena.diagnostics import safe_error
+                            self.errors.append(safe_error(e, "evolutionmapper"))
                             logger.debug(f"Database search failed for {conference} {year}: {e}")
                             continue
             except Exception as e:
+                from paperarena.diagnostics import safe_error
+                self.errors.append(safe_error(e, "evolutionmapper"))
                 logger.warning(f"⚠️ Database search failed: {e}")
         
         # 2. Search Semantic Scholar
@@ -288,6 +353,8 @@ class EvolutionMapper(Tool):
                 
                 logger.info(f"✅ Discovered {len(all_papers)} papers from Semantic Scholar")
             except Exception as e:
+                from paperarena.diagnostics import safe_error
+                self.errors.append(safe_error(e, "evolutionmapper"))
                 logger.error(f"❌ Semantic Scholar search failed: {e}")
         
         # Sort by citation count and year
@@ -365,6 +432,8 @@ class EvolutionMapper(Tool):
                     time.sleep(self.semantic_tool.rate_limit_delay)
                     
                 except Exception as e:
+                    from paperarena.diagnostics import safe_error
+                    self.errors.append(safe_error(e, "evolutionmapper"))
                     logger.warning(f"⚠️ Failed to build network for {paper_id}: {e}")
                     continue
         
@@ -683,6 +752,7 @@ class EvolutionMapper(Tool):
         Returns:
             Formatted evolution report with Mermaid diagram
         """
+        self.last_tool_status = "RUNNING"
         try:
             max_papers = max_papers or 10  # Default to 10 to speed up testing
             format = format or "mermaid"
@@ -693,12 +763,14 @@ class EvolutionMapper(Tool):
             papers = self._discover_papers(topic, max_papers, start_year, end_year)
             
             if not papers:
+                self.last_tool_status = "FAILED" if self.errors or getattr(self.semantic_tool, "errors", []) else "EMPTY"
                 return f"❌ No papers found for topic: '{topic}'"
             
             # Step 2: Build citation network
             network = self._build_citation_network(papers)
             
             if len(network.papers) < 2:
+                self.last_tool_status = "PARTIAL"
                 return f"⚠️ Insufficient papers to build evolution map. Found {len(network.papers)} papers."
             
             # Step 3: Analyze evolution paths
@@ -712,16 +784,26 @@ class EvolutionMapper(Tool):
             
             # Step 5: Generate report
             report = self._generate_report(topic, papers, network, analysis, mermaid_diagram, node_annotations)
+            self.last_network = {"papers": {key: vars(value) for key, value in network.papers.items()},
+                                 "citations": list(network.edges), "analysis": analysis}
+            self.last_tool_status = "PARTIAL" if self.errors or getattr(self.semantic_tool, "errors", []) else "SUCCEEDED"
             
             logger.info("✅ Evolution map generated successfully")
             return report
         
         except Exception as e:
+            from paperarena.diagnostics import safe_error
+            self.errors.append(safe_error(e, "evolution_mapper"))
+            self.last_tool_status = "FAILED"
             error_msg = f"❌ Evolution map generation failed: {str(e)}"
             logger.error(error_msg)
             import traceback
             logger.error(traceback.format_exc())
             return f"Error: {str(e)}"
+
+    def interpret_execution_result(self, result):
+        # Planner–Worker must distinguish empty/error returns from valid maps.
+        return "SUCCEEDED" if self.last_tool_status == "SUCCEEDED" else "FAILED"
 
 
 if __name__ == "__main__":

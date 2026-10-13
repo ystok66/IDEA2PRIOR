@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "tier": "EASY",
+  "selection": "Adopted historical comparison runs, preserving completion states",
+  "external_reports": [
+    {
+      "file": "chatgpt.txt",
+      "method": "chatgpt",
+      "sha256": "5eb77864bcf3b3dbae724d2a607f8632eca57c02c558a9209373e5f7499fbd07",
+      "source_sha256": "5eb77864bcf3b3dbae724d2a607f8632eca57c02c558a9209373e5f7499fbd07",
+      "representation": "original supplied TXT, byte-preserved",
+      "surface": "web Deep Research",
+      "test_period": "2026-10"
+    },
+    {
+      "file": "gemini.txt",
+      "method": "gemini",
+      "sha256": "d8450f4fa50da23ebfdc4d97a81ce7a02f7e01e258ecca03d413b9f1b4a06449",
+      "source_sha256": "d8450f4fa50da23ebfdc4d97a81ce7a02f7e01e258ecca03d413b9f1b4a06449",
+      "representation": "original supplied TXT, byte-preserved",
+      "surface": "web Deep Research",
+      "test_period": "2026-10"
+    }
+  ],
+  "idea2prior_selected_query_count": 10,
+  "idea2prior_source_reports_sha256": {
+    "EASY_selected_report_1": "955553b477faecf7c3a13b93d24fe447a854d1e3bc28e8294983514f8468c857"
+  },
+  "files_sha256": {
+    "chatgpt.txt": "5eb77864bcf3b3dbae724d2a607f8632eca57c02c558a9209373e5f7499fbd07",
+    "gemini.txt": "d8450f4fa50da23ebfdc4d97a81ce7a02f7e01e258ecca03d413b9f1b4a06449",
+    "idea2prior_expert/N001.json": "f84e40511b0e9256c0e992f75034c3722cb802a0b272860ec0a53506ea2923bb",
+    "idea2prior_expert/N002.json": "494a04b1a8bb39752c21ed24c7be4f7067821df397d7ded91171961ddce76353",
+    "idea2prior_expert/N003.json": "8ce6f68a66489a84dbf57729bb19dc0caf24cea38ad90d190e682d48e5e41f2f",
+    "idea2prior_expert/N004.json": "f4133818f20cb82f08c39fec08d97674976333089344c8e5f2b2d1c17bec5597",
+    "idea2prior_expert/N005.json": "11c5c8f6412bcbb63b5d0c1b7faa8935ed2306df160c112a488876450edaf820",
+    "idea2prior_expert/N006.json": "9033f39185075ef43c461d482efb41b51051884d2220f1c03ef8de0803e65db5",
+    "idea2prior_expert/N007.json": "8acf52f7bd96deb732aa3a504bba955af22a8ba339ec069df7bcc48147d4f877",
+    "idea2prior_expert/N008.json": "d71f6d052227c7390a8d7dcfd0945fb1d48841e45e358f67014267ddff4c181f",
+    "idea2prior_expert/N009.json": "9595cadf020cfe2d094a9af6254adccb9dc1b02dfaba5947f56b333b274180d1",
+    "idea2prior_expert/N010.json": "6ab4bb358038ec176537a659621f1f41dbc6fb915f78c12ad2d5d8d3b3e09628",
+    "idea2prior_results.json": "35a134b43c4f7b9f4e0012384bd7751c78030cf233a7d92765bc121559275414",
+    "idea2prior_top5.txt": "ffa91eaec389d934d5520a469b4e4b70305d6329dc3b7f077900f6b42d3cf601",
+    "README.md": "6041d11ff90b4bc75283047483656e252eb0dc5875114d3ac936d895806eaaec"
+  }
+}

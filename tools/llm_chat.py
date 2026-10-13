@@ -8,8 +8,9 @@ import base64
 from io import BytesIO
 from PIL import Image
 import os
-from smolagents import OpenAIServerModel
+from smolagents import LiteLLMModel
 from loguru import logger
+from pipelines.runtime import invoke_model
 
 
 def encode_image_to_base64(image_path: Union[str, Path]) -> str:
@@ -81,10 +82,13 @@ def chat_with_llm(
         logger.info(f"🤖 Calling multimodal LLM: {model_name}")
 
         # Initialize the model
-        api_key = os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("OPENAI_BASE_URL")
-        model = OpenAIServerModel(
-            model_id=model_name, 
+        from pipelines.llm_config import get_litellm_config
+        model_id, base_url, api_key = get_litellm_config("light")
+        # Explicit job routing wins over historical model_name defaults.
+        if model_name and not os.getenv("LLM_LIGHT_MODEL"):
+            model_id = model_name
+        model = LiteLLMModel(
+            model_id=model_id,
             api_base=base_url,
             api_key=api_key,
         )
@@ -114,9 +118,8 @@ def chat_with_llm(
         messages.append({"role": "user", "content": user_content})
 
         # Make the API call
-        response = model(
-            messages=messages, temperature=temperature, max_tokens=max_tokens
-        ).content
+        response = invoke_model(model, messages, stage="code_extractor_llm",
+            request_parameters={"temperature": temperature, "max_tokens": max_tokens}).content
 
         logger.info("✅ LLM call completed successfully")
         return response

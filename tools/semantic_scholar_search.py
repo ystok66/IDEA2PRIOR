@@ -1,9 +1,10 @@
+
+from pipelines.clients.http_transport import get as http_get
+from pipelines.clients.s2_ids import paper_id_path
 import os
-import time
 import requests
 from typing import Optional, List, Dict, Any
 from smolagents import Tool
-from loguru import logger
 
 class SemanticScholarPaperDetailTool(Tool):
     name = "semantic_scholar_detail"
@@ -25,69 +26,20 @@ class SemanticScholarPaperDetailTool(Tool):
         self.api_key = os.getenv("Semantic_Scholar_API_key")
 
     def forward(self, paper_id: str) -> str:
-        url = f"{self.base_url}/paper/{paper_id}"
+        url = f"{self.base_url}/paper/{paper_id_path(paper_id)}"
         params = {
-            "fields": "title,year,venue,abstract,tldr,citationCount,referenceCount,authors,url,openAccessPdf"
+            "fields": "title,year,venue,abstract,tldr,citationCount,referenceCount,authors,url,openAccessPdf,externalIds"
         }
         headers = {}
         if self.api_key:
             headers["x-api-key"] = self.api_key
-        
-        # Retry logic with exponential backoff
-        max_retries = 3
-        backoff_factor = 1
-        
-        for attempt in range(max_retries):
-            try:
-                response = requests.get(url, params=params, headers=headers, timeout=10)
-                
-                if response.status_code == 404:
-                    return f"Paper not found with ID: {paper_id}"
-                
-                if response.status_code == 429:
-                    # Rate limit hit - wait and retry
-                    wait_time = backoff_factor * (2 ** attempt)
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Rate limit hit (429), waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
-                        time.sleep(wait_time)
-                        continue
-                    else:
-                        return f"Error querying Semantic Scholar: Rate limit exceeded after {max_retries} attempts"
-                
-                response.raise_for_status()
-                data = response.json()
-                break  # Success, exit retry loop
-                
-            except requests.exceptions.Timeout:
-                if attempt < max_retries - 1:
-                    wait_time = backoff_factor * (2 ** attempt)
-                    logger.warning(f"Request timeout, retrying in {wait_time}s...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    return f"Error querying Semantic Scholar: Request timeout after {max_retries} attempts"
-            except requests.exceptions.RequestException as e:
-                # Check if we have a response object with status code
-                if hasattr(e, 'response') and e.response is not None:
-                    status_code = e.response.status_code
-                    if attempt < max_retries - 1 and status_code in [500, 502, 503, 504]:
-                        wait_time = backoff_factor * (2 ** attempt)
-                        logger.warning(f"Server error {status_code}, retrying in {wait_time}s...")
-                        time.sleep(wait_time)
-                        continue
-                # For other errors or final attempt, return error
-                if attempt < max_retries - 1:
-                    wait_time = backoff_factor * (2 ** attempt)
-                    logger.warning(f"Request error, retrying in {wait_time}s...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    return f"Error querying Semantic Scholar: {str(e)}"
-        else:
-            # This should not happen, but just in case
-            return f"Error querying Semantic Scholar: Failed after {max_retries} attempts"
             
         try:
+            response = http_get(url, params=params, headers=headers)
+            if response.status_code == 404:
+                return f"Paper not found with ID: {paper_id}"
+            response.raise_for_status()
+            data = response.json()
             
             title = data.get("title")
             abstract = data.get("abstract")
@@ -118,11 +70,7 @@ class SemanticScholarPaperDetailTool(Tool):
             import json
             return json.dumps(result_dict, indent=2)
             
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Semantic Scholar JSON response: {e}")
-            return f"Error querying Semantic Scholar: Invalid JSON response"
         except Exception as e:
-            logger.error(f"Unexpected error in Semantic Scholar tool: {e}")
             return f"Error querying Semantic Scholar: {str(e)}"
 
 class SemanticScholarCitationTool(Tool):
@@ -157,7 +105,7 @@ class SemanticScholarCitationTool(Tool):
         if type not in ["citations", "references"]:
             return "Error: type must be 'citations' or 'references'"
             
-        url = f"{self.base_url}/paper/{paper_id}/{type}"
+        url = f"{self.base_url}/paper/{paper_id_path(paper_id)}/{type}"
         params = {
             "limit": limit,
             "fields": "title,year,venue,citationCount"
@@ -165,57 +113,11 @@ class SemanticScholarCitationTool(Tool):
         headers = {}
         if self.api_key:
             headers["x-api-key"] = self.api_key
-        
-        # Retry logic with exponential backoff
-        max_retries = 3
-        backoff_factor = 1
-        
-        for attempt in range(max_retries):
-            try:
-                response = requests.get(url, params=params, headers=headers, timeout=10)
-                
-                if response.status_code == 429:
-                    wait_time = backoff_factor * (2 ** attempt)
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Rate limit hit (429), waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
-                        time.sleep(wait_time)
-                        continue
-                    else:
-                        return f"Error querying Semantic Scholar: Rate limit exceeded after {max_retries} attempts"
-                
-                response.raise_for_status()
-                data = response.json()
-                break  # Success, exit retry loop
-                
-            except requests.exceptions.Timeout:
-                if attempt < max_retries - 1:
-                    wait_time = backoff_factor * (2 ** attempt)
-                    logger.warning(f"Request timeout, retrying in {wait_time}s...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    return f"Error querying Semantic Scholar: Request timeout after {max_retries} attempts"
-            except requests.exceptions.RequestException as e:
-                # Check if we have a response object with status code
-                if hasattr(e, 'response') and e.response is not None:
-                    status_code = e.response.status_code
-                    if attempt < max_retries - 1 and status_code in [500, 502, 503, 504]:
-                        wait_time = backoff_factor * (2 ** attempt)
-                        logger.warning(f"Server error {status_code}, retrying in {wait_time}s...")
-                        time.sleep(wait_time)
-                        continue
-                # For other errors or final attempt, return error
-                if attempt < max_retries - 1:
-                    wait_time = backoff_factor * (2 ** attempt)
-                    logger.warning(f"Request error, retrying in {wait_time}s...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    return f"Error querying Semantic Scholar: {str(e)}"
-        else:
-            return f"Error querying Semantic Scholar: Failed after {max_retries} attempts"
             
         try:
+            response = http_get(url, params=params, headers=headers)
+            response.raise_for_status()
+            data = response.json()
             
             results = []
             key = "citingPaper" if type == "citations" else "citedPaper"
@@ -233,9 +135,5 @@ class SemanticScholarCitationTool(Tool):
                 
             return "\n".join(results)
             
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Semantic Scholar JSON response: {e}")
-            return f"Error querying Semantic Scholar: Invalid JSON response"
         except Exception as e:
-            logger.error(f"Unexpected error in Semantic Scholar citation tool: {e}")
             return f"Error querying Semantic Scholar: {str(e)}"

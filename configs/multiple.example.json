@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "openai": {"provider": "openai", "model": "YOUR_OPENAI_MODEL", "api_key_env": "OPENAI_API_KEY"},
+    "gemini": {"provider": "gemini", "model": "YOUR_GEMINI_MODEL", "api_key_env": "GEMINI_API_KEY"},
+    "custom": {"provider": "custom", "model": "YOUR_CUSTOM_MODEL", "base_url": "https://api.example.com/v1", "api_key_env": "CUSTOM_API_KEY"}
+  },
+  "roles": {"heavy": "gemini", "light": "gemini", "expert": "openai"},
+  "mode": "retrieval_eval", "years": [2015, 2025],
+  "request_timeout_seconds": 120, "max_output_tokens": 8192, "expert_max_output_tokens": 16384,
+  "search": {"enable_duckduckgo": true, "enable_serpapi": false, "semantic_scholar_api_key_env": "SEMANTIC_SCHOLAR_API_KEY"},
+  "pipeline": {"max_in_flight_requests": 4}
+}

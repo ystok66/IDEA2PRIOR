@@ -11,53 +11,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
-from typing import Union
 
-from rag.types import (
-    ChatCompletionAssistantMessageParam,
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionToolMessageParam,
-    ChatCompletionUserMessageParam,
-)
+from importlib import import_module
 
-from .conversion import (
-    AlpacaItem,
-    HermesFunctionFormatter,
-    ShareGPTMessage,
-)
-from .conversion.conversation_models import (
-    ShareGPTConversation,
-)
-from .conversion.sharegpt.function_call_formatter import (
-    FunctionCallFormatter,
-)
+_EXPORTS = {'Union': ('typing', 'Union'), 'ChatCompletionAssistantMessageParam': ('rag.types', 'ChatCompletionAssistantMessageParam'), 'ChatCompletionMessageParam': ('rag.types', 'ChatCompletionMessageParam'), 'ChatCompletionSystemMessageParam': ('rag.types', 'ChatCompletionSystemMessageParam'), 'ChatCompletionToolMessageParam': ('rag.types', 'ChatCompletionToolMessageParam'), 'ChatCompletionUserMessageParam': ('rag.types', 'ChatCompletionUserMessageParam'), 'AlpacaItem': ('.conversion', 'AlpacaItem'), 'HermesFunctionFormatter': ('.conversion', 'HermesFunctionFormatter'), 'ShareGPTMessage': ('.conversion', 'ShareGPTMessage'), 'ShareGPTConversation': ('.conversion.conversation_models', 'ShareGPTConversation'), 'FunctionCallFormatter': ('.conversion.sharegpt.function_call_formatter', 'FunctionCallFormatter'), 'BaseMessage': ('.base', 'BaseMessage'), 'FunctionCallingMessage': ('.func_message', 'FunctionCallingMessage')}
+__all__ = list(_EXPORTS)
 
-OpenAISystemMessage = ChatCompletionSystemMessageParam
-OpenAIAssistantMessage = Union[
-    ChatCompletionAssistantMessageParam,
-    ChatCompletionToolMessageParam,
-]
-OpenAIUserMessage = ChatCompletionUserMessageParam
-OpenAIToolMessageParam = ChatCompletionToolMessageParam
-
-OpenAIMessage = ChatCompletionMessageParam
-
-
-from .base import BaseMessage  # noqa: E402
-from .func_message import FunctionCallingMessage  # noqa: E402
-
-__all__ = [
-    'OpenAISystemMessage',
-    'OpenAIAssistantMessage',
-    'OpenAIUserMessage',
-    'OpenAIToolMessageParam',
-    'OpenAIMessage',
-    'FunctionCallFormatter',
-    'HermesFunctionFormatter',
-    'ShareGPTConversation',
-    'ShareGPTMessage',
-    'BaseMessage',
-    'FunctionCallingMessage',
-    'AlpacaItem',
-]
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

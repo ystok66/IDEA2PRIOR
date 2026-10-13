@@ -16,7 +16,7 @@ Usage:
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Set, Any, Optional
 from collections import defaultdict
@@ -24,6 +24,8 @@ from collections import defaultdict
 from loguru import logger
 
 from pipelines.state import PipelineState, Paper
+from pipelines.assessment import effective_levels, bucket_for, valid_level
+from pipelines.runtime import atomic_write_json
 from pipelines.tasks.prior_art_types import (
     PriorArtConfig,
     PriorArtMatch,
@@ -199,6 +201,7 @@ def build_synthesis_input(
     coverage_levels: Optional[Dict[str, int]] = None,
     # 新增: 来自 LLM scoring 的 match 信息 (包含 facet_labels)
     scored_matches: Optional[List[PriorArtMatch]] = None,
+    snapshot: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Consolidate all Block 1-3 results into a single synthesis_input.json.
@@ -231,7 +234,7 @@ def build_synthesis_input(
     # Intent.extra_constraints may contain "idea" key, or we use topic as fallback
     idea_description = ""
     if state.intent:
-        idea_description = state.intent.extra_constraints.get("idea", "")
+        idea_description = state.intent.extra_constraints.get("idea_description", state.intent.extra_constraints.get("idea", ""))
     if not idea_description:
         idea_description = f"Research on {topic}"
     
@@ -262,10 +265,10 @@ def build_synthesis_input(
         "usage_context": ["paper_introduction", "related_work_section", "novelty_argument"],
         "run_info": {
             "run_id": run_dir.name,
-            "created_at": datetime.now().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "config": {
-                "fulltext_top_k": getattr(config, 'top_k_fulltext_refine', 20),
-                "enable_citation_graph": getattr(config, 'use_citation_graph', True),
+                "fulltext_top_k": config.debug_top_k_fulltext_refine if config.debug_mode else config.top_k_fulltext_refine,
+                "enable_citation_graph": {"true": True, "false": False}.get(state.intent.extra_constraints.get("use_citation_graph", "unknown")),
                 "debug_mode": config.debug_mode,
             }
         }
@@ -275,18 +278,13 @@ def build_synthesis_input(
     # 2. Build global_stats
     # -------------------------------------------------------------------------
     # 优先使用传入的 coverage_levels (来自 coverage_classifier)
+    coverage_levels = effective_levels(state, scored_matches, coverage_levels, snapshot)
     coverage_by_level = defaultdict(int)
-    if coverage_levels:
-        for pid, level in coverage_levels.items():
+    for level in coverage_levels.values():
+        if valid_level(level):
             coverage_by_level[level] += 1
-    else:
-        # Fallback: 尝试从 paper 对象读取 (向后兼容)
-        for paper in state.papers.values():
-            level = getattr(paper, 'coverage_level', 0) or 0
-            coverage_by_level[level] += 1
-    
-    # 构建 scored_matches 映射 (用于获取 facet_labels 等)
-    # 需要在 global_stats 之前构建，以便 facet_coverage 使用
+    unassessed_count = sum(level is None for level in coverage_levels.values())
+
     match_by_pid: Dict[str, PriorArtMatch] = {}
     if scored_matches:
         for m in scored_matches:
@@ -294,6 +292,7 @@ def build_synthesis_input(
     
     global_stats = {
         "num_candidates": len(state.papers),
+        "num_unassessed": unassessed_count,
         "num_block3": sum(1 for p in state.papers.values() if p.chunks or getattr(p, 'has_fulltext', False)),
         "coverage_by_level": {
             "3": coverage_by_level.get(3, 0),
@@ -307,43 +306,10 @@ def build_synthesis_input(
     # -------------------------------------------------------------------------
     # 3. Build buckets
     # -------------------------------------------------------------------------
-    buckets = {
-        "high_overlap": [],
-        "partial_overlap": [],
-        "adjacent": [],
-        "ignored": [],
-    }
-    
-    # 优先使用传入的 coverage_levels
-    if coverage_levels:
-        for pid in state.papers.keys():
-            # Skip excluded papers (blind evaluation)
-            paper = state.papers.get(pid)
-            if paper and is_excluded_paper(paper, config):
-                continue
-            
-            level = coverage_levels.get(pid, 0)
-            if level >= 3:
-                buckets["high_overlap"].append(pid)
-            elif level == 2:
-                buckets["partial_overlap"].append(pid)
-            elif level == 1:
-                buckets["adjacent"].append(pid)
-            else:
-                buckets["ignored"].append(pid)
-    else:
-        # Fallback
-        for pid, paper in state.papers.items():
-            level = getattr(paper, 'coverage_level', 0) or 0
-            if level >= 3:
-                buckets["high_overlap"].append(pid)
-            elif level == 2:
-                buckets["partial_overlap"].append(pid)
-            elif level == 1:
-                buckets["adjacent"].append(pid)
-            else:
-                buckets["ignored"].append(pid)
-    
+    buckets = {key: [] for key in ("high_overlap", "partial_overlap", "adjacent", "ignored", "unassessed")}
+    for pid in state.papers:
+        buckets[bucket_for(coverage_levels.get(pid))].append(pid)
+
     # -------------------------------------------------------------------------
     # 3b. Build retrieval_summary
     # -------------------------------------------------------------------------
@@ -356,7 +322,7 @@ def build_synthesis_input(
                 query_seeds.append(label)
     
     retrieval_summary = {
-        "query_seeds": query_seeds[:10],  # Limit for readability
+        "query_seeds": query_seeds,  # Limit for readability
         "facet_queries": {
             facet.get("id", f"F{i+1}"): [facet.get("label", "")]
             for i, facet in enumerate(facets_list)
@@ -414,31 +380,11 @@ def build_synthesis_input(
     
     # match_by_pid 已在 global_stats 之前构建
     
-    # Only include papers with some meaningful data (scored or fulltext)
-    included_pids = set(buckets["high_overlap"] + buckets["partial_overlap"] + buckets["adjacent"])
-    # Also include any paper with summaries or snippets
-    included_pids.update(summaries_by_pid.keys())
-    included_pids.update(snippets_by_pid.keys())
-    included_pids.update(key_roles_by_pid.keys())
-    
-    for pid in included_pids:
-        paper = state.papers.get(pid)
-        if not paper:
-            continue
-        
-        # 使用传入的 coverage_levels 获取 level
-        level = coverage_levels.get(pid, 0) if coverage_levels else getattr(paper, 'coverage_level', 0) or 0
-        
-        # Determine overlap_bucket
-        if level >= 3:
-            overlap_bucket = "high_overlap"
-        elif level == 2:
-            overlap_bucket = "partial_overlap"
-        elif level == 1:
-            overlap_bucket = "adjacent"
-        else:
-            overlap_bucket = "ignored"
-        
+    # Preserve every candidate in the machine-readable evidence ledger.
+    for pid, paper in state.papers.items():
+        level = coverage_levels.get(pid)
+        overlap_bucket = bucket_for(level)
+
         # Get key_roles and determine intro_rw_policy
         key_roles = key_roles_by_pid.get(pid, [])
         has_full_intro_rw = pid in intro_rw_full_by_pid
@@ -455,13 +401,18 @@ def build_synthesis_input(
             "venue": paper.venue or "",
             "citation_count": paper.citation_count or 0,
             "abstract": paper.abstract or "",  # 始终包含 abstract，即使 PDF 未下载
+            "authors": paper.authors,
+            "entity_id": paper.entity_id,
+            "document_version": paper.document_version,
+            "content_hash": paper.content_hash,
+            "assessment": snapshot["entries"].get(pid) if snapshot else None,
             "overlap_level": level,
             "overlap_bucket": overlap_bucket,
             # 从 match 获取 facet_labels
             "facet_labels": match.covered_facet_labels if match and match.covered_facet_labels else [],
             # 从 match 获取相似度分数
-            "task_similarity": match.task_similarity if match else 0.0,
-            "method_similarity": match.method_similarity if match else 0.0,
+            "task_similarity": match.task_similarity if match and level is not None else None,
+            "method_similarity": match.method_similarity if match and level is not None else None,
             "key_roles": key_roles,
             "intro_rw_policy": intro_rw_policy,
         }
@@ -481,13 +432,14 @@ def build_synthesis_input(
         papers_list.append(paper_entry)
     
     # Sort papers by overlap_level (desc), then citation_count (desc)
-    papers_list.sort(key=lambda x: (-x["overlap_level"], -x["citation_count"]))
+    papers_list.sort(key=lambda x: (-(x["overlap_level"] if x["overlap_level"] is not None else -1), -x["citation_count"], x["paper_id"]))
     
     # -------------------------------------------------------------------------
     # 6. Assemble final structure
     # -------------------------------------------------------------------------
     synthesis_input = {
         "metadata": metadata,
+        "assessment_snapshot_id": snapshot.get("snapshot_id") if snapshot else None,
         "global_stats": global_stats,
         "retrieval_summary": retrieval_summary,
         "limitations": limitations,
@@ -500,8 +452,7 @@ def build_synthesis_input(
     # 7. Write to disk
     # -------------------------------------------------------------------------
     output_path = synthesis_dir / "synthesis_input.json"
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(synthesis_input, f, ensure_ascii=False, indent=2)
+    atomic_write_json(output_path, synthesis_input)
     
     logger.info(f"[Synthesis] Wrote synthesis_input.json to {output_path}")
     logger.info(f"[Synthesis] Stats: {len(papers_list)} papers, "
@@ -563,35 +514,19 @@ def _build_facet_coverage_stats(
         total_papers = 0
         
         for pid, match in match_by_pid.items():
-            covered_labels = match.covered_facet_labels or []
-            
-            # 模糊匹配: 检查 facet_id、facet_label、或标签中是否包含关键词
-            matched = False
-            if facet_id in covered_labels:
-                matched = True
-            elif facet_label.lower() in [l.lower() for l in covered_labels]:
-                matched = True
-            else:
-                # 关键词模糊匹配
-                facet_keywords = set(facet_label.lower().split())
-                for label in covered_labels:
-                    label_words = set(label.lower().split())
-                    # 如果有 2+ 个词重叠，认为匹配
-                    if len(facet_keywords & label_words) >= 2:
-                        matched = True
-                        break
-            
-            if matched:
+            level = coverage_levels.get(pid) if coverage_levels is not None else match.coverage_level
+            if getattr(match, "scoring_status", "succeeded") != "succeeded" or not valid_level(level):
+                continue
+            if facet_id in (match.covered_facet_labels or []):
                 total_papers += 1
-                # 使用 coverage_levels 确定 strong
-                level = coverage_levels.get(pid, 0) if coverage_levels else match.coverage_level
                 if level >= 2:
                     strong_papers += 1
-        
+
         facet_stats.append({
             "facet_id": facet_id,
             "facet_label": facet_label,
             "strong_papers": strong_papers,
+            "evidence_basis": "abstract_facet_labels; strong_papers means final_overlap>=2, not per-facet fulltext verification",
             "total_papers": total_papers,
         })
     
@@ -656,18 +591,20 @@ def _load_method_exp_snippets(
                         "bullet": obj.get("bullet", ""),
                         "snippet": obj.get("snippet", ""),
                         "loc": obj.get("loc", ""),
+                        "section_heading": obj.get("section_heading", ""),
+                        "section_id": obj.get("section_id", ""),
+                        "paragraph_id": obj.get("paragraph_id"),
+                        "page_start": obj.get("page_start"),
+                        "page_end": obj.get("page_end"),
+                        "score": obj.get("score"),
                     }
                     snippets_by_pid[pid].append(snippet_entry)
     except Exception as e:
         logger.warning(f"[Synthesis] Failed to load method_exp_snippets: {e}")
     
-    # Apply max snippets limit per paper
-    max_snippets = config.max_snippets_per_paper_facet * 3  # Allow more total per paper
-    result = {}
-    for pid, snippets in snippets_by_pid.items():
-        result[pid] = snippets[:max_snippets]
-    
-    return result
+    # Complete evidence storage must not apply a second display cap.
+    return dict(snippets_by_pid)
+
 
 
 def _load_key_paper_roles(synthesis_dir: Path) -> Dict[str, List[str]]:

@@ -32,6 +32,12 @@ class SlotFillingMatch:
     should_cite: bool
     suggested_slot: str       # e.g. "geometry-consistent data augmentation"
     reason: str               # 1-2 sentence justification
+    assessment_status: str = "VALIDATED"
+    error: dict | None = None
+
+
+class ResponseValidationError(ValueError):
+    pass
 
 
 def _is_known_ref(paper: Paper, known_refs: List[str]) -> bool:
@@ -187,8 +193,12 @@ JSON output:"""
                         score_data = None
             
             if isinstance(score_data, dict):
-                relevance_level = int(score_data.get('relevance_level', 0))
-                should_cite = bool(score_data.get('should_cite', False))
+                if type(score_data.get('relevance_level')) is not int or not 0 <= score_data['relevance_level'] <= 3 or type(score_data.get('should_cite')) is not bool:
+                    raise ResponseValidationError("Citation score requires level 0–3 and a JSON boolean")
+                if not isinstance(score_data.get('suggested_slot'), str) or not isinstance(score_data.get('reason'), str):
+                    raise ResponseValidationError("Citation score requires slot and reason strings")
+                relevance_level = score_data['relevance_level']
+                should_cite = score_data['should_cite']
                 suggested_slot = str(score_data.get('suggested_slot', 'general related work'))
                 reason = str(score_data.get('reason', ''))
                 
@@ -209,17 +219,21 @@ JSON output:"""
                     relevance_level=0,
                     should_cite=False,
                     suggested_slot="",
-                    reason="Failed to parse LLM output."
+                    reason="Failed to parse LLM output.", assessment_status="FAILED",
+                    error={"type": "ResponseValidationError", "code": "INVALID_MODEL_RESPONSE",
+                           "message": "Citation assessment did not return valid JSON.", "phase": "slot_filling"}
                 ))
                 
         except Exception as e:
+            from paperarena.diagnostics import safe_error
             logger.warning(f"Failed to score paper {paper.title}: {e}")
             matches.append(SlotFillingMatch(
                 paper_id=paper_id,
                 relevance_level=0,
                 should_cite=False,
                 suggested_slot="",
-                reason=f"Scoring error: {str(e)[:50]}"
+                reason="Citation assessment failed; see the recorded diagnostic.",
+                assessment_status="FAILED", error=safe_error(e, "slot_filling")
             ))
     
     # Sort by relevance_level (desc), then citation_count (desc)
