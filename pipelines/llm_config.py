@@ -49,7 +49,8 @@ def load_llm_config(role: str) -> LLMConfig:
         return LLMConfig(role=role, provider="custom", model=model, api_base=api_base, api_key=api_key)
 
     elif provider == "google":
-        google_key = _env("GOOGLE_API_KEY")
+        # Public profiles may route separate native Gemini keys per role.
+        google_key = _env(f"{prefix}_API_KEY") or _env("GOOGLE_API_KEY")
         if not google_key:
             raise RuntimeError(f"[LLM-{role}] Provider is google but GOOGLE_API_KEY is missing.")
         return LLMConfig(role=role, provider="google", model=model, api_base=None, api_key=google_key)

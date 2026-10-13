@@ -10,15 +10,7 @@ from typing import Optional
 from smolagents import Tool
 from loguru import logger
 
-from .pdf_utils import parse_doc, MINERU_AVAILABLE, PIPELINE_BACKEND_AVAILABLE, VLM_BACKEND_AVAILABLE
-
-# Make RAG imports optional (only needed for PDFExtractorRAGTool)
-try:
-    from rag.embeddings import OpenAIEmbedding
-    from rag.retrievers import SimpleVectorRetriever
-    RAG_AVAILABLE = True
-except ImportError:
-    RAG_AVAILABLE = False
+from .pdf_utils import parse_doc
 
 
 class PDFExtractorTool(Tool):
@@ -54,13 +46,13 @@ class PDFExtractorTool(Tool):
         # Fixed paths for PDF processing
         if pdf_base_dir is None:
             self.pdf_base_dir = Path(
-                "/data/wdy/AgenticPaperQA/paper-prepare/sampled_papers"
+                "inputs/papers"
             )
         else:
             self.pdf_base_dir = Path(pdf_base_dir)
         if output_base_dir is None:
             self.output_base_dir = Path(
-                "/data/wdy/AgenticPaperQA/paper-prepare/sampled_jsons"
+                "outputs/extension_cache"
             )
         else:
             self.output_base_dir = Path(output_base_dir)
@@ -70,23 +62,6 @@ class PDFExtractorTool(Tool):
         logger.info("🔧 Setting up PDF extractor tool...")
         self.is_initialized = True
 
-    def _find_markdown_file(self, output_dir: Path, pdf_name: str) -> Optional[Path]:
-        """
-        Find markdown file in either 'auto' or 'vlm' directory
-        
-        Args:
-            output_dir: Base output directory
-            pdf_name: PDF name without extension
-            
-        Returns:
-            Path to markdown file if found, None otherwise
-        """
-        for dir_name in ["auto", "vlm"]:
-            candidate_path = output_dir / pdf_name / dir_name / f"{pdf_name}.md"
-            if candidate_path.exists():
-                return candidate_path
-        return None
-    
     def _validate_pdf_path(self, pdf_path: str) -> tuple[Path, Optional[str]]:
         """
         Validate PDF file path and return Path object
@@ -123,18 +98,11 @@ class PDFExtractorTool(Tool):
         Returns:
             Tuple of (markdown content, error message or None)
         """
-        # Check both possible directories: "auto" (pipeline backend) and "vlm" (VLM backend)
-        possible_dirs = ["auto", "vlm"]
-        md_file_path = None
-        
-        for dir_name in possible_dirs:
-            candidate_path = output_dir / pdf_name / dir_name / f"{pdf_name}.md"
-            if candidate_path.exists():
-                md_file_path = candidate_path
-                break
-        
-        if md_file_path is None:
-            return None, f"Markdown file not found in any expected location (checked: {possible_dirs})"
+        # Use the fixed expected path: pdf_name/auto/pdf_name.md
+        md_file_path = output_dir / pdf_name / "auto" / f"{pdf_name}.md"
+
+        if not md_file_path.exists():
+            return None, f"Markdown file not found at expected location: {md_file_path}"
 
         logger.info(f"📄 Reading markdown file: {md_file_path}")
 
@@ -160,14 +128,7 @@ class PDFExtractorTool(Tool):
         """
         # Fixed values for language and backend
         language = "en"
-        # Auto-select backend: prefer pipeline, fallback to VLM if pipeline not available
-        if PIPELINE_BACKEND_AVAILABLE:
-            backend = "pipeline"
-        elif VLM_BACKEND_AVAILABLE:
-            backend = "vlm-transformers"
-            logger.info("⚠️ Pipeline backend not available, using VLM backend instead")
-        else:
-            return f"Error: No mineru backend available. Pipeline backend requires 'doclayout-yolo', VLM backend is also unavailable."
+        backend = "pipeline"
 
         try:
             logger.info(f"🚀 Starting PDF extraction for: {pdf_name}")
@@ -176,11 +137,11 @@ class PDFExtractorTool(Tool):
             pdf_file_path = self.pdf_base_dir / f"{pdf_name}.pdf"
             output_dir = self.output_base_dir
 
-            # Find markdown file (check both auto and vlm directories)
-            expected_md_path = self._find_markdown_file(output_dir, pdf_name)
+            # Expected markdown file path based on the structure: pdf_name/auto/pdf_name.md
+            expected_md_path = output_dir / pdf_name / "auto" / f"{pdf_name}.md"
 
             # Check if already parsed (cache check)
-            if expected_md_path:
+            if expected_md_path.exists():
                 logger.info(f"✅ Found cached markdown file: {expected_md_path}")
                 try:
                     with open(expected_md_path, "r", encoding="utf-8") as f:
@@ -200,8 +161,6 @@ class PDFExtractorTool(Tool):
 
                 # Parse PDF using pdf_utils
                 try:
-                    if not MINERU_AVAILABLE:
-                        return f"Error: mineru module is not available. Please install mineru to use PDF extraction."
                     parse_doc(
                         path_list=[validated_pdf_path],
                         output_dir=str(output_dir),
@@ -212,16 +171,12 @@ class PDFExtractorTool(Tool):
                 except Exception as e:
                     return f"Error: PDF parsing failed: {e}"
 
-                # Find and read markdown file
-                expected_md_path = self._find_markdown_file(output_dir, pdf_name)
-                if not expected_md_path:
-                    return f"Error: Markdown file not found after parsing. Checked both 'auto' and 'vlm' directories."
-                
-                try:
-                    with open(expected_md_path, "r", encoding="utf-8") as f:
-                        markdown_content = f.read()
-                except Exception as e:
-                    return f"Error: Failed to read markdown file: {e}"
+                # Extract markdown content
+                markdown_content, extraction_error = self._extract_markdown_content(
+                    output_dir, pdf_name
+                )
+                if extraction_error:
+                    return f"Error: {extraction_error}"
 
             # Return first 2000 characters
             if len(markdown_content) > 2000:
@@ -294,23 +249,22 @@ class PDFExtractorRAGTool(Tool):
         # Fixed paths for PDF processing (same as PDFExtractorTool)
         if pdf_base_dir is None:
             self.pdf_base_dir = Path(
-                "/data/wdy/AgenticPaperQA/paper-prepare/sampled_papers"
+                "inputs/papers"
             )
         else:
             self.pdf_base_dir = Path(pdf_base_dir)
         if output_base_dir is None:
             self.output_base_dir = Path(
-                "/data/wdy/AgenticPaperQA/paper-prepare/sampled_jsons"
+                "outputs/extension_cache"
             )
         else:
             self.output_base_dir = Path(output_base_dir)
 
-        # Initialize vector retriever for content search
-        if not RAG_AVAILABLE:
-            raise ImportError("RAG modules (OpenAIEmbedding, SimpleVectorRetriever) are not available. Please install langchain and related dependencies.")
-        
         # Initialize vector retriever with dedicated OpenAI API key for embeddings
         # Use provided key or fall back to environment variable
+        from rag.embeddings import OpenAIEmbedding
+        from rag.retrievers import SimpleVectorRetriever
+
         embedding_key = embedding_api_key or os.getenv("OPENAI_EMBEDDING_API_KEY") or os.getenv("OPENAI_API_KEY")
         
         # Initialize embedding model with dedicated API key
@@ -432,11 +386,11 @@ class PDFExtractorRAGTool(Tool):
             pdf_file_path = self.pdf_base_dir / f"{pdf_name}.pdf"
             output_dir = self.output_base_dir
 
-            # Find markdown file (check both auto and vlm directories)
-            expected_md_path = self._find_markdown_file(output_dir, pdf_name)
+            # Expected markdown file path based on the structure: pdf_name/auto/pdf_name.md
+            expected_md_path = output_dir / pdf_name / "auto" / f"{pdf_name}.md"
 
             # Check if already parsed (cache check)
-            if expected_md_path:
+            if expected_md_path.exists():
                 logger.info(f"✅ Found cached markdown file: {expected_md_path}")
                 try:
                     with open(expected_md_path, "r", encoding="utf-8") as f:
@@ -455,7 +409,7 @@ class PDFExtractorRAGTool(Tool):
                     return f"Error: File is not a PDF: {pdf_file_path}"
 
                 logger.info(f"📁 Using output directory: {output_dir}")
-                logger.info(f"⚙️ Using language: en, backend: {backend}")
+                logger.info(f"⚙️ Using language: en, backend: pipeline")
 
                 # Parse PDF using pdf_utils
                 try:
@@ -469,10 +423,9 @@ class PDFExtractorRAGTool(Tool):
                 except Exception as e:
                     return f"Error: PDF parsing failed: {e}"
 
-                # Find and read markdown file
-                expected_md_path = self._find_markdown_file(output_dir, pdf_name)
-                if not expected_md_path:
-                    return f"Error: Markdown file not found after parsing. Checked both 'auto' and 'vlm' directories."
+                # Read the parsed markdown content
+                if not expected_md_path.exists():
+                    return f"Error: Markdown file not found at expected location: {expected_md_path}"
 
                 try:
                     with open(expected_md_path, "r", encoding="utf-8") as f:

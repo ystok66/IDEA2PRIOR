@@ -1,3 +1,6 @@
+
+from pipelines.clients.http_transport import get as http_get
+from uuid import uuid4
 """
 Semantic Scholar API Tool for PaperArena
 Provides access to Semantic Scholar's academic graph API for:
@@ -81,6 +84,7 @@ class SemanticScholarTool(Tool):
         """
         super().__init__()
         self.api_key = api_key
+        self.errors = []
         # Auto-detect rate limit delay if not specified
         if rate_limit_delay is None:
             if api_key:
@@ -112,7 +116,7 @@ class SemanticScholarTool(Tool):
             logger.info(f"   Delay between requests: {self.rate_limit_delay:.1f}s")
         self.is_initialized = True
 
-    def _make_request(self, endpoint: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+    def _make_request(self, endpoint: str, params: Optional[Dict] = None, _remaining_retries: int = 1, _request_id=None, _attempt_ordinal=1) -> Dict[str, Any]:
         """
         Make API request with rate limiting
 
@@ -123,26 +127,31 @@ class SemanticScholarTool(Tool):
         Returns:
             JSON response as dictionary
         """
+        _request_id = _request_id or uuid4().hex
         url = f"{self.base_url}/{endpoint}"
         
         try:
             # Rate limiting
             # API key: 1 request per second (strict)
             # Public API: 100 req/min shared (more conservative)
-            time.sleep(self.rate_limit_delay)
+            # Shared HTTP transport performs provider admission before each attempt.
             
-            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            response = http_get(url, headers=self.headers, params=params, timeout=30, logical_request_id=_request_id, attempt_ordinal=_attempt_ordinal)
             response.raise_for_status()
             
             return response.json()
         
         except requests.exceptions.HTTPError as e:
+            from paperarena.diagnostics import safe_error
+            self.errors.append(safe_error(e, "semanticscholartool"))
             if response.status_code == 429:
+                if _remaining_retries <= 0:
+                    raise
                 wait_time = 60 if not self.api_key else 30
                 logger.warning(f"⚠️ Rate limit exceeded, waiting {wait_time} seconds...")
                 time.sleep(wait_time)
                 # Retry once
-                return self._make_request(endpoint, params)
+                return self._make_request(endpoint, params, _remaining_retries=_remaining_retries - 1, _request_id=_request_id, _attempt_ordinal=_attempt_ordinal + 1)
             elif response.status_code == 404:
                 logger.warning(f"⚠️ Resource not found: {endpoint}")
                 return {}
@@ -150,6 +159,8 @@ class SemanticScholarTool(Tool):
                 logger.error(f"❌ HTTP error {response.status_code}: {e}")
                 raise
         except Exception as e:
+            from paperarena.diagnostics import safe_error
+            self.errors.append(safe_error(e, "semanticscholartool"))
             logger.error(f"❌ Request failed: {e}")
             raise
 
@@ -384,6 +395,8 @@ class SemanticScholarTool(Tool):
                 return self.format_paper_list(papers)
         
         except Exception as e:
+            from paperarena.diagnostics import safe_error
+            self.errors.append(safe_error(e, "semanticscholartool"))
             error_msg = f"❌ Semantic Scholar search failed: {str(e)}"
             logger.error(error_msg)
             return f"Error: {str(e)}"

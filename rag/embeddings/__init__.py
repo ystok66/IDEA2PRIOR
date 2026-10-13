@@ -11,18 +11,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
-from .base import BaseEmbedding
-from .mistral_embedding import MistralEmbedding
-from .openai_compatible_embedding import OpenAICompatibleEmbedding
-from .openai_embedding import OpenAIEmbedding
-from .sentence_transformers_embeddings import SentenceTransformerEncoder
-from .vlm_embedding import VisionLanguageEmbedding
 
-__all__ = [
-    "BaseEmbedding",
-    "OpenAIEmbedding",
-    "SentenceTransformerEncoder",
-    "VisionLanguageEmbedding",
-    "MistralEmbedding",
-    "OpenAICompatibleEmbedding",
-]
+from importlib import import_module
+
+_EXPORTS = {'BaseEmbedding': ('.base', 'BaseEmbedding'), 'MistralEmbedding': ('.mistral_embedding', 'MistralEmbedding'), 'OpenAICompatibleEmbedding': ('.openai_compatible_embedding', 'OpenAICompatibleEmbedding'), 'OpenAIEmbedding': ('.openai_embedding', 'OpenAIEmbedding'), 'SentenceTransformerEncoder': ('.sentence_transformers_embeddings', 'SentenceTransformerEncoder'), 'VisionLanguageEmbedding': ('.vlm_embedding', 'VisionLanguageEmbedding')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

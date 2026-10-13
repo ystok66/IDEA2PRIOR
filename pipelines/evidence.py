@@ -17,6 +17,7 @@ from typing import Dict, List, Literal, Set, Optional
 from loguru import logger
 
 from pipelines.paper_record import PaperRecord, SectionRecord
+from pipelines.runtime import invoke_model
 
 
 # ========== Sentence Role Classification ==========
@@ -119,6 +120,7 @@ def generate_facet_patterns_from_idea(
     idea_description: str,
     max_facets: int = 6,
     max_patterns_per_facet: int = 10,
+    facets: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, List[str]]:
     """
     Use expert LLM to dynamically generate facet patterns from the idea.
@@ -145,11 +147,12 @@ def generate_facet_patterns_from_idea(
     expert_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
     
     # Step 1: Generate facets from idea
-    facets = _generate_facets_from_idea(
-        idea_description=idea_description,
-        expert_model=expert_model,
-        max_facets=max_facets,
-    )
+    if facets is None:
+        facets = _generate_facets_from_idea(
+            idea_description=idea_description,
+            expert_model=expert_model,
+            max_facets=max_facets,
+        )
     
     if not facets:
         logger.warning("[Evidence] Failed to generate facets, using empty patterns")
@@ -167,6 +170,9 @@ def generate_facet_patterns_from_idea(
         max_patterns_per_facet=max_patterns_per_facet,
     )
     
+    allowed = {f['id'] for f in facets}
+    if set(facet_patterns) - allowed:
+        raise ValueError('Pattern response references undefined technical facets')
     return facet_patterns
 
 
@@ -217,7 +223,7 @@ Constraints:
 """
     
     messages = [{"role": "user", "content": prompt}]
-    resp = expert_model(messages)
+    resp = invoke_model(expert_model, messages, stage="evidence_patterns")
     text = extract_text_from_llm_response(resp)
     
     try:
@@ -292,7 +298,7 @@ Constraints:
 """
     
     messages = [{"role": "user", "content": prompt}]
-    resp = expert_model(messages)
+    resp = invoke_model(expert_model, messages, stage="evidence_patterns")
     text = extract_text_from_llm_response(resp)
     
     try:
@@ -337,6 +343,10 @@ class EvidenceSpan:
     role: str                   # own_method / prior_work / background
     strength: float             # ∈ [0, 1], strength of evidence
     source: str                 # title / abstract / section
+    section_id: str = ""
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+    document_version: Optional[str] = None
 
 
 def collect_facet_evidence(
@@ -448,6 +458,7 @@ def collect_facet_evidence(
                             role=sent_role,
                             strength=strength,
                             source="section",
+                            section_id=section.section_id, page_start=section.page_start, page_end=section.page_end, document_version=section.document_version,
                         )
                         evidence.append(span)
                         evidence_by_paper[paper_id].append(span)
@@ -514,6 +525,7 @@ def collect_facet_evidence(
                             role=sent_role,
                             strength=strength,
                             source="section",
+                            section_id=section.section_id, page_start=section.page_start, page_end=section.page_end, document_version=section.document_version,
                         )
                         evidence.append(span)
                         evidence_by_paper[paper_id].append(span)
@@ -566,19 +578,19 @@ def _collect_bm25_backfill(
             continue
         
         # Collect all sentences from this paper
-        all_sentences: List[Tuple[str, str, str]] = []  # (text, section_role, source)
+        all_sentences = []  # (text, section_role, source)
         
         if record.abstract:
             for sent in record.abstract.split(". "):
                 sent = sent.strip()
                 if len(sent) > 30:
-                    all_sentences.append((sent, "abstract", "abstract"))
+                    all_sentences.append((sent, "abstract", "abstract", None))
         
         for section in record.sections:
-            if section.role in {"intro", "method", "related_work", "experiment"}:
+            if section.role in {"intro", "method", "related_work", "experiment", "experiments"}:
                 for sent in section.sentences:
                     if len(sent) > 30:
-                        all_sentences.append((sent, section.role, "section"))
+                        all_sentences.append((sent, section.role, "section", section))
         
         if not all_sentences:
             continue
@@ -591,7 +603,7 @@ def _collect_bm25_backfill(
         # Get top-K sentences
         scored = sorted(zip(all_sentences, scores), key=lambda x: x[1], reverse=True)
         
-        for (sent_text, section_role, source), score in scored[:bm25_top_k]:
+        for (sent_text, section_role, source, section), score in scored[:bm25_top_k]:
             if score <= 0:
                 break
             
@@ -604,6 +616,10 @@ def _collect_bm25_backfill(
                 role=sent_role,
                 strength=min(0.7, 0.3 + score * 0.1),  # Scale BM25 score to strength
                 source=source,
+                section_id=section.section_id if section else "",
+                page_start=section.page_start if section else None,
+                page_end=section.page_end if section else None,
+                document_version=section.document_version if section else None,
             ))
     
     logger.debug(f"[Evidence] BM25 backfill added {len(bm25_evidence)} spans for papers with low evidence")

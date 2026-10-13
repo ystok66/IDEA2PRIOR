@@ -1,3 +1,5 @@
+
+from pipelines.clients.http_transport import get as http_get
 import os
 import requests
 from typing import Optional, List, Dict, Any
@@ -86,9 +88,8 @@ class OpenAlexWorksSearchTool(Tool):
             
         try:
             # Per-request rate limiting (sliding window, not batch + sleep)
-            openalex_rate_limiter.wait_for_slot()
             
-            response = requests.get(url, params=params)
+            response = http_get(url, params=params, timeout=(10, 60))
             response.raise_for_status()
             data = response.json()
             
@@ -96,7 +97,7 @@ class OpenAlexWorksSearchTool(Tool):
             for work in data.get("results", []):
                 title = work.get("title")
                 pub_year = work.get("publication_year")
-                venue_name = work.get("host_venue", {}).get("display_name") or "Unknown Venue"
+                venue_name = ((work.get("primary_location") or {}).get("source") or {}).get("display_name") or (work.get("host_venue") or {}).get("display_name") or "Unknown Venue"
                 cited_by = work.get("cited_by_count")
                 work_id = work.get("id")
                 doi = work.get("doi")
@@ -126,6 +127,7 @@ class OpenAlexWorksSearchTool(Tool):
                     "cited_by_count": cited_by,
                     "openalex_id": work_id,
                     "doi": doi,
+                    "pdf_url": (work.get("primary_location") or {}).get("pdf_url"),
                     "abstract": abstract,  # Now includes abstract
                 })
                 

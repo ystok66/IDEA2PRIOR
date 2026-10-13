@@ -10,6 +10,7 @@ This module implements the core discovery logic that:
 """
 
 from __future__ import annotations
+from pipelines.identity import upsert_paper, paper_from_openalex
 
 import os
 import json
@@ -91,11 +92,11 @@ def run_exploration_loop(
             )
             break
 
-        # 2) Enrich metadata and citation graph for a subset of key papers.
-        enrich_metadata_and_citations(agent, state)
-
-        # 3) Optionally parse a small number of key PDFs for deeper signals.
-        maybe_parse_key_papers(agent, state, round_idx=round_idx)
+        # In the staged funnel, relevance selection precedes costly metadata,
+        # citation and PDF work. The prior-art orchestrator owns those stages.
+        if not getattr(cfg, 'staged_retrieval', False):
+            enrich_metadata_and_citations(agent, state)
+            maybe_parse_key_papers(agent, state, round_idx=round_idx)
 
     logger.info(
         f"Exploration loop finished with {len(state.papers)} papers "
@@ -119,7 +120,8 @@ def discover_papers_round(
         search_queries: Optional list of search queries
         cfg: Optional PriorArtConfig for excluded paper filtering
     """
-    logger.info("Discovering papers via OpenAlex...")
+    from pipelines.clients.scholarly import replacement_enabled, discover
+    logger.info('Discovering papers via {}...', 'S2 + arXiv' if replacement_enabled(cfg) else 'OpenAlex')
     
     # 1. Construct query from Intent
     topic = state.intent.topic
@@ -132,6 +134,19 @@ def discover_papers_round(
     venue_str = "|".join(venues) if venues else None
     
     # 2. Call OpenAlex tool
+    if replacement_enabled(cfg):
+        queries = search_queries if search_queries else [topic]
+        added = []
+        for query in queries:
+            for paper in discover(query, (from_year, to_year) if from_year and to_year else None, 20, cfg):
+                if cfg:
+                    from pipelines.tasks.prior_art_utils import is_excluded_paper
+                    if is_excluded_paper(paper, cfg):
+                        continue
+                pid, created = upsert_paper(state, paper, source=paper.retrieval_source)
+                if created:
+                    added.append(state.papers[pid])
+        return added
     oa_tool = OpenAlexWorksSearchTool()
     
     queries_to_run = search_queries if search_queries else [topic]
@@ -177,61 +192,17 @@ def discover_papers_round(
         except Exception as e:
             logger.warning(f"[Fallback] Topic query also failed: {e}")
             
-    # Deduplicate works by ID before processing
-    # OpenAlex tool returns "openalex_id", but raw API returns "id". Handle both.
-    unique_works = {}
-    for w in all_works:
-        wid = w.get("openalex_id") or w.get("id")
-        if wid:
-            unique_works[wid] = w
-            
-    works = list(unique_works.values())
-
     newly_added = []
-    
-    # 3. Parse and deduplicate
-    for work in works:
-        # Extract fields
-        title = work.get("title", "Unknown Title")
-        year = work.get("year")
-        venue = work.get("venue")
-        openalex_id = work.get("openalex_id")
-        doi = work.get("doi")
-        # Clean DOI if it's a URL
-        if doi and "doi.org/" in doi:
-            doi = doi.split("doi.org/")[-1]
-            
-        # Determine canonical key (DOI > OpenAlex ID)
-        canonical_key = doi if doi else openalex_id
-        
-        if not canonical_key:
-            continue
-            
-        # Check if already exists
-        if canonical_key in state.papers:
-            continue
-            
-        # Create Paper object
-        paper = Paper(
-            title=title,
-            year=year,
-            venue=venue,
-            openalex_id=openalex_id,
-            doi=doi,
-            citation_count=work.get("cited_by_count")
-        )
-        
-        # Excluded paper check (blind evaluation)
+    for work in all_works:
+        paper = paper_from_openalex(work, source=f"exploration_round_{state.discovery_round}")
         if cfg:
             from pipelines.tasks.prior_art_utils import is_excluded_paper
             if is_excluded_paper(paper, cfg):
-                logger.debug(f"[ExcludedPaper] Skipping excluded paper: {title[:40]}...")
                 continue
-        
-        # Add to state
-        state.papers[canonical_key] = paper
-        newly_added.append(paper)
-        
+        pid, created = upsert_paper(state, paper, source=paper.retrieval_source)
+        if created:
+            newly_added.append(state.papers[pid])
+
     return newly_added
 
 
@@ -247,13 +218,31 @@ def enrich_metadata_and_citations(agent, state: PipelineState) -> None:
     # Limit enrichment to avoid rate limits (e.g. first 30 papers)
     papers_to_enrich = list(state.papers.values())[:30]
     
+    from pipelines.clients.scholarly import replacement_enabled, paper_lookup_id, batch_metadata, paper_from_s2, title_matches
+    if replacement_enabled():
+        targets = [p for p in papers_to_enrich if not p.fields_of_study and paper_lookup_id(p)]
+        batch = batch_metadata([paper_lookup_id(p) for p in targets])
+        for paper, item in zip(targets, batch):
+            if item['status'] == 'SUCCEEDED':
+                enriched = paper_from_s2(item['data'], 's2_batch_enrichment')
+                if not title_matches(paper.title, enriched.title):
+                    continue
+                # Enrich this known material with work metadata; do not bind
+                # an unversioned provider PDF to its explicit arXiv version.
+                enriched.document_version = paper.document_version
+                enriched.arxiv_id = paper.arxiv_id or enriched.arxiv_id
+                if paper.document_version:
+                    enriched.pdf_url = None
+                enriched.paper_id = paper.paper_id
+                upsert_paper(state, enriched, source='s2_batch_enrichment')
+        papers_to_enrich = []
     for paper in papers_to_enrich:
         # Skip if already enriched (simple check: has fields_of_study)
         if paper.fields_of_study:
             continue
             
         # Determine ID to query
-        paper_id = paper.doi if paper.doi else paper.openalex_id
+        paper_id = paper_lookup_id(paper)
         if not paper_id:
             continue
             
@@ -264,16 +253,12 @@ def enrich_metadata_and_citations(agent, state: PipelineState) -> None:
                 
             details = json.loads(res_json)
             
-            # Update metadata
-            if details.get("citation_count"):
-                paper.citation_count = details["citation_count"]
-            if details.get("s2_id"):
-                paper.s2_id = details["s2_id"]
-            if details.get("pdf_url"):
-                paper.pdf_url = details["pdf_url"]
-            if details.get("abstract"):
-                paper.abstract = details["abstract"]
-            
+            enriched = Paper(title=paper.title, doi=paper.doi, openalex_id=paper.openalex_id,
+                             s2_id=details.get("s2_id"), abstract=details.get("abstract"),
+                             pdf_url=details.get("pdf_url"), citation_count=details.get("citation_count"),
+                             authors=details.get("authors") or [], paper_id=paper.paper_id)
+            upsert_paper(state, enriched, source="s2_metadata")
+
         except Exception as e:
             logger.warning(f"Failed to enrich paper {paper.title[:30]}...: {e}")
             
@@ -406,6 +391,9 @@ def maybe_parse_key_papers(agent, state: PipelineState, round_idx: int) -> None:
     os.makedirs(pdf_cache_dir, exist_ok=True)
 
     for paper in key_papers:
+        if paper.identity_status == 'conflict':
+            logger.warning('[PDF] Skipping identity conflict: %s', paper.title)
+            continue
         logger.info(f"[PDF] Processing key paper: {paper.title[:80]}...")
         
         # Resolve PDF URL if missing
@@ -427,7 +415,11 @@ def maybe_parse_key_papers(agent, state: PipelineState, round_idx: int) -> None:
             continue
 
         # Download PDF to local cache
-        local_filename = f"{paper.doi.replace('/', '_') if paper.doi else paper.openalex_id}.pdf"
+        import hashlib
+        material_key = '|'.join(str(value or '') for value in (
+            paper.doi, paper.s2_id, paper.arxiv_id, paper.openalex_id,
+            paper.document_version, paper.pdf_url))
+        local_filename = hashlib.sha256(material_key.encode('utf-8')).hexdigest() + '.pdf'
         local_pdf_path = os.path.join(pdf_cache_dir, local_filename)
         
         if not os.path.exists(local_pdf_path):

@@ -1,0 +1,6 @@
+{
+  "profiles": {"default": {"provider": "gemini", "model": "YOUR_GEMINI_MODEL", "api_key_env": "GEMINI_API_KEY"}},
+  "roles": {"heavy": "default", "light": "default", "expert": "default"},
+  "mode": "retrieval_eval", "years": [2015, 2025],
+  "search": {"enable_duckduckgo": true, "enable_serpapi": false}
+}

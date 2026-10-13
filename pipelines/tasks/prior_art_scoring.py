@@ -19,6 +19,10 @@ import math
 import re
 import ast
 import os
+import hashlib
+import uuid
+import threading
+from copy import deepcopy
 import requests
 from pathlib import Path
 from typing import List, Dict, Set, Any, Optional, Tuple, TYPE_CHECKING
@@ -30,11 +34,13 @@ from rank_bm25 import BM25Okapi
 
 from pipelines.state import PipelineState, Paper, Chunk
 from pipelines.run_manager import RunManager
-from pipelines.sections import save_paper_sections
+from pipelines.sections import save_paper_sections, load_paper_sections, _sanitize_paper_id
 from pipelines.llm_config import get_litellm_config
 from pipelines.rate_limiter import llm_rate_limiter, pdf_rate_limiter
 from tools.paper_resolver import PaperResolverTool
 from tools.pdf_parser import PdfParserTool
+from pipelines.tasks.prior_art_utils import ordered_parallel_map
+from pipelines.runtime import invoke_model, get_runtime, fingerprint
 
 from pipelines.tasks.prior_art_types import (
     PriorArtConfig, PriorArtMatch,
@@ -46,6 +52,7 @@ from pipelines.tasks.prior_art_llm_utils import (
     repair_json_output,
     parse_json_with_repair,
 )
+from pipelines.tasks.conservative_json import parse_json_locally
 
 
 # =============================================================================
@@ -66,8 +73,92 @@ def call_llm_json(agent_or_model, prompt: str) -> str:
     messages = [{"role": "user", "content": prompt}]
     # smolagents.LiteLLMModel supports direct __call__(messages) -> str
     if hasattr(agent_or_model, "model"):
-        return agent_or_model.model(messages)
-    return agent_or_model(messages)
+        return invoke_model(agent_or_model.model, messages, stage="keyword_generation")
+    return invoke_model(agent_or_model, messages, stage="keyword_generation")
+
+
+def _invoke_with_run_reuse(model, messages, *, stage, task_id=None, purpose,
+                           validate_response, reuse=False, dependencies=None,
+                           rate_limit=False):
+    """Reuse only validated, byte-equivalent inference within one live run.
+
+    This is an inference memo, not a replacement for repeated experimental trials.
+    Nothing is loaded from an earlier run. Stage is excluded from the key because
+    initial/after-enrichment are the same judgment when the evidence is unchanged.
+    Model defaults, endpoint, credentials and caller dependencies remain in the
+    fingerprint; no credential or prompt contents are emitted in reuse events.
+    """
+    runtime = get_runtime()
+
+    def execute():
+        if rate_limit:
+            llm_rate_limiter.wait_for_slot()
+        response = invoke_model(model, messages, stage=stage, task_id=task_id,
+                                validate_response=validate_response)
+        # Also validate when a model/mock is invoked without the runtime adapter.
+        if validate_response(response) is not True:
+            raise ValueError("Response validator must explicitly return True")
+        return response
+
+    if not reuse or runtime is None:
+        return execute()
+    key = fingerprint({
+        "schema": "prior_art_inference_memo_v1", "purpose": purpose,
+        "model": getattr(model, "model_id", None),
+        "endpoint": getattr(model, "api_base", None),
+        "model_defaults": getattr(model, "kwargs", None),
+        "credential_scope": getattr(model, "api_key", None),
+        "messages": messages, "dependencies": dependencies,
+    })
+    # One lock per exact request also prevents duplicate concurrent requests.
+    with runtime._lock:
+        if not hasattr(runtime, "_prior_art_inference_memo"):
+            runtime._prior_art_inference_memo = {}
+            runtime._prior_art_inference_locks = {}
+        request_lock = runtime._prior_art_inference_locks.setdefault(key, threading.Lock())
+    with request_lock:
+        entry = runtime._prior_art_inference_memo.get(key)
+        if entry is not None:
+            validate_response(entry["text"])
+            runtime.ledger.event(
+                "LLM_RESPONSE_REUSED", stage=stage, task_id=task_id or runtime.next_task_id(),
+                reuse_event_id=uuid.uuid4().hex,
+                source_stage=entry["stage"], source_task_id=entry["task_id"],
+                request_fingerprint=key, purpose=purpose, avoided_api_calls=1,
+                prompt_characters=sum(len(str(m.get("content", ""))) for m in messages),
+                saved_tokens=None, scope="same_live_run_exact_request",
+            )
+            return entry["text"]
+        # Give auto-ID helpers an explicit source identity for audit linkage.
+        source_task_id = task_id or runtime.next_task_id()
+        task_id = source_task_id
+        response = execute()
+        runtime._prior_art_inference_memo[key] = {
+            "text": extract_text_from_llm_response(response),
+            "stage": stage, "task_id": source_task_id,
+        }
+        return response
+
+
+def _parse_scoring_json(response, *, audit=False):
+    raw = extract_text_from_llm_response(response)
+    data, mode = parse_json_locally(raw)
+    runtime = get_runtime()
+    if audit and mode != "json" and runtime is not None:
+        runtime.ledger.event("LOCAL_JSON_FORMAT_RECOVERY", parser="conservative_json_v1",
+                             recovery_mode=mode, response_text_sha256=hashlib.sha256(raw.encode("utf-8")).hexdigest())
+    return data
+
+
+def _validate_facets_response(response):
+    data = _parse_scoring_json(response, audit=True)
+    if (not isinstance(data, list) or not 3 <= len(data) <= 7
+            or any(not isinstance(value, str) or not value.strip() for value in data)):
+        raise ValueError("Idea facets must be 3-7 nonempty strings")
+    normalized = [" ".join(value.split()) for value in data]
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("Idea facets must be distinct")
+    return True
 
 
 def decompose_idea_into_facets(agent, idea_description: str) -> List[str]:
@@ -102,45 +193,20 @@ JSON output:"""
 
     try:
         messages = [{"role": "user", "content": prompt}]
-        result = light_model(messages)
+        result = invoke_model(light_model, messages, stage='idea_facets',
+                              validate_response=_validate_facets_response)
         result_str = extract_text_from_llm_response(result)
         logger.debug(f"[PriorArt] Raw facet output (cleaned): {result_str[:1000]!r}")
         
-        facets: List[str] = []
-        try:
-            parsed = json.loads(result_str)
-        except Exception:
-            try:
-                parsed = ast.literal_eval(result_str)
-            except Exception:
-                logger.warning("[PriorArt] Failed to parse facets as JSON/AST, using line-split fallback")
-                # Very last-resort fallback: try to get one facet per line
-                for line in result_str.splitlines():
-                    line = line.strip().strip("-•* \t")
-                    if not line:
-                        continue
-                    facets.append(line)
-            else:
-                # ast.literal_eval succeeded
-                if isinstance(parsed, list):
-                    facets = [str(x).strip() for x in parsed if str(x).strip()]
-                else:
-                    facets = [str(parsed).strip()]
-        else:
-            # json.loads succeeded
-            if isinstance(parsed, list):
-                facets = [str(x).strip() for x in parsed if str(x).strip()]
-            else:
-                facets = [str(parsed).strip()]
-
+        _validate_facets_response(result)
+        facets = [" ".join(value.split()) for value in _parse_scoring_json(result)]
         logger.info(f"[PriorArt] Extracted {len(facets)} facets from idea")
-        return facets[:7]
+        return facets
         
     except Exception as e:
         logger.error(f"Failed to decompose idea into facets: {e}")
     
-    # Ultimate fallback: use the whole idea as a single facet
-    return [idea_description[:100]]
+        raise ValueError("Idea facet decomposition failed validation; batch scoring was not started") from e
 
 
 def extract_idea_features(agent, idea_description: str) -> Dict[str, Set[str]]:
@@ -174,7 +240,9 @@ JSON output:"""
 
     try:
         messages = [{"role": "user", "content": prompt}]
-        result = light_model(messages)
+        result = invoke_model(light_model, messages, stage='idea_features',
+                              validate_response=lambda response: _validate_string_lists_response(
+                                  response, ("datasets", "metrics", "method_families")))
         result_str = extract_text_from_llm_response(result)
         logger.debug(f"[PriorArt] Raw idea-struct output (cleaned): {result_str[:1000]!r}")
         
@@ -182,15 +250,8 @@ JSON output:"""
         metrics: Set[str] = set()
         families: Set[str] = set()
         
-        data = None
-        try:
-            data = json.loads(result_str)
-        except Exception:
-            try:
-                data = ast.literal_eval(result_str)
-            except Exception:
-                logger.warning("[PriorArt] Could not parse idea structural features, returning empty sets.")
-                return {"datasets": set(), "metrics": set(), "method_families": set()}
+        _validate_string_lists_response(result, ("datasets", "metrics", "method_families"))
+        data = _parse_scoring_json(result)
         
         if isinstance(data, dict):
             for name, target in [
@@ -234,21 +295,21 @@ def compute_structural_overlap(idea_features: Dict[str, Set[str]], paper: Paper)
     overlap_datasets = idea_features["datasets"] & paper_datasets
     if overlap_datasets:
         score += 1
-        details.append(f"Datasets: {', '.join(overlap_datasets)}")
+        details.append(f"Datasets: {', '.join(sorted(overlap_datasets))}")
         
     # Check Metrics
     paper_metrics = set(m.lower() for m in paper.metrics)
     overlap_metrics = idea_features["metrics"] & paper_metrics
     if overlap_metrics:
         score += 1
-        details.append(f"Metrics: {', '.join(overlap_metrics)}")
+        details.append(f"Metrics: {', '.join(sorted(overlap_metrics))}")
         
     # Check Method Families
     paper_families = set(f.lower() for f in paper.method_families)
     overlap_families = idea_features["method_families"] & paper_families
     if overlap_families:
         score += 1
-        details.append(f"Methods: {', '.join(overlap_families)}")
+        details.append(f"Methods: {', '.join(sorted(overlap_families))}")
         
     return score, details
 
@@ -291,31 +352,13 @@ JSON output:"""
 
     try:
         messages = [{"role": "user", "content": prompt}]
-        result = light_model(messages)
+        result = invoke_model(light_model, messages, stage='idea_high_level_facets',
+                              validate_response=_validate_paper_facets_response)
         result_str = extract_text_from_llm_response(result)
         logger.debug(f"[PriorArt] Raw high-level facets (idea, cleaned): {result_str[:1000]!r}")
         
-        data = None
-        try:
-            # Try standard parsing first
-            data = json.loads(result_str)
-        except Exception:
-            try:
-                # Try AST literal eval
-                data = ast.literal_eval(result_str)
-            except Exception:
-                # Fallback: Try to extract JSON-like object via regex if full parse fails
-                import re
-                match = re.search(r"\{.*\}", result_str, re.DOTALL)
-                if match:
-                    try:
-                        data = json.loads(match.group(0))
-                    except:
-                        pass
-                
-                if not data:
-                    logger.warning("[PriorArt] Failed to parse high-level facets from idea, using empty sets.")
-                    return {ftype: set() for ftype in HIGH_LEVEL_FACET_TYPES}
+        _validate_paper_facets_response(result)
+        data = _parse_scoring_json(result)
         
         if isinstance(data, dict):
             facets: Dict[str, Set[str]] = {}
@@ -371,6 +414,7 @@ def _repair_json_output(raw: str) -> str:
 def extract_high_level_facets_from_paper(
     agent,
     paper: Paper,
+    reuse: bool = False,
 ) -> Dict[str, List[str]]:
     """
     Extract high-level structural facets from a paper (using title/abstract/chunks).
@@ -412,40 +456,25 @@ JSON output:"""
 
     try:
         messages = [{"role": "user", "content": prompt}]
-        resp = light_model(messages)
+        if reuse:
+            resp = _invoke_with_run_reuse(
+                light_model, messages, stage='paper_high_level_facets',
+                purpose='paper_high_level_facets', reuse=True,
+                dependencies={"document_version": paper.document_version,
+                              "content_hash": paper.content_hash},
+                validate_response=_validate_paper_facets_response,
+            )
+        else:
+            resp = invoke_model(light_model, messages, stage='paper_high_level_facets',
+                                validate_response=_validate_paper_facets_response)
         result_str = extract_text_from_llm_response(resp)
         logger.debug(
             f"[PriorArt] Raw high-level facets (paper={paper.title[:60]!r}, cleaned): "
             f"{result_str[:1000]!r}"
         )
         
-        # 3-layer parsing: direct -> repair -> literal_eval
-        data = None
-        
-        # Layer 1: Direct json.loads
-        try:
-            data = json.loads(result_str)
-        except Exception:
-            pass
-        
-        # Layer 2: Try with JSON repair
-        if data is None:
-            try:
-                repaired = _repair_json_output(result_str)
-                data = json.loads(repaired)
-                logger.debug(f"[PriorArt] JSON repair succeeded for paper {paper.title[:50]!r}")
-            except Exception:
-                pass
-        
-        # Layer 3: Fallback to ast.literal_eval
-        if data is None:
-            try:
-                data = ast.literal_eval(result_str)
-            except Exception:
-                logger.warning(
-                    f"[PriorArt] Failed to parse high-level facets for paper {paper.title!r}, using empty lists."
-                )
-                return {ftype: [] for ftype in HIGH_LEVEL_FACET_TYPES}
+        _validate_paper_facets_response(resp)
+        data = _parse_scoring_json(resp)
         
         if isinstance(data, dict):
             facets: Dict[str, List[str]] = {}
@@ -491,7 +520,7 @@ def compute_high_level_facet_overlap(
     for ftype in HIGH_LEVEL_FACET_TYPES:
         overlap = idea_facets.get(ftype, set()) & paper_facets_sets.get(ftype, set())
         if overlap:
-            details[ftype] = list(overlap)
+            details[ftype] = sorted(overlap)
             if ftype in ["problem_facets", "setting_facets", "mechanism_facets"]:
                 has_major_overlap = True
             else:
@@ -514,6 +543,7 @@ def generate_relevance_keywords_from_idea(
     idea: str,
     facets: List[str],
     max_keywords: int = 20,
+    reuse: bool = False,
 ) -> List[str]:
     """
     Use the LLM once to propose loose relevance keywords / phrases
@@ -545,9 +575,16 @@ Do not output markdown code blocks.
 """
     # Use expert_model instead of agent
     try:
-        resp = call_llm_json(expert_model, prompt)
+        if reuse:
+            resp = _invoke_with_run_reuse(
+                expert_model, [{"role": "user", "content": prompt}],
+                stage="keyword_generation", purpose="relevance_keywords", reuse=True,
+                validate_response=_validate_keywords_response,
+            )
+        else:
+            resp = call_llm_json(expert_model, prompt)
         text = extract_text_from_llm_response(resp)
-        keywords = json.loads(text)
+        keywords = _parse_scoring_json(text)
         if isinstance(keywords, list):
             return [str(k).lower().strip() for k in keywords]
     except Exception as e:
@@ -649,7 +686,7 @@ def prefilter_papers_for_llm_scoring(
             regular_papers.append((s, pid, p))
     
     # Sort regular papers descending by score
-    regular_papers.sort(key=lambda x: x[0], reverse=True)
+    regular_papers.sort(key=lambda x: (-x[0], x[1]))
     
     # Strategy: Keep all papers with score > 0, plus all seed papers
     # This ensures we don't lose potentially relevant papers due to strict threshold
@@ -688,6 +725,8 @@ def llm_relevance_prefilter(
     topic: str,
     idea_description: str,
     max_workers: int = 1,
+    stage: str = "initial",
+    reuse: bool = False,
 ) -> List[Tuple[str, Paper]]:
     """
     Stage 2: Use a light LLM to do quick true/false relevance filtering.
@@ -710,9 +749,6 @@ def llm_relevance_prefilter(
         """Check if a single paper is potentially relevant."""
         pid, paper = pid_paper
         
-        # Per-request rate limiting for LLM
-        llm_rate_limiter.wait_for_slot()
-        
         # Create thread-local LLM instance (each thread must have its own)
         model_id, api_base, api_key = get_litellm_config(role="light")
         local_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
@@ -731,32 +767,26 @@ Only output valid JSON, no explanation:
 """
         try:
             messages = [{"role": "user", "content": prompt}]
-            resp = local_model(messages)
+            resp = _invoke_with_run_reuse(
+                local_model, messages, stage=f"relevance_prefilter_{stage}", task_id=pid,
+                purpose="relevance_prefilter", reuse=reuse, rate_limit=True,
+                dependencies={"paper_id": pid, "document_version": paper.document_version},
+                validate_response=_validate_relevance_response,
+            )
             text = extract_text_from_llm_response(resp)
-            result = json.loads(text)
-            is_relevant = result.get("is_relevant", True)  # Default to true if parse fails
+            result = _parse_scoring_json(text)
+            is_relevant = result.get("is_relevant")
+            if type(is_relevant) is not bool:
+                raise ValueError("is_relevant must be a JSON boolean")
             return (pid, paper, is_relevant)
         except Exception as e:
             logger.debug(f"[PreFilter-LLM] Error checking {paper.title[:40]}: {e}")
+            from pipelines.runtime import get_runtime
+            if get_runtime():
+                get_runtime().ledger.event("PREFILTER_FAILED_KEEP", paper_id=pid, stage=stage, error=str(e))
             return (pid, paper, True)  # Keep paper on error
     
-    results = []
-    
-    if max_workers <= 1:
-        # Serial execution
-        for pid_paper in papers:
-            results.append(_check_single_paper(pid_paper))
-    else:
-        # Parallel execution
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_paper = {executor.submit(_check_single_paper, pp): pp for pp in papers}
-            for fut in as_completed(future_to_paper):
-                try:
-                    results.append(fut.result())
-                except Exception as e:
-                    pid, paper = future_to_paper[fut]
-                    logger.warning(f"[PreFilter-LLM] Error: {e}")
-                    results.append((pid, paper, True))
+    results = ordered_parallel_map(papers, _check_single_paper, max_workers)
     
     # Filter to relevant papers
     relevant_papers = [(pid, p) for pid, p, is_relevant in results if is_relevant]
@@ -768,6 +798,72 @@ Only output valid JSON, no explanation:
     )
     
     return relevant_papers
+
+
+def _validate_score_response(response, facet_count, refined=False):
+    data = _parse_scoring_json(response, audit=True)
+    _validate_score_data(data, facet_count, refined=refined)
+    return True
+
+
+def _validate_relevance_response(response):
+    data = _parse_scoring_json(response, audit=True)
+    if not isinstance(data, dict) or type(data.get("is_relevant")) is not bool:
+        raise ValueError("is_relevant must be a JSON boolean")
+    return True
+
+
+def _validate_keywords_response(response):
+    data = _parse_scoring_json(response, audit=True)
+    if not isinstance(data, list) or not data or any(not isinstance(x, str) or not x.strip() for x in data):
+        raise ValueError("keywords must be a nonempty list of nonempty strings")
+    return True
+
+
+def _validate_paper_facets_response(response):
+    return _validate_string_lists_response(response, HIGH_LEVEL_FACET_TYPES)
+
+
+def _validate_string_lists_response(response, keys):
+    data = _parse_scoring_json(response, audit=True)
+    if not isinstance(data, dict) or any(
+            key not in data or not isinstance(data[key], list)
+            or any(not isinstance(x, str) for x in data[key])
+            for key in keys):
+        raise ValueError("Response must include all required fields as string lists")
+    return True
+
+
+def _validate_score_data(data, facet_count, refined=False):
+    """Reject incomplete/nonfinite model judgments instead of inventing zero."""
+    if not isinstance(data, dict):
+        raise ValueError("score response must be an object")
+    level_key = "coverage_level_refined" if refined else "coverage_level"
+    level = data.get(level_key)
+    if type(level) is not int or not 0 <= level <= 3:
+        raise ValueError(f"{level_key} must be an integer from 0 to 3")
+    if not isinstance(data.get("notes"), str):
+        raise ValueError("notes must be a string")
+    if refined:
+        if data.get("role") not in {"main_contribution", "key_technique", "background", "irrelevant"}:
+            raise ValueError("invalid refinement role")
+        return data
+    labels = data.get("covered_facets")
+    valid_labels = {f"F{i + 1}" for i in range(facet_count)}
+    if not isinstance(labels, list) or any(not isinstance(v, str) or v not in valid_labels for v in labels):
+        raise ValueError("covered_facets must contain only defined facet labels")
+    for field in ("task_similarity", "method_similarity"):
+        value = data.get(field)
+        if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1:
+            raise ValueError(f"{field} must be a finite number from 0 to 1")
+    if "high_level_facets" in data:
+        hl = data["high_level_facets"]
+        if not isinstance(hl, dict) or any(
+                not isinstance(hl.get(key, []), list) or
+                any(not isinstance(item, str) for item in hl.get(key, []))
+                for key in HIGH_LEVEL_FACET_TYPES):
+            raise ValueError("invalid high_level_facets")
+    return data
 
 
 def score_papers_with_abstract_only(
@@ -795,25 +891,27 @@ def score_papers_with_abstract_only(
     The output is a list of PriorArtMatch objects, sorted by:
       coverage_level, high_level_facet_score, structural_score, citations.
     """
-    # Determine max papers to score
-    if cfg:
+    staged = bool(cfg and getattr(cfg, "staged_retrieval", False))
+    reuse = bool(cfg and cfg.reuse_llm_across_stages)
+    # The staged funnel already chose its bounded candidate pool. Do not apply a
+    # second citation cap or redundant boolean judgment before full scoring.
+    if staged:
+        max_papers = len(state.papers)
+    elif cfg:
         max_papers = get_max_abstract_to_score(cfg, stage)
     else:
         max_papers = 80 # Default fallback
 
     logger.info(f"[PriorArt] Scoring top {max_papers} papers (abstract-only) [Stage: {stage}]...")
     
-    # Instantiate light model for scoring
-    model_id, api_base, api_key = get_litellm_config(role="light")
-    light_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
-
     # Sort papers by citation count
     all_papers = list(state.papers.items())
-    all_papers.sort(key=lambda x: x[1].citation_count or 0, reverse=True)
+    if not staged:
+        all_papers.sort(key=lambda x: (-(x[1].citation_count or 0), x[0]))
 
     # Two-stage pre-filter logic
     # Stage 1: Lexical scoring with generic-word penalty
-    if cfg and cfg.enable_prefilter and len(all_papers) > cfg.prefilter_min_papers:
+    if not staged and cfg and cfg.enable_prefilter and len(all_papers) > cfg.prefilter_min_papers:
         logger.info(
             "[PriorArt] Stage 1: Applying lexical pre-filter: "
             f"{len(all_papers)} candidate papers -> at most {cfg.prefilter_max_keep}."
@@ -824,6 +922,7 @@ def score_papers_with_abstract_only(
             idea=idea_description,
             facets=facets,
             max_keywords=cfg.prefilter_max_keywords,
+            reuse=reuse,
         )
         logger.info(f"[PriorArt] Generated relevance keywords: {keywords[:10]}...")  # Log first 10
         
@@ -837,7 +936,7 @@ def score_papers_with_abstract_only(
         )
     
     # Stage 2: Light LLM true/false relevance filter
-    if cfg and cfg.enable_llm_prefilter:
+    if not staged and cfg and cfg.enable_llm_prefilter:
         llm_top_n = cfg.debug_llm_prefilter_top_n if cfg.debug_mode else cfg.llm_prefilter_top_n
         papers_for_llm_filter = all_papers[:llm_top_n]
         
@@ -851,6 +950,8 @@ def score_papers_with_abstract_only(
                 topic=state.intent.topic,
                 idea_description=idea_description,
                 max_workers=max_workers,
+                stage=stage,
+                reuse=reuse,
             )
             # Combine filtered papers with remaining papers (beyond llm_top_n)
             all_papers = filtered_papers + all_papers[llm_top_n:]
@@ -861,6 +962,7 @@ def score_papers_with_abstract_only(
     matches = []
     
     facets_str = "\n".join([f"F{i+1}. {facet}" for i, facet in enumerate(facets)])
+    allowed_facet_labels = json.dumps([f"F{i+1}" for i in range(len(facets))])
     
     # =========================================================================
     # Define per-paper scoring function for parallelization
@@ -872,9 +974,26 @@ def score_papers_with_abstract_only(
         Returns PriorArtMatch object.
         """
         paper_id, paper = paper_tuple
-        
-        # Per-request rate limiting for LLM (sliding window, not batch + sleep)
-        llm_rate_limiter.wait_for_slot()
+        paper = deepcopy(paper)  # Workers produce isolated patches.
+        if staged and paper.identity_status == 'conflict':
+            return PriorArtMatch(
+                paper_id=paper_id, coverage_level=None, scoring_status='identity_conflict',
+                notes='Conflicting identity; retained for audit, excluded from relevance judgment.',
+            ), paper.high_level_facets
+        if (staged and state.intent.years and paper.year is not None
+                and not state.intent.years[0] <= paper.year <= state.intent.years[1]):
+            return PriorArtMatch(
+                paper_id=paper_id, coverage_level=None, scoring_status='out_of_scope',
+                notes='Verified year outside the requested interval; retained for audit.',
+            ), paper.high_level_facets
+        if staged and not (paper.abstract or "").strip():
+            # Missing evidence is uncertainty, not a negative judgment. The
+            # funnel can enrich this record and invoke scoring again later.
+            return PriorArtMatch(
+                paper_id=paper_id, coverage_level=None,
+                scoring_status="missing_abstract",
+                notes="Abstract unavailable; awaiting metadata enrichment.",
+            ), paper.high_level_facets
         
         # Create thread-local LLM instance (each thread must have its own)
         _model_id, _api_base, _api_key = get_litellm_config(role="light")
@@ -885,8 +1004,9 @@ def score_papers_with_abstract_only(
         # Build paper context (Abstract Only)
         paper_context = f"""Title: {paper.title}
 Venue: {paper.venue or 'Unknown'}
-Year: {paper.year or 'Unknown'}
-Citation Count: {paper.citation_count or 0}"""
+Year: {paper.year or 'Unknown'}"""
+        if not staged:
+            paper_context += f"\nCitation Count: {paper.citation_count or 0}"
         
         # Add abstract if available
         if hasattr(paper, 'abstract') and paper.abstract:
@@ -896,6 +1016,16 @@ Citation Count: {paper.citation_count or 0}"""
         
         # Check if we should use merged LLM call
         use_merged = cfg.enable_merged_llm_calls if cfg else True
+        reuse_dependencies = {
+            "paper_id": paper_id, "entity_id": paper.entity_id,
+            "document_version": paper.document_version, "content_hash": paper.content_hash,
+            "idea": idea_description, "topic": state.intent.topic, "facets": facets,
+            "idea_features": idea_features, "idea_high_level_facets": idea_high_level_facets,
+            # Keep the full abstract in the validity key even when the legacy
+            # prompt uses its existing 1000-character evidence window.
+            "abstract": paper.abstract, "doi": paper.doi, "arxiv_id": paper.arxiv_id,
+            "staged_retrieval": staged, "merged_calls": use_merged,
+        }
         
         if use_merged:
             # ===== MERGED LLM CALL: Scoring + Facet Extraction in One =====
@@ -919,7 +1049,7 @@ Please output a SINGLE JSON object with ALL of the following fields:
   1 = adjacent work (same domain but different approach)
   2 = partial overlap (covers some facets)
   3 = high overlap (covers most/all facets, potential conflict)
-- "covered_facets": list of facet labels (e.g., ["F1", "F3"]) that this paper covers
+- "covered_facets": a list containing only labels from {allowed_facet_labels} that this paper covers; use [] when none apply
 - "task_similarity": float 0.0-1.0 how similar the task/problem addressed is
 - "method_similarity": float 0.0-1.0 how similar the method/approach is
 - "notes": brief justification (1-2 sentences)
@@ -933,20 +1063,19 @@ JSON output:"""
             
             try:
                 messages = [{"role": "user", "content": merged_prompt}]
-                resp = local_model(messages)
+                resp = _invoke_with_run_reuse(
+                    local_model, messages, stage=f"abstract_scoring_{stage}",
+                    task_id=paper_id + "/merged", purpose="abstract_scoring_merged",
+                    reuse=reuse, dependencies=reuse_dependencies, rate_limit=True,
+                    validate_response=lambda response: _validate_score_response(response, len(facets)),
+                )
                 result_str = extract_text_from_llm_response(resp)
                 logger.debug(f"[PriorArt] Raw merged output for {paper.title[:30]}...: {result_str[:500]!r}")
                 
-                score_data = None
-                try:
-                    score_data = json.loads(result_str)
-                except Exception:
-                    try:
-                        score_data = ast.literal_eval(result_str)
-                    except Exception:
-                        pass
+                score_data = _parse_scoring_json(resp)
                 
                 if isinstance(score_data, dict):
+                    _validate_score_data(score_data, len(facets))
                     # Extract scoring fields
                     coverage_level = int(score_data.get("coverage_level", 0))
                     covered_facet_labels = score_data.get("covered_facets", []) or []
@@ -964,7 +1093,7 @@ JSON output:"""
                         }
                     elif not paper.high_level_facets:
                         # Fallback: use separate call if merged didn't include facets
-                        paper.high_level_facets = extract_high_level_facets_from_paper(None, paper)
+                        paper.high_level_facets = extract_high_level_facets_from_paper(None, paper, reuse=reuse)
                     
                     # Map facet labels to readable text
                     covered_facets: List[str] = []
@@ -985,6 +1114,8 @@ JSON output:"""
                         notes=notes,
                         task_similarity=task_sim,
                         method_similarity=method_sim,
+                        abstract_coverage_level=coverage_level,
+                        abstract_notes=notes,
                     )
                     
                     # Compute structural score
@@ -998,7 +1129,7 @@ JSON output:"""
                     match.high_level_facet_matches = hl_details
                     
                     logger.info(f"[PriorArt] Scored {paper.title[:40]}...: level={coverage_level}, task_sim={task_sim:.2f}")
-                    return match
+                    return match, paper.high_level_facets
                 
             except Exception as e:
                 logger.warning(f"[PriorArt] Merged LLM call failed for {paper.title[:40]}...: {e}")
@@ -1006,7 +1137,7 @@ JSON output:"""
         # ===== FALLBACK: Separate calls (original behavior) =====
         # Extract facets if not present
         if not paper.high_level_facets:
-            paper.high_level_facets = extract_high_level_facets_from_paper(None, paper)
+            paper.high_level_facets = extract_high_level_facets_from_paper(None, paper, reuse=reuse)
         
         # Scoring-only prompt
         prompt = f"""You are a JSON generator. **Do NOT call any tools or write/run any code.**
@@ -1027,7 +1158,7 @@ Please output a JSON object with:
   1 = adjacent work (same domain but different approach)
   2 = partial overlap (covers some facets)
   3 = high overlap (covers most/all facets, potential conflict)
-- "covered_facets": list of facet labels (e.g., ["F1", "F3"]) that this paper covers
+- "covered_facets": a list containing only labels from {allowed_facet_labels} that this paper covers; use [] when none apply
 - "task_similarity": float 0.0-1.0 how similar the task/problem addressed is
 - "method_similarity": float 0.0-1.0 how similar the method/approach is
 - "notes": brief justification (1-2 sentences)
@@ -1036,19 +1167,18 @@ JSON output:"""
 
         try:
             messages = [{"role": "user", "content": prompt}]
-            resp = local_model(messages)
+            resp = _invoke_with_run_reuse(
+                local_model, messages, stage=f"abstract_scoring_{stage}",
+                task_id=paper_id + "/separate", purpose="abstract_scoring_separate",
+                reuse=reuse, dependencies=reuse_dependencies, rate_limit=True,
+                validate_response=lambda response: _validate_score_response(response, len(facets)),
+            )
             result_str = extract_text_from_llm_response(resp)
             
-            score_data = None
-            try:
-                score_data = json.loads(result_str)
-            except Exception:
-                try:
-                    score_data = ast.literal_eval(result_str)
-                except Exception:
-                    pass
+            score_data = _parse_scoring_json(resp)
             
             if isinstance(score_data, dict):
+                _validate_score_data(score_data, len(facets))
                 coverage_level = int(score_data.get("coverage_level", 0))
                 covered_facet_labels = score_data.get("covered_facets", []) or []
                 notes = score_data.get("notes", "")
@@ -1073,6 +1203,8 @@ JSON output:"""
                     notes=notes,
                     task_similarity=task_sim,
                     method_similarity=method_sim,
+                    abstract_coverage_level=coverage_level,
+                    abstract_notes=notes,
                 )
                 
                 struct_score, struct_details = compute_structural_overlap(idea_features, paper)
@@ -1084,7 +1216,7 @@ JSON output:"""
                 match.high_level_facet_matches = hl_details
                 
                 logger.info(f"[PriorArt] Scored {paper.title[:40]}...: level={coverage_level}")
-                return match
+                return match, paper.high_level_facets
                 
         except Exception as e:
             logger.warning(f"Failed to score paper {paper.title[:40]}...: {e}")
@@ -1092,11 +1224,13 @@ JSON output:"""
         # Return fallback match
         return PriorArtMatch(
             paper_id=paper_id,
-            coverage_level=0,
+            coverage_level=None,
+            scoring_status="failed",
+            scoring_error="No valid score response after the configured fallback path.",
             covered_facet_labels=[],
             covered_facets=[],
             notes="Scoring failed.",
-        )
+        ), paper.high_level_facets
     
     # =========================================================================
     # Execute scoring with parallel workers (rate limiting at client layer)
@@ -1107,24 +1241,33 @@ JSON output:"""
     
     logger.info(f"[PriorArt] Scoring {len(papers_to_score)} papers with parallel workers (workers={max_workers})")
     
-    matches = run_parallel(
+    scored_results = ordered_parallel_map(
         items=papers_to_score,
         process_func=_score_single_paper,
         max_workers=max_workers,
-        desc="LLMScoring",
     )
+    matches = []
+    for match, paper_facets in scored_results:
+        state.papers[match.paper_id].high_level_facets = paper_facets
+        matches.append(match)
+        if reuse and get_runtime():
+            get_runtime().ledger.event(
+                "ABSTRACT_ASSESSMENT", stage=stage, paper_id=match.paper_id,
+                status=match.scoring_status, coverage_level=match.coverage_level,
+                task_similarity=match.task_similarity, method_similarity=match.method_similarity,
+            )
     
     # Sort by coverage_level (desc), then similarity, then citation_count
     # This prioritizes papers with similar tasks/methods over high-citation surveys
     matches.sort(
         key=lambda m: (
-            m.coverage_level,
-            m.task_similarity,             # Task similarity (new)
-            m.method_similarity,           # Method similarity (new)
-            m.high_level_facet_score,
-            min(state.papers[m.paper_id].citation_count or 0, 200)  # Cap citation influence
+            -(m.coverage_level if m.coverage_level is not None else -1),
+            -m.task_similarity,
+            -m.method_similarity,
+            -m.high_level_facet_score,
+            0 if staged else -min(state.papers[m.paper_id].citation_count or 0, 200),
+            m.paper_id,
         ),
-        reverse=True
     )
     
     logger.info(f"Scored {len(matches)} papers")
@@ -1150,65 +1293,218 @@ def enrich_papers_with_fulltext(
         max_workers: Number of parallel threads
         run_mgr: Optional RunManager for linking PDFs to run directory
     """
-    from pipelines.tasks.prior_art_utils import ensure_pdf_url, run_parallel
+    from pipelines.tasks.prior_art_utils import ensure_pdf_url, run_parallel, verified_pdf_alternatives
     
     # Use RunManager's pdf_cache if available, else fallback to cwd
     if run_mgr:
         pdf_cache_dir = str(run_mgr.pdf_cache_dir)
+        pages_cache_dir = Path(getattr(run_mgr, "pdf_pages_cache_dir", run_mgr.pdf_cache_dir))
     else:
         pdf_cache_dir = os.path.join(os.getcwd(), "pdf_cache")
+        pages_cache_dir = Path(pdf_cache_dir)
     # Ensure cache dir exists (outside threads)
     try:
         os.makedirs(pdf_cache_dir, exist_ok=True)
+        pages_cache_dir.mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
 
+    no_manager_scope = uuid.uuid4().hex
+
+    def load_cached_pages(raw_hash, parser_version):
+        """Reuse extraction only after the current PDF bytes have been hashed.
+
+        The cache contains no URL/DOI lookup and preserves native page order.
+        Missing, damaged, or differently versioned entries are ordinary misses.
+        """
+        cache_path = pages_cache_dir / f"{raw_hash}.{parser_version}.pages.json"
+        try:
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            candidate_pages = cached.get("pages")
+            if (cached.get("pdf_sha256") == raw_hash
+                    and cached.get("parser_version") == parser_version
+                    and isinstance(candidate_pages, list) and candidate_pages
+                    and all(isinstance(page, dict)
+                            and type(page.get("page")) is int
+                            and page["page"] == index + 1
+                            and isinstance(page.get("text"), str)
+                            for index, page in enumerate(candidate_pages))
+                    and cached.get("pages_sha256") == fingerprint(candidate_pages)):
+                return candidate_pages
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+        return None
+
     def _process_one_paper(pid: str) -> Optional[str]:
         """Process a single paper: resolve URL, download PDF, parse chunks. Returns pid if success."""
-        # PdfParserTool instantiated locally for thread safety
+        # Native extraction is serialized inside PdfParserTool; text work is local.
         parser = PdfParserTool()
         
         paper = state.papers.get(pid)
         if not paper:
             return None
+        if paper.identity_status == 'conflict':
+            paper.pdf_status = 'error'
+            paper.pages_status = paper.chunks_status = paper.sections_status = 'identity_conflict'
+            logger.warning(f'[Fulltext] Identity conflict for {pid}; material must be adjudicated before use')
+            return None
+        artifact_manifest = (Path(run_mgr.run_dir) / "pdf_sections" / f"{_sanitize_paper_id(pid)}.artifacts.json") if run_mgr else None
         
-        if paper.chunks:  # Already parsed
-            return pid
+        def remote_binding():
+            return {"paper_id": pid, "doi": paper.doi, "arxiv_id": paper.arxiv_id,
+                "document_version": paper.document_version, "url": paper.pdf_url,
+                "scope": "versioned" if paper.document_version else str(run_mgr.run_dir if run_mgr else no_manager_scope)}
+
+        # Automatic remote paths must never become explicit-local inputs merely
+        # because the same Paper object was restored or passed into another run.
+        remote_input = paper.pdf_origin == "remote_cache" or bool(paper.pdf_source_binding)
+        if paper.local_pdf_path and paper.pdf_origin is None:
+            remote_input = Path(paper.local_pdf_path).resolve().is_relative_to(Path(pdf_cache_dir).resolve())
+        if remote_input and paper.pdf_source_binding != remote_binding():
+            old_binding = dict(paper.pdf_source_binding)
+            paper.source_records.append({"source": "superseded_remote_material",
+                "binding": old_binding, "content_hash": paper.content_hash,
+                "local_pdf_path": paper.local_pdf_path})
+            if old_binding.get("arxiv_id") != paper.arxiv_id and paper.pdf_url == old_binding.get("url"):
+                paper.pdf_url = None
+                paper.pdf_resolve_failed = False
+            paper.local_pdf_path = None
+            paper.content_hash = None
+            paper.parser_version = None
+            paper.chunks = []
+            paper.parsed_sections = []
+            paper.has_fulltext = False
+            paper.pdf_status = "not_attempted"
+            paper.section_status = "not_attempted"
+            paper.pages_status = paper.chunks_status = paper.sections_status = "not_attempted"
+
+        cache_identity_verified = False
+        if paper.local_pdf_path and os.path.isfile(paper.local_pdf_path) and paper.content_hash:
+            from tools.pdf_parser import PARSER_VERSION
+            cache_identity_verified = (
+                hashlib.sha256(Path(paper.local_pdf_path).read_bytes()).hexdigest() == paper.content_hash
+                and paper.parser_version == PARSER_VERSION
+            )
+        if paper.chunks and run_mgr and cache_identity_verified:
+            try:
+                existing_sections = load_paper_sections(run_mgr.run_dir, pid)
+                manifest = json.loads(artifact_manifest.read_text(encoding="utf-8"))
+                from pipelines.runtime import fingerprint
+                if (existing_sections and existing_sections.sections
+                        and existing_sections.paper_id == pid
+                        and manifest.get("pdf_sha256") == paper.content_hash
+                        and manifest.get("parser_version") == paper.parser_version
+                        and manifest.get("sections_sha256") == fingerprint(existing_sections.to_dict())
+                        and manifest.get("chunks_sha256") == fingerprint([c.model_dump() for c in paper.chunks])):
+                    paper.parsed_sections = existing_sections.to_dict()["sections"]
+                    paper.section_status = "parsed"
+                    paper.sections_status = "parsed"
+                    paper.chunks_status = "parsed"
+                    paper.has_fulltext = True
+                    return pid
+            except (OSError, ValueError, TypeError, KeyError):
+                pass  # Recover missing/corrupt sections even when chunks exist.
             
         logger.info(f"[Fulltext] Enriching paper: {paper.title[:50]}...")
         
-        # Resolve PDF URL using unified helper with caching
-        pdf_url = ensure_pdf_url(paper)
-        if not pdf_url:
-            logger.warning(f"[Fulltext] No PDF URL found for paper: {paper.title[:50]}")
-            return None
+        # Bind cached bytes to a source/version, not just a DOI-shaped filename.
+        # Unversioned remote sources are reused within this run only; explicit
+        # caller-provided local files remain material inputs and are fingerprinted.
+        from pipelines.runtime import fingerprint, atomic_write_json
+        explicit_local = bool(paper.local_pdf_path) and not remote_input
+        source_binding = None
+        binding_path = None
+        cache_valid = explicit_local and os.path.isfile(paper.local_pdf_path)
+        if explicit_local:
+            local_pdf_path = paper.local_pdf_path
+            safe_name = _sanitize_paper_id(pid)
+        else:
+            pdf_url = ensure_pdf_url(paper)
+            if not pdf_url:
+                logger.warning(f"[Fulltext] No PDF URL found for paper: {paper.title[:50]}")
+                return None
+            source_binding = remote_binding()
+            safe_name = "material_" + fingerprint(source_binding)
+            local_pdf_path = str(Path(pdf_cache_dir) / f"{safe_name}.pdf")
+            binding_path = Path(pdf_cache_dir) / f"{safe_name}.source.json"
+            if Path(local_pdf_path).is_file() and binding_path.is_file():
+                try:
+                    binding = json.loads(binding_path.read_text(encoding="utf-8"))
+                    cache_valid = binding.get("source_binding") == source_binding and binding.get("pdf_sha256") == hashlib.sha256(Path(local_pdf_path).read_bytes()).hexdigest()
+                except (OSError, ValueError, TypeError):
+                    cache_valid = False
+        pages = None
 
-        # Download PDF to local cache
-        # Sanitize paper_id for use as filename (DOIs contain /, S2: contains :)
-        safe_name = pid.replace('/', '_').replace('\\', '_').replace(':', '_')
-        if paper.doi:
-            safe_name = paper.doi.replace('/', '_').replace('\\', '_').replace(':', '_')
-        elif paper.openalex_id:
-            safe_name = paper.openalex_id.replace('/', '_').replace('\\', '_').replace(':', '_')
-            
-        local_filename = f"{safe_name}.pdf"
-        local_pdf_path = os.path.join(pdf_cache_dir, local_filename)
-        
-        if not os.path.exists(local_pdf_path):
-            try:
-                # Per-request rate limiting for PDF downloads
-                pdf_rate_limiter.wait_for_slot()
-                
-                logger.info(f"Downloading PDF from {paper.pdf_url}...")
-                response = requests.get(paper.pdf_url, timeout=30)
-                response.raise_for_status()
-                with open(local_pdf_path, "wb") as f:
-                    f.write(response.content)
-            except Exception as e:
-                logger.warning(f"[Fulltext] Failed to download PDF for paper: {paper.title[:50]} - {e}")
+        if not cache_valid:
+            pdf_url = ensure_pdf_url(paper)
+            if not pdf_url:
+                paper.pdf_status = "error"
+                return None
+            acquired = False
+            # One independently verified alternate URL is still material for
+            # this same selected paper; it never fills the slot with paper six.
+            for source_attempt in range(2):
+                temp_path = str(Path(local_pdf_path).with_suffix(f".{uuid.uuid4().hex}.tmp.pdf"))
+                try:
+                    pdf_rate_limiter.wait_for_slot()
+                    logger.info(f"Downloading PDF from {paper.pdf_url}...")
+                    response = requests.get(paper.pdf_url, timeout=30)
+                    response.raise_for_status()
+                    with open(temp_path, "wb") as f:
+                        f.write(response.content)
+                    from tools.pdf_parser import PARSER_VERSION
+                    downloaded_hash = hashlib.sha256(Path(temp_path).read_bytes()).hexdigest()
+                    pages = load_cached_pages(downloaded_hash, PARSER_VERSION)
+                    if pages is None:
+                        pages = parser._extract_text_pymupdf(temp_path)
+                    if not pages:
+                        raise ValueError("Downloaded PDF has no pages")
+                    os.replace(temp_path, local_pdf_path)
+                    if binding_path:
+                        atomic_write_json(binding_path, {"source_binding": source_binding, "pdf_sha256": downloaded_hash})
+                    paper.source_records.append({"source": "pdf_download_attempt", "url": paper.pdf_url,
+                        "source_attempt": source_attempt + 1, "status": "SUCCEEDED", "pdf_sha256": downloaded_hash})
+                    acquired = True
+                    break
+                except Exception as e:
+                    failed_url = paper.pdf_url
+                    paper.source_records.append({"source": "pdf_download_attempt", "url": failed_url,
+                        "source_attempt": source_attempt + 1, "status": "FAILED", "error_type": type(e).__name__})
+                    logger.warning(f"[Fulltext] Failed to download PDF for paper: {paper.title[:50]} - {e}")
+                    if source_attempt or explicit_local:
+                        break
+                    try:
+                        alternatives = verified_pdf_alternatives(paper, failed_url)
+                    except Exception as alternative_error:
+                        paper.source_records.append({"source": "pdf_alternative_identity",
+                            "failed_url": failed_url, "status": "error",
+                            "error_type": type(alternative_error).__name__})
+                        break
+                    if not alternatives:
+                        break
+                    alternative = alternatives[0]
+                    if (alternative.get("identity_status") != "verified_arxiv_metadata"
+                            or not alternative.get("url") or alternative["url"] == failed_url):
+                        break
+                    paper.pdf_url = alternative["url"]
+                    paper.arxiv_id = alternative["arxiv_id"]
+                    paper.document_version = alternative["document_version"]
+                    source_binding = remote_binding()
+                    safe_name = "material_" + fingerprint(source_binding)
+                    local_pdf_path = str(Path(pdf_cache_dir) / f"{safe_name}.pdf")
+                    binding_path = Path(pdf_cache_dir) / f"{safe_name}.source.json"
+                    pages = None
+                finally:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+            if not acquired:
+                paper.pdf_status = "error"
                 return None
         
         paper.local_pdf_path = local_pdf_path
+        paper.pdf_origin = "explicit_local" if explicit_local else "remote_cache"
+        if source_binding is not None:
+            paper.pdf_source_binding = source_binding
         
         # Link PDF to run directory if RunManager is available
         if run_mgr:
@@ -1220,50 +1516,202 @@ def enrich_papers_with_fulltext(
         # Parse the PDF into chunks
         try:
             logger.info(f"Parsing PDF: {local_pdf_path}")
-            parser_result_str = parser.forward(pdf_path=local_pdf_path, chunk_size=1000)
-            
-            # Extract text from chunks
-            content_json = json.loads(parser_result_str)
+            from tools.pdf_parser import PARSER_VERSION
+            raw_hash = hashlib.sha256(Path(local_pdf_path).read_bytes()).hexdigest()
+            pages_cache = pages_cache_dir / f"{raw_hash}.{PARSER_VERSION}.pages.json"
+            if pages is None:
+                pages = load_cached_pages(raw_hash, PARSER_VERSION)
+            pages, content_json, paper_sections = parser.parse_artifacts(
+                local_pdf_path, pid, paper.title, paper.year or 0,
+                chunk_size=1000, pages=pages,
+            )
+            from pipelines.runtime import atomic_write_json, fingerprint
+            atomic_write_json(pages_cache, {"pdf_sha256": raw_hash,
+                "parser_version": PARSER_VERSION, "pages": pages, "pages_sha256": fingerprint(pages)})
+            paper.pdf_status = "downloaded"
+            replace_chunks = (not paper.chunks or paper.content_hash != raw_hash
+                              or paper.parser_version != PARSER_VERSION)
+            paper.content_hash = raw_hash
+            paper.parser_version = PARSER_VERSION
+            paper.pages_status = "parsed"
             
             # Populate paper.chunks
-            paper.chunks = [
+            if replace_chunks:
+                paper.chunks = [
                 Chunk(
                     text=chunk["text"],
                     page_start=chunk.get("page_start"),
                     page_end=chunk.get("page_end")
                 )
                 for chunk in content_json
-            ]
+                ]
+            paper.chunks_status = "parsed" if paper.chunks else "empty"
             
             # Parse sections with semantic roles (intro, related_work, method, etc.)
             try:
-                paper_sections = parser.parse_sections(
-                    pdf_path=local_pdf_path,
-                    paper_id=pid,
-                    title=paper.title,
-                    year=paper.year or 0,
-                )
+                if not paper_sections.sections:
+                    raise ValueError("Section parser returned no sections")
                 # Save sections JSON to task directory
                 if run_mgr:
                     sections_path = save_paper_sections(run_mgr.run_dir, paper_sections)
                     logger.info(f"[Fulltext] Saved sections to {sections_path}")
                     # Mark paper as having fulltext for downstream processing
                     paper.has_fulltext = True
+                paper.section_status = "parsed"
+                paper.sections_status = "parsed"
+                paper.parsed_sections = paper_sections.to_dict()["sections"]
+                paper.has_fulltext = bool(paper.chunks)
+                if artifact_manifest:
+                    atomic_write_json(artifact_manifest, {"paper_id": pid,
+                        "pdf_sha256": raw_hash, "parser_version": PARSER_VERSION,
+                        "sections_sha256": fingerprint(paper_sections.to_dict()),
+                        "chunks_sha256": fingerprint([c.model_dump() for c in paper.chunks])})
             except Exception as e:
+                paper.section_status = "parse_error"
+                paper.sections_status = "parse_error"
                 logger.warning(f"[Fulltext] Failed to parse sections for {paper.title[:50]}: {e}")
             
             return pid
         except Exception as e:
+            paper.pdf_status = "error"
+            paper.has_fulltext = False
+            paper.pages_status = "parse_error"
+            paper.section_status = "parse_error"
+            paper.sections_status = "parse_error"
             logger.warning(f"Failed to parse PDF {local_pdf_path}: {e}")
             return None
 
     # Use single executor with per-request rate limiting (pdf_rate_limiter)
     run_parallel(
-        items=paper_ids,
+        items=list(dict.fromkeys(paper_ids)),
         process_func=_process_one_paper,
         max_workers=max_workers,
         desc="EnrichFulltext",
     )
+
+
+def prepare_fixed_fulltext_for_eval(
+    state: PipelineState,
+    matches: List[PriorArtMatch],
+    candidate_ids: List[str],
+    run_mgr: RunManager,
+    cfg: PriorArtConfig,
+    years=None,
+) -> List[str]:
+    """Acquire a fixed five-paper material set without a second scoring pass.
+
+    Valid abstract judgments use the existing shortlist order. Any remaining
+    slots take eligible unassessed records in supplied candidate order, with
+    that distinction recorded. No failed acquisition is replaced by item six.
+    Abstract grades and refinement statuses remain untouched; a later unified
+    Expert judgment owns the evaluation ranking.
+    """
+    from pipelines.assessment import valid_level, valid_similarity
+    from pipelines.runtime import atomic_write_json
+    from pipelines.tasks.candidate_selection import match_order
+
+    limit = getattr(cfg, "retrieval_eval_fulltext_limit", 5)
+    if type(limit) is not int or limit != 5:
+        raise ValueError("Retrieval evaluation prepares exactly five candidate slots")
+    if run_mgr is None:
+        raise ValueError("Retrieval evaluation material preparation requires a run manager")
+
+    scope = years if years is not None else state.intent.years
+    eligible_ids = []
+    excluded = []
+    for pid in dict.fromkeys(candidate_ids):
+        paper = state.papers.get(pid)
+        reason = ("missing_record" if paper is None else
+                  "identity_conflict" if paper.identity_status == "conflict" else
+                  "known_year_out_of_scope" if scope and paper.year is not None
+                  and not scope[0] <= paper.year <= scope[1] else None)
+        if reason:
+            excluded.append({"paper_id": pid, "reason": reason})
+        else:
+            eligible_ids.append(pid)
+    eligible = set(eligible_ids)
+    by_id = {match.paper_id: match for match in matches}
+    assessed = sorted((match for pid, match in by_id.items() if pid in eligible
+                       and match.scoring_status == "succeeded"
+                       and valid_level(match.coverage_level)
+                       and valid_similarity(match.task_similarity)
+                       and valid_similarity(match.method_similarity)), key=match_order)
+    assessed_ids = {match.paper_id for match in assessed}
+    ordered = [match.paper_id for match in assessed] + [
+        pid for pid in eligible_ids if pid not in assessed_ids
+    ]
+    attempted_ids, seen_entities, selections = [], set(), []
+    for pid in ordered:
+        paper = state.papers[pid]
+        entity = paper.entity_id or pid
+        if entity in seen_entities:
+            excluded.append({"paper_id": pid, "reason": "duplicate_entity"})
+            continue
+        seen_entities.add(entity)
+        match = by_id.get(pid)
+        attempted_ids.append(pid)
+        selections.append({
+            "paper_id": pid,
+            "selection_basis": "valid_abstract_match" if pid in assessed_ids else "unassessed_candidate_order",
+            "abstract_scoring_status": getattr(match, "scoring_status", "not_scored"),
+            "accepted_abstract_grade": match.coverage_level if pid in assessed_ids else None,
+        })
+        if len(attempted_ids) == limit:
+            break
+
+    path = Path(run_mgr.run_dir) / "eval_fulltext_plan.json"
+    plan = {
+        "schema_version": "fixed-eval-fulltext-v1", "status": "PLANNED",
+        "budget": limit, "attempted_ids": attempted_ids, "selections": selections,
+        "source_candidate_ids": list(dict.fromkeys(candidate_ids)),
+        "selection_rule": "valid_abstract_match_order_then_unassessed_candidate_order_entity_unique",
+        "replacement_policy": "NO_REPLACEMENT", "no_replacement": True,
+        "llm_per_paper_refinement": "NOT_RUN_BY_PROTOCOL",
+        "year_scope": scope, "excluded_records": excluded,
+        "available_ids": [], "success_material_count": 0,
+        "materials": [],
+    }
+    atomic_write_json(path, plan)
+    collection_error = None
+    try:
+        if attempted_ids:
+            enrich_papers_with_fulltext(
+                state, attempted_ids, max_workers=cfg.max_workers_pdf, run_mgr=run_mgr,
+            )
+    except BaseException as error:
+        collection_error = type(error).__name__
+        raise
+    finally:
+        materials, available_ids = [], []
+        for pid in attempted_ids:
+            paper = state.papers[pid]
+            available = (paper.pdf_status == "downloaded" and paper.pages_status == "parsed"
+                         and any(chunk.text.strip() for chunk in paper.chunks))
+            if available:
+                available_ids.append(pid)
+            pages_dir = Path(getattr(run_mgr, "pdf_pages_cache_dir", run_mgr.pdf_cache_dir))
+            pages_path = (pages_dir / f"{paper.content_hash}.{paper.parser_version}.pages.json"
+                          if paper.content_hash and paper.parser_version else None)
+            materials.append({
+                "paper_id": pid, "available": available,
+                "pdf_status": paper.pdf_status, "pages_status": paper.pages_status,
+                "chunks_status": paper.chunks_status, "section_status": paper.section_status,
+                "sections_status": paper.sections_status,
+                "content_hash": paper.content_hash, "parser_version": paper.parser_version,
+                "local_pdf_path": paper.local_pdf_path,
+                "page_cache_path": str(pages_path) if pages_path and pages_path.is_file() else None,
+                "text_character_count": sum(len(chunk.text) for chunk in paper.chunks),
+            })
+        plan.update(
+            status=("COLLECTION_FAILED" if collection_error else "NO_CANDIDATES" if not attempted_ids
+                    else "MATERIAL_COMPLETE" if len(available_ids) == len(attempted_ids) else "PARTIAL_MATERIAL"),
+            available_ids=available_ids, success_material_count=len(available_ids),
+            attempted_count=len(attempted_ids), materials=materials,
+            missing_material_ids=[pid for pid in attempted_ids if pid not in available_ids],
+            collection_error_type=collection_error,
+        )
+        atomic_write_json(path, plan)
+    return attempted_ids
 
 
 def generate_evidence_keywords_from_idea(
@@ -1273,6 +1721,7 @@ def generate_evidence_keywords_from_idea(
     facets: List[str],
     idea_features: Dict[str, Set[str]],
     max_keywords: int = 30,
+    reuse: bool = False,
 ) -> List[str]:
     """
     Use LLM to generate evidence keywords from idea for fulltext search.
@@ -1284,6 +1733,7 @@ def generate_evidence_keywords_from_idea(
         idea=idea_description,
         facets=facets,
         max_keywords=max_keywords,
+        reuse=reuse,
     )
 
 
@@ -1329,7 +1779,7 @@ def find_evidence_snippets(
         return []
     
     snippets: List[str] = []
-    keyword_list = list(keywords)
+    keyword_list = sorted(keywords) if isinstance(keywords, (set, frozenset)) else list(keywords)
     
     # Tokenize chunks for BM25
     tokenized_chunks = []
@@ -1385,6 +1835,8 @@ def refine_top_papers_with_fulltext(
     top_k: int = 20,
     max_workers: int = 1,
     run_mgr: Optional["RunManager"] = None,
+    cfg: Optional[PriorArtConfig] = None,
+    eligible_paper_ids: Optional[Set[str]] = None,
 ) -> List[PriorArtMatch]:
     """
     Second-stage refinement for the most promising papers.
@@ -1404,21 +1856,43 @@ def refine_top_papers_with_fulltext(
     """
     logger.info(f"[PriorArt] Refining top {top_k} papers with fulltext...")
 
-    # Instantiate light model for refinement
-    model_id, api_base, api_key = get_litellm_config(role="light")
-    light_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
-
-    # 1. Sort ALL candidates by relevance
+    staged = bool(cfg and getattr(cfg, "staged_retrieval", False))
+    # Restrict expensive work to the already enriched shortlist in staged mode.
+    candidates = [m for m in matches if m.coverage_level is not None and m.scoring_status == "succeeded"
+                  and (eligible_paper_ids is None or m.paper_id in eligible_paper_ids)
+                  and (not staged or state.papers[m.paper_id].identity_status != "conflict")]
     sorted_candidates = sorted(
-        matches,
+        candidates,
         key=lambda m: (
-            m.coverage_level,
-            m.high_level_facet_score,
-            m.structural_score,
-            state.papers[m.paper_id].citation_count or 0,
+            -m.coverage_level,
+            -m.task_similarity if staged else 0,
+            -m.method_similarity if staged else 0,
+            -m.high_level_facet_score,
+            -m.structural_score,
+            0 if staged else -(state.papers[m.paper_id].citation_count or 0),
+            m.paper_id,
         ),
-        reverse=True,
     )
+    if not sorted_candidates or top_k <= 0:
+        logger.info("[Fulltext] No eligible candidates; skipping evidence keyword request.")
+        return matches
+
+    def prepare_keywords(_):
+        words = generate_evidence_keywords_from_idea(
+            agent=agent, topic=state.intent.topic, idea_description=idea_description,
+            facets=facets, idea_features=idea_features, max_keywords=30,
+            reuse=bool(cfg and cfg.reuse_llm_across_stages),
+        )
+        return make_keywords_for_evidence(idea_features, extra_keywords=words)
+
+    # This request keeps its original expert model, 30-word limit and prompt. It
+    # does not depend on download outcomes and is never replaced by prior scores.
+    keyword_executor = None
+    keyword_future = None
+    if cfg is None or cfg.overlap_pdf_keywords:
+        from contextvars import copy_context
+        keyword_executor = ThreadPoolExecutor(max_workers=1)
+        keyword_future = keyword_executor.submit(copy_context().run, prepare_keywords, None)
     
     # 2. Retry logic: keep trying papers until we reach top_k successful downloads
     #    or exhaust all candidates
@@ -1450,7 +1924,7 @@ def refine_top_papers_with_fulltext(
         # Check which papers succeeded (have chunks or has_fulltext)
         for pid in batch_pids:
             paper = state.papers.get(pid)
-            if paper and (paper.chunks or getattr(paper, 'has_fulltext', False)):
+            if paper and paper.pdf_status != 'error' and (paper.chunks or getattr(paper, 'has_fulltext', False)):
                 successful_pids.append(pid)
         
         candidate_idx = batch_end
@@ -1463,29 +1937,23 @@ def refine_top_papers_with_fulltext(
     logger.info(f"[Fulltext] Final: {len(top_candidates)} papers with fulltext out of target {top_k}")
 
     # 3. Build evidence keyword set using LLM (domain-agnostic)
-    evidence_kw_from_llm = generate_evidence_keywords_from_idea(
-        agent=agent,
-        topic=state.intent.topic,
-        idea_description=idea_description,
-        facets=facets,
-        idea_features=idea_features,
-        max_keywords=30,
-    )
-    
-    # Merge LLM keywords with structural features
-    evidence_keywords = make_keywords_for_evidence(
-        idea_features=idea_features,
-        facet_synonyms=None,  # Could add expand_facet_synonyms here later
-        extra_keywords=evidence_kw_from_llm,
-    )
+    try:
+        evidence_keywords = keyword_future.result() if keyword_future else prepare_keywords(None)
+    finally:
+        if keyword_executor:
+            keyword_executor.shutdown(wait=True)
     
     logger.info(f"[PriorArt] Evidence keywords ({len(evidence_keywords)}): {sorted(evidence_keywords)[:10]}...")
 
+    # Freeze every prompt before dispatch. Workers return patches and never edit
+    # shared match/state; the coordinator accepts them in original candidate order.
+    tasks = []
     for match in top_candidates:
         paper = state.papers[match.paper_id]
         snippets = find_evidence_snippets(paper, evidence_keywords, max_snippets=3)
 
         if not snippets:
+            match.refinement_status = "no_evidence"
             continue
 
         # Build refinement prompt using idea, facets, and snippets
@@ -1519,25 +1987,41 @@ Based on ALL of the above, answer in JSON:
 
 Return RAW JSON only, no backticks.
 """
+        tasks.append((match.paper_id, prompt, tuple(snippets)))
+
+    def refine_one(task):
+        paper_id, prompt, snippets = task
         try:
+            model_id, api_base, api_key = get_litellm_config(role="light")
+            light_model = LiteLLMModel(model_id=model_id, api_base=api_base, api_key=api_key)
             messages = [{"role": "user", "content": prompt}]
-            resp = light_model(messages)
+            resp = invoke_model(light_model, messages, stage='fulltext_refinement', task_id=paper_id, validate_response=lambda response: _validate_score_response(response, len(facets), refined=True))
             text = extract_text_from_llm_response(resp)
-            refined = json.loads(text)
-
-            # Update the match object in-place
-            level_refined = int(refined.get("coverage_level_refined", match.coverage_level))
-            role = str(refined.get("role", "unknown")).strip()
-            notes = str(refined.get("notes", "")).strip()
-
-            # Update match
-            match.refined_coverage_level = level_refined
-            match.coverage_level = level_refined
-            match.role = role
-            match.notes = f"{match.notes}\\n{notes}".strip()
-
+            refined = _validate_score_data(_parse_scoring_json(text), len(facets), refined=True)
+            return paper_id, snippets, refined, None
         except Exception as e:
-            logger.warning(f"[PriorArt] Failed to refine fulltext scoring for {paper.title}: {e}")
+            logger.warning(f"[PriorArt] Failed to refine fulltext scoring for {paper_id}: {e}")
+            return paper_id, snippets, None, str(e)
+
+    patches = ordered_parallel_map(tasks, refine_one,
+        cfg.max_workers_fulltext_refine if cfg else 4)
+    matches_by_id = {m.paper_id: m for m in matches}
+    for paper_id, snippets, refined, error in patches:
+        match = matches_by_id[paper_id]
+        if match.abstract_coverage_level is None:
+            match.abstract_coverage_level = match.coverage_level
+            match.abstract_notes = match.notes
+        match.refinement_snippets = list(snippets)
+        if error:
+            match.refinement_status = "failed"
+            match.refinement_error = error
+            continue
+        match.refinement_status = "succeeded"
+        match.refinement_error = None
+        match.refined_coverage_level = refined["coverage_level_refined"]
+        match.coverage_level = refined["coverage_level_refined"]
+        match.role = refined["role"]
+        match.notes = f"{match.notes}\n{refined['notes']}".strip()
 
     # 4. Return the updated list (all matches, not only top_k)
     return matches

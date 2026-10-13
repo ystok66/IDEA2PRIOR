@@ -4,19 +4,28 @@ Extracts code and pseudocode from research papers, evaluates completeness and re
 parses framework and dependencies, runs tests, and classifies papers.
 """
 
+from __future__ import annotations
+
 import re
 import ast
 import json
+import hashlib
+import textwrap
+import uuid
+from pipelines.runtime import atomic_write_json, atomic_write_bytes
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from collections import defaultdict
 
 from smolagents import Tool
 from smolagents.local_python_executor import LocalPythonExecutor
 from loguru import logger
 
-from .pdf_extractor import PDFExtractorRAGTool
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .pdf_extractor import PDFExtractorRAGTool
 
 # Try to import LLM chat function
 try:
@@ -39,6 +48,7 @@ try:
         LLM_AVAILABLE = True
 except (ImportError, FileNotFoundError, AttributeError) as e:
     LLM_AVAILABLE = False
+    LLM_IMPORT_ERROR = e
     logger.warning(f"⚠️  LLM chat function not available: {e}, pseudocode evaluation will be limited")
 
 
@@ -52,6 +62,7 @@ class CodeBlock:
     context: str = ""
     section: str = ""
     algorithm_name: str = ""
+    provenance: str = "paper_extracted_text"
 
 
 @dataclass
@@ -65,6 +76,7 @@ class PseudocodeBlock:
     line_start: int = 0
     line_end: int = 0
     raw_text: str = ""
+    provenance: str = "paper_extracted_text"
 
 
 @dataclass
@@ -113,6 +125,7 @@ class TestResult:
     execution_test: Dict[str, Any] = field(default_factory=dict)
     logic_check: Dict[str, Any] = field(default_factory=dict)
     accuracy_test: Dict[str, Any] = field(default_factory=dict)
+    block_results: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -197,16 +210,21 @@ Please return in JSON format:
         pdf_base_dir: Optional[Path | str] = None,
         output_base_dir: Optional[Path | str] = None,
         authorized_imports: Optional[List[str]] = None,
-        use_mock: bool = True,
+        use_mock: bool = False,
         llm_model_name: str = "gemini-2.0-flash-exp",  # Use Gemini model name
         web_search_tool: Optional[Any] = None,  # Optional web search tool (e.g., DuckDuckGoSearchTool)
-        enable_web_search: bool = True,  # Enable web search enhancement
+        enable_web_search: bool = True,
+        execute_code: bool = False,
+        llm_enabled: bool = True,  # Enable web search enhancement
     ):
         """Initialize the code extractor tool"""
         super().__init__()
         self.pdf_extractor = pdf_extractor
         self.is_initialized = False
         self.use_mock = use_mock
+        self.execute_code = execute_code
+        self.llm_enabled = llm_enabled
+        self.analysis_errors = []
         self.llm_model_name = llm_model_name
         self.web_search_tool = web_search_tool
         self.enable_web_search = enable_web_search and (web_search_tool is not None)
@@ -214,14 +232,14 @@ Please return in JSON format:
         # Set up paths
         if pdf_base_dir is None:
             self.pdf_base_dir = Path(
-                "/data/wdy/AgenticPaperQA/paper-prepare/sampled_papers"
+                "inputs/papers"
             )
         else:
             self.pdf_base_dir = Path(pdf_base_dir)
             
         if output_base_dir is None:
             self.output_base_dir = Path(
-                "/data/wdy/AgenticPaperQA/paper-prepare/sampled_jsons"
+                "outputs/extension_cache"
             )
         else:
             self.output_base_dir = Path(output_base_dir)
@@ -294,7 +312,7 @@ Please return in JSON format:
         ]
         
         available_imports = default_imports.copy()
-        for lib, lib_wildcard in optional_imports:
+        for lib, lib_wildcard in (optional_imports if execute_code else []):
             try:
                 __import__(lib)
                 available_imports.extend([lib, lib_wildcard])
@@ -304,7 +322,9 @@ Please return in JSON format:
         authorized_imports = authorized_imports or available_imports
         
         try:
-            self.code_executor = LocalPythonExecutor(authorized_imports)
+            self.code_executor = LocalPythonExecutor(authorized_imports) if execute_code else None
+            if self.code_executor is not None:
+                self.code_executor.send_tools({})
             logger.info(f"✅ Code executor initialized with {len(authorized_imports)} authorized imports")
         except Exception as e:
             logger.warning(f"⚠️  Failed to initialize LocalPythonExecutor: {e}")
@@ -546,7 +566,7 @@ Please return in JSON format:
         Returns:
             Integrated results dictionary
         """
-        if not LLM_AVAILABLE:
+        if not (LLM_AVAILABLE and self.llm_enabled):
             logger.warning("⚠️  LLM not available, skipping web result integration")
             return pdf_extracted
         
@@ -1199,7 +1219,7 @@ I have extracted code and pseudocode from a research paper PDF, and also searche
     
     def _extract_with_llm(self, markdown_content: str) -> Optional[Dict[str, Any]]:
         """Use LLM to extract code/pseudocode information - IMPROVED with chunking and multi-round extraction"""
-        if not LLM_AVAILABLE:
+        if not (LLM_AVAILABLE and self.llm_enabled):
             return None
         
         try:
@@ -1273,7 +1293,8 @@ Return JSON format:
                                 steps=block_data.get("steps", []),
                                 input=block_data.get("input", ""),
                                 output=block_data.get("output", ""),
-                                raw_text="\n".join(block_data.get("steps", []))
+                                raw_text="\n".join(block_data.get("steps", [])),
+                                provenance="llm_reconstructed_pseudocode",
                             ))
                         
                         framework = result.get("framework", "").strip()
@@ -1290,6 +1311,7 @@ Return JSON format:
                             all_model_structures.append(model_structure)
                             
                     except json.JSONDecodeError as e:
+                        self.analysis_errors.append({"type": type(e).__name__, "phase": "extract_with_llm"})
                         logger.warning(f"⚠️  Failed to parse LLM JSON response for chunk {chunk_idx + 1}: {e}")
                         logger.debug(f"Response: {response[:500]}")
             
@@ -1308,6 +1330,7 @@ Return JSON format:
             }
             
         except Exception as e:
+            self.analysis_errors.append({"type": type(e).__name__, "phase": "extract_with_llm"})
             logger.warning(f"⚠️  LLM-assisted extraction failed: {e}")
             return None
     
@@ -1319,7 +1342,7 @@ Return JSON format:
                 completeness_score=0.0
             )
         
-        if not LLM_AVAILABLE:
+        if not (LLM_AVAILABLE and self.llm_enabled):
             logger.warning("⚠️  LLM not available, using basic evaluation")
             # Basic evaluation without LLM
             total_score = 0.0
@@ -1388,13 +1411,14 @@ Return JSON format:
                 missing_components=result_dict.get("missing_components", [])
             )
         except Exception as e:
+            self.analysis_errors.append({"type": type(e).__name__, "phase": "evaluate_pseudocode_with_llm"})
             logger.error(f"❌ LLM evaluation failed: {e}")
             # Fallback to basic evaluation
             return self._evaluate_pseudocode_with_llm([])  # Will use basic evaluation
     
     def _extract_framework_from_text(self, markdown_content: str) -> Optional[Dict[str, Any]]:
         """Extract framework and dependencies from text using LLM"""
-        if not LLM_AVAILABLE:
+        if not (LLM_AVAILABLE and self.llm_enabled):
             return None
         
         try:
@@ -1451,11 +1475,13 @@ Return JSON:
                         "model_structure": result.get("model_structure", {})
                     }
                 except json.JSONDecodeError as e:
+                    self.analysis_errors.append({"type": type(e).__name__, "phase": "extract_framework_from_text"})
                     logger.warning(f"⚠️  Failed to parse LLM JSON response: {e}")
                     logger.debug(f"Response: {response[:500]}")
             
             return None
         except Exception as e:
+            self.analysis_errors.append({"type": type(e).__name__, "phase": "extract_framework_from_text"})
             logger.warning(f"⚠️  LLM framework extraction failed: {e}")
             return None
     
@@ -1533,73 +1559,115 @@ Return JSON:
         )
     
     def _run_tests(self, code_blocks: List[CodeBlock]) -> TestResult:
-        """Run tests on extracted code"""
-        syntax_check = {"passed": True, "errors": []}
-        execution_test = {"passed": False, "output": "", "errors": []}
-        logic_check = {"passed": True, "warnings": []}
-        accuracy_test = {"available": False, "result": ""}
-        
-        for block in code_blocks:
-            if block.language == "python":
-                # Syntax check
-                try:
-                    ast.parse(block.code)
-                except SyntaxError as e:
-                    syntax_check["passed"] = False
-                    syntax_check["errors"].append(
-                        f"Code block {block.section}: Syntax error at line {e.lineno}: {e.msg}"
-                    )
-                
-                # Execution test (IMPROVED: Better error handling for variable access errors)
-                if self.code_executor:
-                    try:
-                        # Wrap code in try-except to handle variable access errors gracefully
-                        # This is common in extracted code snippets that reference undefined variables
-                        wrapped_code = f"""
-try:
-    {block.code}
-    _result = "Code executed successfully (no return value)"
-except NameError as e:
-    _result = f"Variable access error (expected for incomplete code): {{str(e)}}"
-except Exception as e:
-    _result = f"Execution error: {{str(e)}}"
-_result
-"""
-                        result = self.code_executor(wrapped_code)
-                        if result and "Variable access error" not in str(result):
-                            execution_test["passed"] = True
-                            execution_test["output"] = str(result)[:200] if result else "No output"
-                        else:
-                            # Variable access error is expected for incomplete code snippets
-                            execution_test["errors"].append(
-                                f"Code block {block.section}: Variable access error (expected for incomplete code snippets)"
-                            )
-                    except Exception as e:
-                        error_msg = str(e)
-                        # Categorize errors for better reporting
-                        if "NameError" in error_msg or "not defined" in error_msg.lower():
-                            execution_test["errors"].append(
-                                f"Code block {block.section}: Variable access error (expected for incomplete code snippets): {error_msg[:150]}"
-                            )
-                        else:
-                            execution_test["errors"].append(
-                                f"Code block {block.section}: Execution error: {error_msg[:200]}"
-                            )
-                
-                # Logic check
-                if "def " in block.code:
-                    func_count = block.code.count("def ")
-                    return_count = block.code.count("return ")
-                    if func_count > return_count:
-                        logic_check["warnings"].append(
-                            f"Code block {block.section}: {func_count - return_count} functions missing return statement"
-                        )
-        
+        """Record each block separately; loading definitions is not exercising them.
+
+        This validates the supplied snippets only. It makes no assertion about
+        paper-level algorithm correctness, external dependencies, or test data.
+        """
+        records = []
+        artifact_root = Path(self.output_base_dir) / "code_validation" / uuid.uuid4().hex
+        artifact_root.mkdir(parents=True, exist_ok=False)
+        for index, block in enumerate(code_blocks):
+            entry = {"block_index": index, "section": block.section,
+                     "line_start": block.line_start, "line_end": block.line_end,
+                     "provenance": block.provenance,
+                     "source_sha256": hashlib.sha256(block.code.encode("utf-8")).hexdigest(),
+                     "syntax": "NOT_RUN", "wrapper_syntax": "NOT_RUN", "import": "NOT_RUN",
+                     "load": "NOT_RUN", "execute": "NOT_RUN", "assertion": "NOT_APPLICABLE",
+                     "status": "NOT_RUN", "error": None, "stdout": None, "stderr": None}
+            records.append(entry)
+            original_path = artifact_root / f"block_{index:04d}_original.txt"
+            atomic_write_bytes(original_path, block.code.encode("utf-8"))
+            entry["source_path"] = str(original_path)
+            if block.language.lower() != "python":
+                entry.update(status="NOT_APPLICABLE", syntax="NOT_APPLICABLE")
+                continue
+            try:
+                tree = ast.parse(block.code)
+                entry["syntax"] = "SUCCEEDED"
+            except SyntaxError as error:
+                entry.update(syntax="FAILED", status="FAILED", error=f"SyntaxError at line {error.lineno}: {error.msg}")
+                continue
+            definition_only = bool(tree.body) and all(
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Import, ast.ImportFrom))
+                or (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str))
+                for node in tree.body)
+            has_assert = any(isinstance(node, ast.Assert) for node in tree.body)
+            has_import = any(isinstance(node, (ast.Import, ast.ImportFrom)) for node in tree.body)
+            entry["definition_only"] = definition_only
+            entry["import"] = "NOT_RUN" if has_import else "NOT_APPLICABLE"
+            entry["assertion"] = "NOT_RUN" if has_assert else "NOT_APPLICABLE"
+            body = textwrap.indent(block.code or "pass", "    ")
+            wrapped = ("try:\n" + body + "\n    _paperarena_validation = {'status': 'SUCCEEDED'}\n"
+                       "except Exception as _paperarena_error:\n"
+                       "    _paperarena_validation = {'status': 'FAILED', 'error_type': type(_paperarena_error).__name__, 'error': str(_paperarena_error)}\n"
+                       "_paperarena_validation\n")
+            wrapped_path = artifact_root / f"block_{index:04d}_wrapped.py"
+            atomic_write_bytes(wrapped_path, wrapped.encode("utf-8"))
+            entry.update(wrapper_path=str(wrapped_path), wrapper_sha256=hashlib.sha256(wrapped.encode("utf-8")).hexdigest())
+            try:
+                ast.parse(wrapped)
+                entry["wrapper_syntax"] = "SUCCEEDED"
+            except SyntaxError as error:
+                entry.update(wrapper_syntax="FAILED", status="FAILED", error=f"Wrapper SyntaxError: {error}")
+                continue
+            if not self.code_executor:
+                continue
+            try:
+                returned = self.code_executor(wrapped)
+                if hasattr(returned, "output"):
+                    outcome = returned.output
+                    logs = getattr(returned, "logs", None)
+                elif isinstance(returned, tuple) and len(returned) == 3:
+                    outcome, logs, _ = returned
+                else:
+                    outcome, logs = returned, None
+                entry["executor_logs"] = logs
+                if not isinstance(outcome, dict) or outcome.get("status") not in ("SUCCEEDED", "FAILED"):
+                    entry.update(status="INVALID_OUTPUT", error="Executor did not return the declared validation schema")
+                    continue
+                entry["status"] = outcome["status"]
+                if outcome["status"] == "FAILED":
+                    entry["error"] = outcome.get("error")
+                    entry["error_type"] = outcome.get("error_type")
+                    entry["load"] = "FAILED"
+                    entry["execute"] = "FAILED"
+                    if outcome.get("error_type") in ("ImportError", "ModuleNotFoundError"):
+                        entry["import"] = "FAILED"
+                        entry["execute"] = "NOT_RUN"
+                    if outcome.get("error_type") == "AssertionError":
+                        entry["assertion"] = "FAILED"
+                else:
+                    entry["load"] = "SUCCEEDED"
+                    entry["execute"] = "NOT_RUN" if definition_only else "SUCCEEDED"
+                    if has_import:
+                        entry["import"] = "SUCCEEDED"
+                    if has_assert:
+                        entry["assertion"] = "SUCCEEDED"
+            except Exception as error:
+                entry.update(status="UNKNOWN", error_type=type(error).__name__, error=str(error))
+            finally:
+                logs_path = artifact_root / f"block_{index:04d}_execution.json"
+                atomic_write_json(logs_path, entry)
+                entry["execution_path"] = str(logs_path)
+        applicable = [row for row in records if row["syntax"] != "NOT_APPLICABLE"]
+        syntax_passed = bool(applicable) and all(row["syntax"] == "SUCCEEDED" for row in applicable)
+        execution_passed = bool(applicable) and all(row["execute"] == "SUCCEEDED" for row in applicable)
+        statuses = [row["status"] for row in applicable]
+        aggregate = ("NOT_APPLICABLE" if not applicable else
+                     "SUCCEEDED" if execution_passed else
+                     "PARTIAL" if any(row["execute"] == "SUCCEEDED" for row in applicable) else
+                     "FAILED" if any(state in ("FAILED", "INVALID_OUTPUT", "UNKNOWN") for state in statuses) else "NOT_RUN")
+        atomic_write_json(artifact_root / "blocks.json", {"status": aggregate, "blocks": records,
+            "claim": "snippet loading/execution only; paper algorithm accuracy NOT_RUN"})
         return TestResult(
-            syntax_check=syntax_check,
-            execution_test=execution_test,
-            logic_check=logic_check,
-            accuracy_test=accuracy_test
+            syntax_check={"passed": syntax_passed, "status": "NOT_APPLICABLE" if not applicable else "SUCCEEDED" if syntax_passed else "FAILED",
+                          "errors": [row["error"] for row in applicable if row["syntax"] == "FAILED"]},
+            execution_test={"passed": execution_passed, "status": aggregate, "output": "", "artifact_dir": str(artifact_root),
+                            "errors": [row["error"] for row in applicable if row["error"]], "planned_blocks": len(code_blocks),
+                            "applicable_blocks": len(applicable), "executed_blocks": sum(row["execute"] == "SUCCEEDED" for row in applicable)},
+            logic_check={"passed": False, "status": "NOT_RUN", "warnings": ["No algorithm correctness oracle was provided"]},
+            accuracy_test={"available": False, "status": "NOT_RUN", "result": ""}, block_results=records,
         )
     
     def _classify_paper(
@@ -1675,7 +1743,7 @@ _result
         report = f"# Code Extraction and Reproducibility Evaluation Report\n\n"
         report += f"## Paper Information\n\n"
         report += f"- **Paper name**: {pdf_name}\n"
-        report += f"- **Evaluation time**: {Path(__file__).stat().st_mtime}\n\n"
+        report += f"- **Evaluation time (UTC)**: {datetime.now(timezone.utc).isoformat()}\n\n"
         
         # Code existence
         report += f"## 📊 Code Detection Results\n\n"
@@ -1695,7 +1763,7 @@ _result
         report += "\n"
         
         # LLM evaluation
-        report += f"## 🤖 LLM Evaluation Results\n\n"
+        report += "## 🤖 LLM Evaluation Results\n\n" if self.llm_enabled else "## Heuristic Evaluation (LLM disabled)\n\n"
         report += f"- **Reproducibility score**: {llm_evaluation.reproducibility_score:.2f}/1.0\n"
         report += f"- **Completeness score**: {llm_evaluation.completeness_score:.2f}/1.0\n"
         # Always show framework/dependencies (even if empty) for parser compatibility
@@ -1746,19 +1814,19 @@ _result
         
         # Test results
         report += f"## 🧪 Test Results\n\n"
-        report += f"- **Syntax check**: {'✅ Passed' if test_results.syntax_check.get('passed') else '❌ Failed'}\n"
+        report += f"- **Syntax check**: {test_results.syntax_check.get('status', 'UNKNOWN')}\n"
         if test_results.syntax_check.get('errors'):
             for error in test_results.syntax_check['errors']:
                 report += f"  - {error}\n"
-        report += f"- **Execution test**: {'✅ Passed' if test_results.execution_test.get('passed') else '❌ Failed'}\n"
+        report += f"- **Execution test**: {test_results.execution_test.get('status', 'UNKNOWN')}\n"
         if test_results.execution_test.get('errors'):
             for error in test_results.execution_test['errors']:
                 report += f"  - {error}\n"
-        report += f"- **Logic check**: {'✅ Passed' if test_results.logic_check.get('passed') else '⚠️ Warnings'}\n"
+        report += f"- **Logic check**: {test_results.logic_check.get('status', 'UNKNOWN')}\n"
         if test_results.logic_check.get('warnings'):
             for warning in test_results.logic_check['warnings']:
                 report += f"  - {warning}\n"
-        report += f"- **Accuracy test**: {'✅ Available' if test_results.accuracy_test.get('available') else '❌ No test data'}\n"
+        report += f"- **Accuracy test**: {test_results.accuracy_test.get('status', 'UNKNOWN')}\n"
         report += "\n"
         
         # Classification
@@ -1774,6 +1842,7 @@ _result
                 report += f"### Code Block {i + 1}\n\n"
                 report += f"- **Location**: {block.section or 'Unknown section'}, Lines {block.line_start}-{block.line_end}\n"
                 report += f"- **Language**: {block.language}\n"
+                report += f"- **Provenance**: {block.provenance}\n"
                 report += f"\n**Code**:\n\n```{block.language}\n{block.code}\n```\n\n"
         
         # Pseudocode blocks
@@ -1781,6 +1850,7 @@ _result
             report += f"## Extracted Pseudocode\n\n"
             for i, block in enumerate(pseudocode_blocks):
                 report += f"### {block.algorithm_name}\n\n"
+                report += f"- **Provenance**: {block.provenance}\n"
                 if block.input:
                     report += f"- **Input**: {block.input}\n"
                 if block.output:
@@ -1808,6 +1878,7 @@ _result
         Returns:
             Markdown report with comprehensive evaluation
         """
+        self.last_tool_status = "UNKNOWN"
         try:
             logger.info(f"🔍 Extracting and evaluating code from PDF: {pdf_name}")
             
@@ -1830,7 +1901,7 @@ _result
             # Try LLM extraction for better coverage (even if regex found something)
             llm_extracted_framework = None
             llm_extracted_dependencies = []
-            if LLM_AVAILABLE:
+            if LLM_AVAILABLE and self.llm_enabled:
                 # IMPROVED: More aggressive trigger conditions
                 # Try LLM extraction if:
                 # 1. No code/pseudocode found with regex, OR
@@ -1938,6 +2009,13 @@ _result
             )
             
             # Generate report
+            self.last_analysis = {
+                "code_existence": asdict(code_existence), "completeness": asdict(completeness),
+                "llm_evaluation": asdict(llm_evaluation), "framework": asdict(framework_analysis),
+                "tests": asdict(test_results), "classification": asdict(classification),
+                "code_blocks": [asdict(block) for block in code_blocks],
+                "pseudocode_blocks": [asdict(block) for block in pseudocode_blocks],
+            }
             report = self._generate_report(
                 pdf_name,
                 code_existence,
@@ -1951,12 +2029,23 @@ _result
             )
             
             logger.info(f"✅ Code extraction and evaluation completed. Classification: {classification.emoji} {classification.category}")
+            if not self.llm_enabled:
+                report = "> LLM analysis was disabled. Evaluation scores below are heuristic fallbacks, not model assessments.\n\n" + report
+            if not self.execute_code:
+                report = "> Extracted Python was not executed. Syntax checks and code presence do not establish algorithm correctness.\n\n" + report
+            self.last_tool_status = "SUCCEEDED"
+            self.last_test_results = test_results
             return report
             
         except Exception as e:
             error_msg = f"❌ Code extraction and evaluation failed: {str(e)}"
             logger.error(error_msg)
+            self.last_tool_status = "FAILED"
             return f"Error: {str(e)}"
+
+    def interpret_execution_result(self, result) -> str:
+        """Declared operation status; code-block validity stays in its own ledger."""
+        return getattr(self, "last_tool_status", "UNKNOWN")
 
 
 if __name__ == "__main__":

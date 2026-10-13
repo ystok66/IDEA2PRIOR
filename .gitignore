@@ -1,42 +1,48 @@
-# ======================
-# 1. 环境变量 / 密钥文件
-# ======================
+# Credentials and local configuration
 .env
-.env.*.local
-*.secret
+.env.*
+!.env.example
+configs/*.local.json
 *.key
 *.pem
+*.p12
+*.pfx
+*.secret
 
-# ======================
-# 2. 本地缓存 & 大文件
-# ======================
+# Generated runs, caches and private release bookkeeping
+outputs/
+runs/
+cache/
+retrieval_cache/
 pdf_cache/
 search_outputs/
+pilot_runs/
+audit/
+.local/
+.pytest_cache/
+.research/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 *.log
 *.pdf
-*.json
-*.txt
-*.jsonl
-*_[0-9][0-9][0-9][0-9][0-9][0-9].md
+*.zip
 
-# 如果你希望这些运行输出不进仓库：
-report_output*.txt
-
-# ======================
-# 3. 编辑器 / IDE 产物
-# ======================
+# Packaging and editor state
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.ipynb_checkpoints/
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# ======================
-# 4. OS 级别垃圾文件
-# ======================
 .DS_Store
 Thumbs.db
-ehthumbs.db
+
+# Dataset JSON, JSONL, prompt TXT, configuration examples and notebooks are source.
+
+# Historical source directories are private even if an OS-held directory remains.
+Idea2Paper*/
+reflectors/
+tests_offline/
+tmpx2wm68n_/

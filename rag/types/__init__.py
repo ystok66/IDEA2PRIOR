@@ -11,70 +11,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
-from .enums import (
-    AudioModelType,
-    EmbeddingModelType,
-    HuggingFaceRepoType,
-    ModelPlatformType,
-    ModelType,
-    OpenAIBackendRole,
-    OpenAIImageType,
-    OpenAIVisionDetailType,
-    OpenAPIName,
-    RoleType,
-    StorageType,
-    TaskType,
-    TerminationMode,
-    VectorDistance,
-    VoiceType,
-)
-from .openai_types import (
-    NOT_GIVEN,
-    ChatCompletion,
-    ChatCompletionAssistantMessageParam,
-    ChatCompletionChunk,
-    ChatCompletionMessage,
-    ChatCompletionMessageParam,
-    ChatCompletionMessageToolCall,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionToolMessageParam,
-    ChatCompletionUserMessageParam,
-    Choice,
-    CompletionUsage,
-    NotGiven,
-    ParsedChatCompletion,
-)
-from .unified_model_type import UnifiedModelType
 
-__all__ = [
-    'RoleType',
-    'ModelType',
-    'TaskType',
-    'TerminationMode',
-    'OpenAIBackendRole',
-    'EmbeddingModelType',
-    'VectorDistance',
-    'StorageType',
-    'Choice',
-    'ChatCompletion',
-    'ChatCompletionChunk',
-    'ChatCompletionMessage',
-    'ChatCompletionMessageParam',
-    'ChatCompletionSystemMessageParam',
-    'ChatCompletionUserMessageParam',
-    'ChatCompletionAssistantMessageParam',
-    'ChatCompletionToolMessageParam',
-    'ChatCompletionMessageToolCall',
-    'CompletionUsage',
-    'OpenAIImageType',
-    'OpenAIVisionDetailType',
-    'OpenAPIName',
-    'ModelPlatformType',
-    'AudioModelType',
-    'VoiceType',
-    'UnifiedModelType',
-    'NOT_GIVEN',
-    'NotGiven',
-    'ParsedChatCompletion',
-    'HuggingFaceRepoType',
-]
+from importlib import import_module
+
+_EXPORTS = {'AudioModelType': ('.enums', 'AudioModelType'), 'EmbeddingModelType': ('.enums', 'EmbeddingModelType'), 'HuggingFaceRepoType': ('.enums', 'HuggingFaceRepoType'), 'ModelPlatformType': ('.enums', 'ModelPlatformType'), 'ModelType': ('.enums', 'ModelType'), 'OpenAIBackendRole': ('.enums', 'OpenAIBackendRole'), 'OpenAIImageType': ('.enums', 'OpenAIImageType'), 'OpenAIVisionDetailType': ('.enums', 'OpenAIVisionDetailType'), 'OpenAPIName': ('.enums', 'OpenAPIName'), 'RoleType': ('.enums', 'RoleType'), 'StorageType': ('.enums', 'StorageType'), 'TaskType': ('.enums', 'TaskType'), 'TerminationMode': ('.enums', 'TerminationMode'), 'VectorDistance': ('.enums', 'VectorDistance'), 'VoiceType': ('.enums', 'VoiceType'), 'NOT_GIVEN': ('.openai_types', 'NOT_GIVEN'), 'ChatCompletion': ('.openai_types', 'ChatCompletion'), 'ChatCompletionAssistantMessageParam': ('.openai_types', 'ChatCompletionAssistantMessageParam'), 'ChatCompletionChunk': ('.openai_types', 'ChatCompletionChunk'), 'ChatCompletionMessage': ('.openai_types', 'ChatCompletionMessage'), 'ChatCompletionMessageParam': ('.openai_types', 'ChatCompletionMessageParam'), 'ChatCompletionMessageToolCall': ('.openai_types', 'ChatCompletionMessageToolCall'), 'ChatCompletionSystemMessageParam': ('.openai_types', 'ChatCompletionSystemMessageParam'), 'ChatCompletionToolMessageParam': ('.openai_types', 'ChatCompletionToolMessageParam'), 'ChatCompletionUserMessageParam': ('.openai_types', 'ChatCompletionUserMessageParam'), 'Choice': ('.openai_types', 'Choice'), 'CompletionUsage': ('.openai_types', 'CompletionUsage'), 'NotGiven': ('.openai_types', 'NotGiven'), 'ParsedChatCompletion': ('.openai_types', 'ParsedChatCompletion'), 'UnifiedModelType': ('.unified_model_type', 'UnifiedModelType')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

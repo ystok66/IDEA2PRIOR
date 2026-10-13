@@ -7,12 +7,17 @@ import json
 import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set
-from json_repair import repair_json
 
 from smolagents import Tool
 from loguru import logger
 
 from .llm_chat import chat_with_llm
+
+
+def repair_json(value):
+    """Load JSON repair only when a local conference database needs it."""
+    from json_repair import repair_json as repair
+    return repair(value)
 
 
 class DatabaseSearch(Tool):
@@ -55,7 +60,7 @@ class DatabaseSearch(Tool):
         # Fixed path for database
         if database_dir is None:
             self.database_dir = Path(
-                "/data/wdy/AgenticPaperQA/paper-prepare/selected_papers"
+                "inputs/conference_papers"
             )
         else:
             self.database_dir = Path(database_dir)

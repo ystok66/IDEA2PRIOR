@@ -1,0 +1,6 @@
+Search for the research paper that best matches the idea below. The target has a journal, conference, or workshop publication dated from 2015 through 2025, inclusive. A verified preprint version of the same work is acceptable; its date and title may differ from the published version.
+
+Return a ranked list of up to five distinct candidate papers. For each, give the exact title, authors, publication year, venue, a DOI or stable paper URL, and one sentence explaining the match. Rank by the complete idea rather than shared topic words. Verify each paper's identity against an authoritative record. Do not invent citations. Versions of the same work count as one candidate, but a predecessor or follow-up is not automatically the same paper. If no plausible candidate can be verified, say so.
+
+Research idea:
+Could a circuit’s requirement that every output uniquely determines its input make hidden malicious modifications harder to conceal? I want to compare genuinely reversible designs with ordinary computations merely packaged in reversible gates.

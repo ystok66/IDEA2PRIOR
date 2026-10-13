@@ -1,0 +1,1526 @@
+[
+  {
+    "item_id": "C001",
+    "historical_item_id": "C001_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 414.2039999999997,
+    "model_request_attempts": 239,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 241610,
+        "completion_tokens": 76822,
+        "total_tokens": 318432
+      },
+      "complete_total_tokens": {
+        "prompt_tokens": 241610,
+        "completion_tokens": 76822,
+        "total_tokens": 318432
+      },
+      "token_usage_complete": true,
+      "requests_missing_usage": 0
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 1
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses the fuzziness and subjectivity of neighborhood boundaries through a human-centric participatory approach, aligning strongly with the core research idea facets.",
+        "authors": [
+          "Vicente Tang",
+          "Marco Painho"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper directly addresses how residents perceive and define neighborhood boundaries differently, explicitly analyzing patterns of disagreement in subjective urban delineations. Its focus on participatory mapping of contested and non-administrative boundaries matches the core idea.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper directly addresses how residents perceive and define neighborhood boundaries differently, explicitly analyzing patterns of disagreement in subjective urban delineations. Its focus on participatory mapping of contested and non-administrative boundaries matches the core idea.",
+        "material_representation": "none",
+        "paper_id": "p_e9307d1e90c6e1bc3769ccef",
+        "rank": 1,
+        "title": "Patterns of (dis)agreement: revealing differences in perceived neighborhood boundaries in Lisbon",
+        "url": "https://doi.org/10.5194/agile-giss-5-44-2024",
+        "venue": "AGILE: GIScience Series",
+        "year": 2024
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the problem of fuzzy boundaries and contested spatial perceptions by aggregating individual human-drawn polygons into representative regions. It maps well to the idea facets by focusing on human-centric data collection and the reconciliation of imprecise geographic delineations.",
+        "authors": [
+          "N. Dalton",
+          "M. Hurrell"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The study directly tackles the challenge of capturing and reconciling conflicting resident-sketched polygons when mapping neighborhood extents, evaluating methods for boundary agreement and overlap. It focuses on aggregating divergent human perceptions rather than enforcing an arbitrary administrative boundary.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The study directly tackles the challenge of capturing and reconciling conflicting resident-sketched polygons when mapping neighborhood extents, evaluating methods for boundary agreement and overlap. It focuses on aggregating divergent human perceptions rather than enforcing an arbitrary administrative boundary.",
+        "material_representation": "none",
+        "paper_id": "p_8298c4c73a71b7e795ae0126",
+        "rank": 2,
+        "title": "Methods for neighbourhood Mapping, boundary agreement",
+        "url": "https://doi.org/10.1177/23998083221115195",
+        "venue": "Environment and Planning B: Urban Analytics and City Science",
+        "year": 2022
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the delineation of neighborhoods with fuzzy boundaries using subjective VGI, which aligns closely with the majority of the provided idea facets.",
+        "authors": [
+          "M. Aadland",
+          "Christopher Farah",
+          "Kevin Magee"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper proposes a fuzzy-set framework to map neighborhood boundaries based on socially defined volunteered geographic information rather than crisp borders, explicitly enabling maps to incorporate spatial uncertainty between interior and boundary zones.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper proposes a fuzzy-set framework to map neighborhood boundaries based on socially defined volunteered geographic information rather than crisp borders, explicitly enabling maps to incorporate spatial uncertainty between interior and boundary zones.",
+        "material_representation": "none",
+        "paper_id": "p_6e2f15a83bdc0c39705945a0",
+        "rank": 3,
+        "title": "µ-shapes: Delineating urban neighborhoods using volunteered geographic information",
+        "url": "https://doi.org/10.5311/josis.2016.12.240",
+        "venue": "Journal of Spatial Information Science",
+        "year": 2016
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the problem of mapping vague, socially-derived regions using a fuzzy Bayesian framework, which aligns almost perfectly with the proposed facets F1, F2, F3, and F5.",
+        "authors": [
+          "J. Huck",
+          "J. Whyatt",
+          "G. Davies",
+          "J. Dixon",
+          "Brendan Sturgeon",
+          "Bree Hocking",
+          "C. Tredoux",
+          "N. Jarman",
+          "Dominic Bryan"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The study introduces a fuzzy Bayesian inference model to map socially derived, vague, and contested place-based regions using perceptual data, explicitly replacing arbitrary crisp lines with probability distributions of spatial membership.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The study introduces a fuzzy Bayesian inference model to map socially derived, vague, and contested place-based regions using perceptual data, explicitly replacing arbitrary crisp lines with probability distributions of spatial membership.",
+        "material_representation": "none",
+        "paper_id": "p_7738ee03f5fc9843fe02bd82",
+        "rank": 4,
+        "title": "Fuzzy Bayesian inference for mapping vague and place-based regions: a case study of sectarian territory",
+        "url": "https://doi.org/10.1080/13658816.2023.2229894",
+        "venue": "International Journal of Geographical Information Science",
+        "year": 2023
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the fuzziness of cognitive neighborhood boundaries and subjective spatial perceptions, aligning strongly with the provided idea facets. It uses human-centric empirical surveys to model these informal regions, mirroring the proposed research framework.",
+        "authors": [
+          "Crystal J. Bae",
+          "D. Montello"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper investigates residents' vague and divergent cognitive boundaries of an urban neighborhood, comparing individual drawn boundaries and proposing methods to summarize multiple conflicting polygons.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper investigates residents' vague and divergent cognitive boundaries of an urban neighborhood, comparing individual drawn boundaries and proposing methods to summarize multiple conflicting polygons.",
+        "material_representation": "none",
+        "paper_id": "p_128ffee4572fed7642e4f22e",
+        "rank": 5,
+        "title": "Representations of an Urban Ethnic Neighbourhood: Residents' Cognitive Boundaries of Koreatown, Los Angeles",
+        "url": "https://doi.org/10.2148/benv.44.2.218",
+        "venue": "Built Environment",
+        "year": 2018
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C001.json",
+    "source_report_sha256": "b1ad39318f16a503bea29d1934b331177c1b2cf7755c7297e631d326d6d0b572",
+    "expert_output_source_sha256": "998472e1612515c6397ea04764ba73a9874a50c3f55bca4a03e8f553f86efc0e"
+  },
+  {
+    "item_id": "C002",
+    "historical_item_id": "C002_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 419.5779999999995,
+    "model_request_attempts": 280,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 295194,
+        "completion_tokens": 90635,
+        "total_tokens": 385829
+      },
+      "complete_total_tokens": {
+        "prompt_tokens": 295194,
+        "completion_tokens": 90635,
+        "total_tokens": 385829
+      },
+      "token_usage_complete": true,
+      "requests_missing_usage": 0
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 4
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses the output perturbation mechanism (Laplace) and its utility/privacy guarantees when bounded, directly intersecting with the foundations, mechanism design, and trade-off facets.",
+        "authors": [
+          "N. Holohan",
+          "S. Antonatos",
+          "S. Braghin",
+          "Pól Mac Aonghusa"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "This paper investigates how enforcing realistic numerical limits (avoiding semantically impossible query answers like negative counts via bounded support) directly risks invalidating differential privacy unless parameters are specifically calibrated.",
+        "field_conflicts": {
+          "year": [
+            2018,
+            2019
+          ]
+        },
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "This paper investigates how enforcing realistic numerical limits (avoiding semantically impossible query answers like negative counts via bounded support) directly risks invalidating differential privacy unless parameters are specifically calibrated.",
+        "material_representation": "none",
+        "paper_id": "p_1b5cd4b57300e07e78ee2493",
+        "rank": 1,
+        "title": "The Bounded Laplace Mechanism in Differential Privacy",
+        "url": "https://doi.org/10.29012/jpc.715",
+        "venue": "Journal of Privacy and Confidentiality",
+        "year": 2019
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the accuracy-privacy trade-off of the Gaussian mechanism under bounded domains, which aligns closely with the core idea facets regarding output perturbation and statistical utility.",
+        "authors": [
+          "Bo Chen",
+          "M. Hale"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "This paper tackles the issue that standard mechanisms output invalid numerical answers across unbounded support by developing a bounded Gaussian mechanism tailored to realistic finite domains.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "This paper tackles the issue that standard mechanisms output invalid numerical answers across unbounded support by developing a bounded Gaussian mechanism tailored to realistic finite domains.",
+        "material_representation": "none",
+        "paper_id": "p_61372498e3233d26d580b120",
+        "rank": 2,
+        "title": "The Bounded Gaussian Mechanism for Differential Privacy",
+        "url": "https://doi.org/10.48550/arxiv.2211.17230",
+        "venue": "Journal of Privacy and Confidentiality",
+        "year": 2022
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the trade-off between output bounding (privacy/utility constraint) and bias, aligning closely with the foundations and mechanisms outlined in the research idea.",
+        "authors": [
+          "Kai Zhang",
+          "Yanjun Zhang",
+          "Ruo-Xi Sun",
+          "Pei-Wei Tsai",
+          "Muneeb Ul Hassan",
+          "Xing-Liang Yuan",
+          "Minhui Xue",
+          "Jinjun Chen"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The authors address the mismatch between unbounded output mechanisms and real-world application limits by formulating bounded and unbiased composite differential privacy mechanisms for numerical data.",
+        "field_conflicts": {
+          "year": [
+            2023,
+            2024
+          ]
+        },
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The authors address the mismatch between unbounded output mechanisms and real-world application limits by formulating bounded and unbiased composite differential privacy mechanisms for numerical data.",
+        "material_representation": "none",
+        "paper_id": "p_295f9ee6621601dbd4def8ac",
+        "rank": 3,
+        "title": "Bounded and Unbiased Composite Differential Privacy",
+        "url": "https://doi.org/10.1109/sp54263.2024.00108",
+        "venue": "2024 IEEE Symposium on Security and Privacy (SP)",
+        "year": 2024
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the intersection of floating-point precision, differential privacy mechanisms, and their formal utility and privacy bounds. It is highly aligned with the idea's focus on bridging numerical implementation gaps in private algorithms.",
+        "authors": [
+          "Samuel Haney",
+          "Damien Desfontaines",
+          "Luke Hartman",
+          "Ruchit Shrestha",
+          "Michael Hay"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "This work explores how implementing privacy on finite computers with floating-point limits introduces vulnerabilities and designs interval refining to safely preserve differential privacy.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "This work explores how implementing privacy on finite computers with floating-point limits introduces vulnerabilities and designs interval refining to safely preserve differential privacy.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_240f27d26a7cdcd9ac1d6075",
+        "rank": 4,
+        "title": "Precision-based attacks and interval refining: how to break, then fix, differential privacy on finite computers",
+        "url": "https://doi.org/10.48550/arxiv.2207.13793",
+        "venue": "arXiv.org",
+        "year": 2022
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses differential privacy foundations and introduces a bounded-noise mechanism that offers specific accuracy-privacy trade-offs and utility bounds. It aligns closely with the core objectives of the provided idea facets, specifically regarding noise injection strategies and error guarantees.",
+        "authors": [
+          "Y. Dagan",
+          "Gil Kur"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper develops an optimal additive mechanism utilizing strictly bounded noise to guarantee hard error limits while maintaining provable differential privacy.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper develops an optimal additive mechanism utilizing strictly bounded noise to guarantee hard error limits while maintaining provable differential privacy.",
+        "material_representation": "none",
+        "paper_id": "p_04d01a2b2bb1c0a8c50e3ff9",
+        "rank": 5,
+        "title": "A bounded-noise mechanism for differential privacy",
+        "url": "https://arxiv.org/abs/2012.03817",
+        "venue": "Annual Conference Computational Learning Theory",
+        "year": 2020
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C002.json",
+    "source_report_sha256": "b1ad39318f16a503bea29d1934b331177c1b2cf7755c7297e631d326d6d0b572",
+    "expert_output_source_sha256": "2bb3bc6ab85b7f3515ab77ba8a2c4c943a663a01d01b86b7aa773a0a01c43524"
+  },
+  {
+    "item_id": "C003",
+    "historical_item_id": "C003_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 474.875,
+    "model_request_attempts": 291,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 427453,
+        "completion_tokens": 112654,
+        "total_tokens": 540107
+      },
+      "complete_total_tokens": {
+        "prompt_tokens": 427453,
+        "completion_tokens": 112654,
+        "total_tokens": 540107
+      },
+      "token_usage_complete": true,
+      "requests_missing_usage": 0
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 4
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses curriculum learning and data ordering strategies across diverse tasks, aligning perfectly with the provided research facets.",
+        "authors": [
+          "Laura Burdick",
+          "Jonathan K. Kummerfeld",
+          "R. Mihalcea"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper directly analyzes curriculum data ordering across multiple distinct NLP tasks and establishes that ordering strategies yield substantial performance gains for some tasks but not others. A limitation is that its evaluation is confined to a small set of standard NLP classification and tagging tasks.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper directly analyzes curriculum data ordering across multiple distinct NLP tasks and establishes that ordering strategies yield substantial performance gains for some tasks but not others. A limitation is that its evaluation is confined to a small set of standard NLP classification and tagging tasks.",
+        "material_representation": "none",
+        "paper_id": "p_0b4aac86cf246a5c28435273",
+        "rank": 1,
+        "title": "To Batch or Not to Batch? Comparing Batching and Curriculum Learning Strategies across Tasks and Datasets",
+        "url": "https://doi.org/10.3390/math9182234",
+        "venue": "Mathematics",
+        "year": 2021
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses curriculum learning for LLMs, evaluating the effects of data ordering on convergence and performance across different tasks, which aligns with all proposed facets.",
+        "authors": [
+          "Ya-Ning Jia",
+          "Chun-Hui Zhang",
+          "Xingjian Diao",
+          "Xiangchi Yuan",
+          "Z. Ouyang",
+          "Chiyu Ma",
+          "S. Vosoughi"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "The study directly isolates data ordering effects and concludes that curriculum progression is not universally beneficial, showing that ordering effectiveness depends jointly on task complexity and model capability. However, the empirical evaluation focuses specifically on LLM mathematical reasoning.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The study directly isolates data ordering effects and concludes that curriculum progression is not universally beneficial, showing that ordering effectiveness depends jointly on task complexity and model capability. However, the empirical evaluation focuses specifically on LLM mathematical reasoning.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_985efcb1393063f01bbbdc53",
+        "rank": 2,
+        "title": "What Makes a Good Curriculum? Disentangling the Effects of Data Ordering on LLM Mathematical Reasoning",
+        "url": "https://doi.org/10.48550/arxiv.2510.19099",
+        "venue": "Annual Meeting of the Association for Computational Linguistics",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "This paper directly investigates curriculum learning and the impact of data ordering strategies, covering all specified facets by evaluating both explicit and implicit curricula across diverse tasks and orderings.",
+        "authors": [
+          "Xiaoxia Wu",
+          "Ethan Dyer",
+          "Behnam Neyshabur"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "The work conducts a large-scale evaluation of sample ordering to determine when curricula succeed, proving that ordering provides clear gains under specific conditions like noisy or time-budgeted settings rather than standard training. However, it tests image benchmarks rather than a broad spectrum of semantic tasks.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The work conducts a large-scale evaluation of sample ordering to determine when curricula succeed, proving that ordering provides clear gains under specific conditions like noisy or time-budgeted settings rather than standard training. However, it tests image benchmarks rather than a broad spectrum of semantic tasks.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_99b1a016db3ca57033301457",
+        "rank": 3,
+        "title": "When Do Curricula Work?",
+        "url": "https://arxiv.org/abs/2012.03107",
+        "venue": "International Conference on Learning Representations",
+        "year": 2020
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses curriculum learning for neural networks and provides a comparative evaluation of various data scheduling strategies (syllabuses) across different tasks, aligning closely with all provided facets except F4.",
+        "authors": [
+          "Mark Collier",
+          "Jöran Beel"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper empirically tests multiple curriculum schedules across different sequential tasks, demonstrating that learning speed improvements from data sequencing are inherently task-dependent. Its scope is nonetheless restricted to three sequential benchmarks using LSTM networks.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper empirically tests multiple curriculum schedules across different sequential tasks, demonstrating that learning speed improvements from data sequencing are inherently task-dependent. Its scope is nonetheless restricted to three sequential benchmarks using LSTM networks.",
+        "material_representation": "none",
+        "paper_id": "p_addbf5a446e05fbc533fdb33",
+        "rank": 4,
+        "title": "An Empirical Comparison of Syllabuses for Curriculum Learning",
+        "url": "https://arxiv.org/abs/1809.10789",
+        "venue": "Irish Conference on Artificial Intelligence and Cognitive Science",
+        "year": 2018
+      },
+      {
+        "abstract_match_explanation": "The paper directly investigates curriculum learning (F1, F3) across diverse algorithmic tasks (F5) to study their impact on grokking (F4-adjacent), directly aligning with the proposed facets.",
+        "authors": [
+          "Hao-Tian Chen",
+          "Zihao Wang"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The experiments examine whether curriculum ordering improves learning across different algorithmic operations, showing that ordered data progression succeeds on simpler tasks like modular addition but fails on complex operations like modular division. The primary limitation is its focus solely on synthetic modular arithmetic tasks.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The experiments examine whether curriculum ordering improves learning across different algorithmic operations, showing that ordered data progression succeeds on simpler tasks like modular addition but fails on complex operations like modular division. The primary limitation is its focus solely on synthetic modular arithmetic tasks.",
+        "material_representation": "none",
+        "paper_id": "p_24f94d687d5cd717765fd3f3",
+        "rank": 5,
+        "title": "Guiding Grokking: How Curriculum Learning Shapes Algorithmic Understanding in Neural Networks",
+        "url": "https://doi.org/10.1109/csecs64665.2025.11009497",
+        "venue": "2025 7th International Conference on Software Engineering and Computer Science (CSECS)",
+        "year": 2025
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C003.json",
+    "source_report_sha256": "b1ad39318f16a503bea29d1934b331177c1b2cf7755c7297e631d326d6d0b572",
+    "expert_output_source_sha256": "3b4bda6a6bb2452a00757a868d2a4d3e4e72b7e6ca97aafc1e156095f450556c"
+  },
+  {
+    "item_id": "C004",
+    "historical_item_id": "C004_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 523.4369999999999,
+    "model_request_attempts": 278,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 291546,
+        "completion_tokens": 86996,
+        "total_tokens": 378542
+      },
+      "complete_total_tokens": {
+        "prompt_tokens": 291546,
+        "completion_tokens": 86996,
+        "total_tokens": 378542
+      },
+      "token_usage_complete": true,
+      "requests_missing_usage": 0
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 4
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses the need to transform text-based instructions into listener-centric, voice-optimized formats to improve task execution, aligning perfectly with all defined facets.",
+        "authors": [
+          "Alyssa Hwang",
+          "Natasha Oza",
+          "Chris Callison-Burch",
+          "Andrew Head"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "This paper directly addresses the research idea by showing the failure of reading written text aloud and proposing strategies to rewrite and reorganize instructions specifically for a listener's cognitive and hands-free needs.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "This paper directly addresses the research idea by showing the failure of reading written text aloud and proposing strategies to rewrite and reorganize instructions specifically for a listener's cognitive and hands-free needs.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_451823cbd580ab55d3ae3fa0",
+        "rank": 1,
+        "title": "Rewriting the Script: Adapting Text Instructions for Voice Interaction",
+        "url": "https://doi.org/10.1145/3563657.3596059",
+        "venue": "Proceedings of the 2023 ACM Designing Interactive Systems Conference",
+        "year": 2023
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the transformation of static tutorials into interactive, listener-centric guidance, mirroring the provided idea facets almost entirely regarding contextual framing and instructional reorganization.",
+        "authors": [
+          "Qingxiaoyang Zhu",
+          "Yi-Chieh Lee",
+          "Hao-Chuan Wang"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It investigates transforming static, author-centric written tutorials into interactive, conversational step-by-step guidance centered around listener metacognition and situational awareness.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It investigates transforming static, author-centric written tutorials into interactive, conversational step-by-step guidance centered around listener metacognition and situational awareness.",
+        "material_representation": "none",
+        "paper_id": "p_8d87f11663400c1255c0299c",
+        "rank": 2,
+        "title": "ActionaBot: Structuring Metacognitive Conversations towards In-Situ Awareness in How-To Instruction Following",
+        "url": "https://doi.org/10.1145/3719160.3736627",
+        "venue": "Proceedings of the 7th ACM Conference on Conversational User Interfaces",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses listener-centric adaptation of instructions (F1, F3, F5) and the transformation of instruction delivery based on user uncertainty (F4). It focuses on adaptive linguistic generation rather than discourse restructuring (F2), representing a high overlap in the core research objectives.",
+        "authors": [
+          "Dimosthenis Kontogiorgos",
+          "D. Schlangen"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "It explicitly contrasts speaker-based versus listener-based spoken instruction generation in voice user interfaces, adapting information dynamically to user comprehension.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It explicitly contrasts speaker-based versus listener-based spoken instruction generation in voice user interfaces, adapting information dynamically to user comprehension.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_cb8a36815d33504c8e8b73ae",
+        "rank": 3,
+        "title": "Beyond speech: leveraging mouse movements for information adaptation in voice interfaces",
+        "url": "https://doi.org/10.3389/fcomp.2025.1634228",
+        "venue": "Frontiers in Computer Science",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses recipient design in instruction-giving by decomposing and reformatting instructions to ensure they are mimicable for the listener, aligning perfectly with all proposed research facets.",
+        "authors": [
+          "B. Due",
+          "S. Lange",
+          "M. F. Nielsen",
+          "Celine Jarlskov"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It focuses on recipient design in spoken instruction delivery, detailing how instructors systematically decompose complex instructions into simplified, listener-oriented procedural steps.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It focuses on recipient design in spoken instruction delivery, detailing how instructors systematically decompose complex instructions into simplified, listener-oriented procedural steps.",
+        "material_representation": "none",
+        "paper_id": "p_0f2cb018b0501a596b194be0",
+        "rank": 4,
+        "title": "Mimicable embodied demonstration in a decomposed sequence: Two aspects of recipient design in professionals' video-mediated encounters",
+        "url": "https://doi.org/10.1016/j.pragma.2019.07.015",
+        "venue": "Journal of Pragmatics",
+        "year": 2019
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses transforming visual instructions into listener-centric (BLV-accessible) formats through cognitive adaptation and contextual framing. It mirrors the core objectives of the idea facets by reorganizing instructional delivery based on user-specific needs and real-time monitoring.",
+        "authors": [
+          "Mina Huh",
+          "Zihui Xue",
+          "Ujjaini Das",
+          "K. Ashutosh",
+          "Kristen Grauman",
+          "Amy Pavel"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "It restructures source procedural instructions into recipient-adapted spoken feedback and step-by-step guidance tailored to the user's specific context and constraints.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It restructures source procedural instructions into recipient-adapted spoken feedback and step-by-step guidance tailored to the user's specific context and constraints.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_d62ba91fe5bcf31b52ed53df",
+        "rank": 5,
+        "title": "Vid2Coach: Transforming How-To Videos into Task Assistants",
+        "url": "https://doi.org/10.1145/3746059.3747612",
+        "venue": "Proceedings of the 38th Annual ACM Symposium on User Interface Software and Technology",
+        "year": 2025
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C004.json",
+    "source_report_sha256": "996e757a85a337f54dc09f4bdc10286a1e11f50c39db598a419b90a147f07d1a",
+    "expert_output_source_sha256": "e4df39868dde24c809bf3168b41b61c50f552c5bf47cace7772d0d8e5a6fb277"
+  },
+  {
+    "item_id": "C005",
+    "historical_item_id": "C005_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 537.4369999999999,
+    "model_request_attempts": 262,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 285038,
+        "completion_tokens": 82768,
+        "total_tokens": 367806
+      },
+      "complete_total_tokens": {
+        "prompt_tokens": 285038,
+        "completion_tokens": 82768,
+        "total_tokens": 367806
+      },
+      "token_usage_complete": true,
+      "requests_missing_usage": 0
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 3
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses multi-component fault recovery and non-interfering error correction within MPI, showing strong alignment with the provided facets regarding distributed system resilience.",
+        "authors": [
+          "A. Bouteiller",
+          "G. Bosilca"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "This paper directly addresses the research question by designing failure recovery scoping in distributed applications so that independent cooperating components recover without interfering with each other while overlapping recovery with ongoing computation. Its primary limitation is being situated within the specific MPI/HPC programming paradigm rather than general multi-agent architectures.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "This paper directly addresses the research question by designing failure recovery scoping in distributed applications so that independent cooperating components recover without interfering with each other while overlapping recovery with ongoing computation. Its primary limitation is being situated within the specific MPI/HPC programming paradigm rather than general multi-agent architectures.",
+        "material_representation": "none",
+        "paper_id": "p_de78e984318df928403395a1",
+        "rank": 1,
+        "title": "Implicit Actions and Non-blocking Failure Recovery with MPI",
+        "url": "https://doi.org/10.1109/ftxs56515.2022.00009",
+        "venue": "2022 IEEE/ACM 12th Workshop on Fault Tolerance for HPC at eXtreme Scale (FTXS)",
+        "year": 2022
+      },
+      {
+        "abstract_match_explanation": "The paper focuses on distributed rollback recovery and independent fault tolerance, which overlaps with state restoration and non-blocking error correction, but it lacks the focus on multi-agent collaboration or autonomous self-healing mechanisms.",
+        "authors": [
+          "Eric Simon",
+          "Renato B. Hoffmann",
+          "Lucas Alf",
+          "Dalvan Griebler"
+        ],
+        "coverage_level": 2,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It proposes a non-blocking rollback recovery protocol allowing failed distributed operators to recover independently without interrupting other active operators. However, it focuses primarily on distributed dataflow pipelines and data lineage rather than general autonomous agent self-healing.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It proposes a non-blocking rollback recovery protocol allowing failed distributed operators to recover independently without interrupting other active operators. However, it focuses primarily on distributed dataflow pipelines and data lineage rather than general autonomous agent self-healing.",
+        "material_representation": "none",
+        "paper_id": "p_0df4b87f6266301d478883cc",
+        "rank": 2,
+        "title": "LOG.io: Unified Rollback Recovery and Data Lineage Capture for Distributed Data Pipelines",
+        "url": "https://doi.org/10.48550/arxiv.2512.16038",
+        "venue": "arXiv.org",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses multi-agent error propagation and state recovery through autonomous oversight, showing high alignment with F1, F3, and F5. The decoupled architecture provides a novel approach to the fault tolerance and self-healing goals described in the idea.",
+        "authors": [
+          "Churong Liang",
+          "Jinling Gan",
+          "Kairan Hong",
+          "Qiushi Tian",
+          "Zong-Ze Wu",
+          "Runnan Li"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "COCO decouples oversight and contextual rollback from the critical execution path to let cooperating agents correct errors asynchronously without imposing linear latency bottlenecks on ongoing execution. A notable limitation is that simultaneous correlated failures can still overwhelm its decoupled oversight queue.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "COCO decouples oversight and contextual rollback from the critical execution path to let cooperating agents correct errors asynchronously without imposing linear latency bottlenecks on ongoing execution. A notable limitation is that simultaneous correlated failures can still overwhelm its decoupled oversight queue.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_eedf954d88294dcb596ee9ca",
+        "rank": 3,
+        "title": "COCO: Cognitive Operating System with Continuous Oversight for Multi-Agent Workflow Reliability",
+        "url": "https://doi.org/10.48550/arxiv.2508.13815",
+        "venue": "arXiv.org",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses multi-agent self-healing and fault recovery via transactional workflows, covering most of the proposed facets through its focus on stateful restoration and localized repair. It aligns closely with autonomous self-healing and collaborative error handling in distributed task environments.",
+        "authors": [
+          "Long-Ling Geng",
+          "Edward Y. Chang"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "ALAS introduces isolated validation and localized repair in multi-agent LLM planning, editing only the minimally affected regions to preserve in-progress work and avoid disruptive global recomputation. Its scope is mainly evaluated on transactional planning workflows and job-shop scheduling rather than low-level distributed processes.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "ALAS introduces isolated validation and localized repair in multi-agent LLM planning, editing only the minimally affected regions to preserve in-progress work and avoid disruptive global recomputation. Its scope is mainly evaluated on transactional planning workflows and job-shop scheduling rather than low-level distributed processes.",
+        "material_representation": "none",
+        "paper_id": "p_4e4e41f8376bf7d805dfabfe",
+        "rank": 4,
+        "title": "ALAS: Transactional and Dynamic Multi-Agent LLM Planning",
+        "url": "https://doi.org/10.48550/arxiv.2511.03094",
+        "venue": "arXiv.org",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper addresses distributed fault tolerance and state restoration (F3) and coordination for recovery (F4), but it focuses on HPC MPI applications rather than general autonomous multi-agent systems.",
+        "authors": [
+          "Nuria Losada",
+          "G. Bosilca",
+          "A. Bouteiller",
+          "Patricia González",
+          "María J. Martín"
+        ],
+        "coverage_level": 2,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper provides a localized rollback mechanism for cooperating message-passing processes, preventing unaffected processes from having to discard their state and repeat computations. It is limited strictly to SPMD MPI workloads using application-level checkpointing and message logging.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper provides a localized rollback mechanism for cooperating message-passing processes, preventing unaffected processes from having to discard their state and repeat computations. It is limited strictly to SPMD MPI workloads using application-level checkpointing and message logging.",
+        "material_representation": "none",
+        "paper_id": "p_1dbdf9238d910b196279ab81",
+        "rank": 5,
+        "title": "Local rollback for resilient MPI applications with application-level checkpointing and message logging",
+        "url": "https://doi.org/10.1016/j.future.2018.09.041",
+        "venue": "Future Generation Computer Systems",
+        "year": 2019
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C005.json",
+    "source_report_sha256": "0f8758b6dbc0bf007c24730f1ff298e19190bf08381235d9aa1f60391c93726d",
+    "expert_output_source_sha256": "0abed00ae87ed83fd0e5e1db01b6fd8a897b07ccd76354d892c35bf6a51c7b0b"
+  },
+  {
+    "item_id": "C006",
+    "historical_item_id": "C006_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 491.6719999999998,
+    "model_request_attempts": 456,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 336278,
+        "completion_tokens": 88714,
+        "total_tokens": 424992
+      },
+      "complete_total_tokens": null,
+      "token_usage_complete": false,
+      "requests_missing_usage": 135
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 4
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses indexing efficiency and retrieval performance in the context of deduplicated storage systems, aligning closely with facets concerning indexing strategies and query/latency impacts.",
+        "authors": [
+          "Asaf Levi",
+          "P. Shilane",
+          "Sarai Sheinvald",
+          "Gala Yadgar"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "Directly embodies the idea by showing that primary storage data deduplication can be leveraged to build deduplication-aware inverted indexes, drastically reducing term-lookup latency and indexing overhead rather than merely saving storage space.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Directly embodies the idea by showing that primary storage data deduplication can be leveraged to build deduplication-aware inverted indexes, drastically reducing term-lookup latency and indexing overhead rather than merely saving storage space.",
+        "material_representation": "none",
+        "paper_id": "p_54d860d3f2a4c5d198bb0923",
+        "rank": 1,
+        "title": "Physical vs. Logical Indexing with IDEA: Inverted Deduplication-Aware Index",
+        "url": "https://doi.org/10.1145/3729426",
+        "venue": "ACM Transactions on Storage",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses document retrieval in repetitive text collections by leveraging redundancy via grammar compression, which maps closely to indexing strategies that capitalize on repeated sub-sequences.",
+        "authors": [
+          "D. Cobas",
+          "G. Navarro"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "Focuses specifically on document retrieval across repetitive text collections, capitalizing on structural repetition via grammar compression to achieve efficient query times and compact indexes.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Focuses specifically on document retrieval across repetitive text collections, capitalizing on structural repetition via grammar compression to achieve efficient query times and compact indexes.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_2f313ce0e40cde25de06b73d",
+        "rank": 2,
+        "title": "Fast, Small, and Simple Document Listing on Repetitive Text Collections",
+        "url": "https://doi.org/10.1007/978-3-030-32686-9_34",
+        "venue": "Lecture Notes in Computer Science",
+        "year": 2019
+      },
+      {
+        "abstract_match_explanation": "The paper focuses on compressed indexing for highly repetitive text collections, directly addressing indexing efficiency (F2), sub-sequence representation (F4), and query latency (F5) via the R-index structure.",
+        "authors": [
+          "D. Cobas",
+          "T. Gagie",
+          "G. Navarro"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "Introduces the sr-index to exploit repetitiveness in text collections for fast pattern matching and reduced index space; this CPM 2021 work is the conference predecessor to the expanded 2025 ACM TALG journal version (p_cd69c8e7e63f376e24b0e916).",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Introduces the sr-index to exploit repetitiveness in text collections for fast pattern matching and reduced index space; this CPM 2021 work is the conference predecessor to the expanded 2025 ACM TALG journal version (p_cd69c8e7e63f376e24b0e916).",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_084ba1a5147ec5d7cbca6b2f",
+        "rank": 3,
+        "title": "A Fast and Small Subsampled R-index",
+        "url": "https://doi.org/10.4230/lipics.cpm.2021.13",
+        "venue": "Annual Symposium on Combinatorial Pattern Matching",
+        "year": 2021
+      },
+      {
+        "abstract_match_explanation": "The paper provides a comprehensive survey on indexing techniques specifically designed to exploit highly repetitive string collections, which aligns directly with the core focus of the provided idea facets.",
+        "authors": [
+          "G. Navarro"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "Provides a comprehensive survey detailing how string collections with high repetitiveness can be indexed to achieve both orders-of-magnitude compression and efficient search access.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Provides a comprehensive survey detailing how string collections with high repetitiveness can be indexed to achieve both orders-of-magnitude compression and efficient search access.",
+        "material_representation": "none",
+        "paper_id": "p_2bff88fc6b2360182ea3b72f",
+        "rank": 4,
+        "title": "Indexing Highly Repetitive String Collections, Part I",
+        "url": "https://doi.org/10.1145/3434399",
+        "venue": "ACM Computing Surveys",
+        "year": 2021
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses indexing efficiency and search performance on repetitive text collections using grammar-based compression, aligning closely with the goal of leveraging repeated sub-sequences for index optimization.",
+        "authors": [
+          "Francisco Claude",
+          "G. Navarro",
+          "Alejandro Pacheco"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "Demonstrates that grammar-compressed representations of repetitive text can be engineered to guarantee logarithmic search time per occurrence while operating within compact index space.",
+        "field_conflicts": {
+          "venue": [
+            "Journal of Computer and System Sciences",
+            "Journal of computer and system sciences (Print)"
+          ],
+          "year": [
+            2020,
+            2021
+          ]
+        },
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Demonstrates that grammar-compressed representations of repetitive text can be engineered to guarantee logarithmic search time per occurrence while operating within compact index space.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_5db128c1bbeca4c3fc16986c",
+        "rank": 5,
+        "title": "Grammar-Compressed Indexes with Logarithmic Search Time",
+        "url": "https://doi.org/10.1016/j.jcss.2020.12.001",
+        "venue": "Journal of Computer and System Sciences",
+        "year": 2021
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C006.json",
+    "source_report_sha256": "aacdc0666f41ca0f5e1d9d3e8553cc7e719b3a99eedb480025b9dca4eabe3de2",
+    "expert_output_source_sha256": "2bd366416669c60976f09c3c4f15abfb0e83b3109a77679ee384cd50ad712c12"
+  },
+  {
+    "item_id": "C007",
+    "historical_item_id": "C007_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 514.453,
+    "model_request_attempts": 479,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 286806,
+        "completion_tokens": 84223,
+        "total_tokens": 371029
+      },
+      "complete_total_tokens": null,
+      "token_usage_complete": false,
+      "requests_missing_usage": 137
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 2
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly investigates re-identification risks and the uniqueness of mobility traces under spatial generalization techniques like geohashing and K-means, mapping closely to the proposed facets.",
+        "authors": [
+          "Andrea Artioli",
+          "Luca Bedogni",
+          "M. Andreolini"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The study directly tests spatial generalization countermeasures like geohashing and clustering, demonstrating that individual mobility traces maintain high uniqueness and re-identification rates despite strong reduction in location precision.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The study directly tests spatial generalization countermeasures like geohashing and clustering, demonstrating that individual mobility traces maintain high uniqueness and re-identification rates despite strong reduction in location precision.",
+        "material_representation": "none",
+        "paper_id": "p_203c1c8e33b3d6fb86519bcd",
+        "rank": 1,
+        "title": "Effects of Geohashing and K-Means Clustering on Uniqueness in a Mobility Dataset",
+        "url": "https://doi.org/10.1109/sec62691.2024.00042",
+        "venue": "2024 IEEE/ACM Symposium on Edge Computing (SEC)",
+        "year": 2024
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the re-identification of individuals from obfuscated trajectory data by utilizing time-aware and multi-resolutional analysis, aligning perfectly with the provided research facets regarding privacy degradation and trajectory inference.",
+        "authors": [
+          "Takuto Ohka",
+          "Shun Matsumoto",
+          "Masatsugu Ichino",
+          "H. Yoshiura"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper investigates re-identifying individuals from obfuscated and pseudonymized location traces across multiple resolutions, showing mobility histories remain readily linkable even when spatial precision is reduced.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper investigates re-identifying individuals from obfuscated and pseudonymized location traces across multiple resolutions, showing mobility histories remain readily linkable even when spatial precision is reduced.",
+        "material_representation": "none",
+        "paper_id": "p_0937be705963abb81614fb8d",
+        "rank": 2,
+        "title": "Time-aware multi-resolutional approach to re-identifying location histories by using social networks",
+        "url": "https://doi.org/10.1109/qrs-c51114.2020.00038",
+        "venue": "2020 IEEE 20th International Conference on Software Quality, Reliability and Security Companion (QRS-C)",
+        "year": 2020
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses re-identification from anonymized GPS trip data, which aligns closely with the core idea of inferring identity from mobility patterns despite the removal of direct identifiers.",
+        "authors": [
+          "Benedikt Stroebl",
+          "Alexandra Kapp"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "The authors analyze whether removing identifiers and coarsening trajectory grids protects privacy, showing that recurrent personal mobility patterns and unique location visits leave users vulnerable to re-identification.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The authors analyze whether removing identifiers and coarsening trajectory grids protects privacy, showing that recurrent personal mobility patterns and unique location visits leave users vulnerable to re-identification.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_3c631caeb3961169ee1ae46e",
+        "rank": 3,
+        "title": "Investigating vulnerabilities of GPS trip data to trajectory-user linking attacks",
+        "url": "https://doi.org/10.1080/17489725.2025.2511649",
+        "venue": "Journal of Location Based Services",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the re-identification of modified GPS trajectories using a transformer-based model, which aligns almost perfectly with the provided research facets concerning inference attacks on trajectory data.",
+        "authors": [
+          "Stefan Schestakov",
+          "Simon Gottschalk",
+          "Thorben Funke",
+          "Elena Demidova"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper proposes RE-Trace to re-identify GPS trajectories subjected to transformation and obfuscation attacks, demonstrating that underlying movement representations persist through deliberate spatial modifications.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper proposes RE-Trace to re-identify GPS trajectories subjected to transformation and obfuscation attacks, demonstrating that underlying movement representations persist through deliberate spatial modifications.",
+        "material_representation": "none",
+        "paper_id": "p_6d0d49c3c94c9e0c65ed7d76",
+        "rank": 4,
+        "title": "RE-Trace: Re-identification of Modified GPS Trajectories",
+        "url": "https://doi.org/10.1145/3643680",
+        "venue": "ACM Transactions on Spatial Algorithms and Systems",
+        "year": 2024
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the re-identification of individuals through mobility traces and quantifies uniqueness, which maps closely to F2, F3, and F4. It specifically explores how coarsened (temporal granularity) and limited data points lead to privacy degradation.",
+        "authors": [
+          "Jing Gao",
+          "Lijun Sun",
+          "Ming Cai"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper empirically quantifies how human mobility traces remain uniquely identifiable even when observations are subjected to coarse temporal intervals and cloaking generalization.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper empirically quantifies how human mobility traces remain uniquely identifiable even when observations are subjected to coarse temporal intervals and cloaking generalization.",
+        "material_representation": "none",
+        "paper_id": "p_044182605b920adeadedbbdf",
+        "rank": 5,
+        "title": "Quantifying privacy vulnerability of individual mobility traces: A case study of license plate recognition data",
+        "url": "https://doi.org/10.1016/j.trc.2019.04.022",
+        "venue": "Transportation Research Part C: Emerging Technologies",
+        "year": 2019
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C007.json",
+    "source_report_sha256": "aacdc0666f41ca0f5e1d9d3e8553cc7e719b3a99eedb480025b9dca4eabe3de2",
+    "expert_output_source_sha256": "f37fd420b7c41298fd313dfd2468c103baa00e55c2ed6cfc8c45daae747d0d83"
+  },
+  {
+    "item_id": "C008",
+    "historical_item_id": "C008_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 459.1410000000001,
+    "model_request_attempts": 501,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 315768,
+        "completion_tokens": 94762,
+        "total_tokens": 410530
+      },
+      "complete_total_tokens": null,
+      "token_usage_complete": false,
+      "requests_missing_usage": 150
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 1
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses granular attribute protection and selective disclosure via a modified differential privacy framework (OSDP) that optimizes the utility-privacy trade-off for mixed-sensitivity datasets.",
+        "authors": [
+          "Ios Kotsogiannis",
+          "Stelios Doudalis",
+          "Samuel Haney",
+          "Ashwin Machanavajjhala",
+          "S. Mehrotra"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "Introduces one-sided differential privacy to enable truthful data release while maintaining adversary uncertainty regarding which records are sensitive via sensitivity masking. It directly addresses sharing useful data without resolving or leaking unsettled personal sensitivity statuses.",
+        "field_conflicts": {
+          "year": [
+            2017,
+            2020
+          ]
+        },
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Introduces one-sided differential privacy to enable truthful data release while maintaining adversary uncertainty regarding which records are sensitive via sensitivity masking. It directly addresses sharing useful data without resolving or leaking unsettled personal sensitivity statuses.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_20205bb83a6ff66023a8092b",
+        "rank": 1,
+        "title": "One-sided Differential Privacy",
+        "url": "https://doi.org/10.1109/icde48307.2020.00049",
+        "venue": "2020 IEEE 36th International Conference on Data Engineering (ICDE)",
+        "year": 2020
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses privacy-preserving data sharing under uncertainty regarding attribute sensitivity and optimizes the trade-off between utility and privacy in graph-structured data.",
+        "authors": [
+          "Hui Hu",
+          "Lu Cheng",
+          "Jayden Parker Vap",
+          "Mike Borowczak"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "Directly tackles collaborative graph learning when sensitive attributes are only partially observed due to differing and uncertain user privacy preferences. It disentangles representations to protect undisclosed personal attributes while maintaining high task utility.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Directly tackles collaborative graph learning when sensitive attributes are only partially observed due to differing and uncertain user privacy preferences. It disentangles representations to protect undisclosed personal attributes while maintaining high task utility.",
+        "material_representation": "none",
+        "paper_id": "p_adda7d46fc6297821be93360",
+        "rank": 2,
+        "title": "Learning Privacy-Preserving Graph Convolutional Network with Partially Observed Sensitive Attributes",
+        "url": "https://doi.org/10.1145/3485447.3511975",
+        "venue": "Proceedings of the ACM Web Conference 2022",
+        "year": 2022
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses uncertainty-aware data privacy, differential privacy, and utility-privacy trade-offs in a collaborative data environment, showing high alignment with the provided research facets.",
+        "authors": [
+          "Kombou Victor",
+          "Qi Xia",
+          "Hu Xia",
+          "Jian-Bin Gao",
+          "Wei Zhang",
+          "Eyezo'o Benjamin Fabien",
+          "S. Befoum",
+          "Anto Leoba Jonathan",
+          "Kuiche Sop Brinda Leaticia"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "Implements an uncertainty-aware Bayesian framework coupled with differential privacy to balance cross-modal data sharing with user privacy protection. However, its scope is centered specifically on NFT transaction and visual analytics rather than general attribute privacy under preference uncertainty.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Implements an uncertainty-aware Bayesian framework coupled with differential privacy to balance cross-modal data sharing with user privacy protection. However, its scope is centered specifically on NFT transaction and visual analytics rather than general attribute privacy under preference uncertainty.",
+        "material_representation": "none",
+        "paper_id": "p_f4cd2a265082eceda4766971",
+        "rank": 3,
+        "title": "PrivaMod: Uncertainty-Aware Multimedia Fusion with Privacy Guarantees for NFT Visual and Transaction Analysis",
+        "url": "https://doi.org/10.1145/3762999",
+        "venue": "ACM Transactions on Multimedia Computing, Communications, and Applications",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses granular attribute protection (F1) and utility-privacy trade-offs (F5) within a spatiotemporal context. It utilizes a hybrid approach of generalization and differential privacy, aligning strongly with the research idea's focus on anonymization and attribute-level privacy.",
+        "authors": [
+          "Fatemeh Deldar",
+          "M. Abadi"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "Combines sensitive attribute generalization with personalized differential privacy to navigate individual privacy specifications while preserving statistical utility. It focuses primarily on spatiotemporal trajectory records rather than broader information sharing under attribute uncertainty.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Combines sensitive attribute generalization with personalized differential privacy to navigate individual privacy specifications while preserving statistical utility. It focuses primarily on spatiotemporal trajectory records rather than broader information sharing under attribute uncertainty.",
+        "material_representation": "none",
+        "paper_id": "p_879a835a128b6610937f2b01",
+        "rank": 4,
+        "title": "PDP-SAG: Personalized Privacy Protection in Moving Objects Databases by Combining Differential Privacy and Sensitive Attribute Generalization",
+        "url": "https://doi.org/10.1109/access.2019.2925236",
+        "venue": "IEEE Access",
+        "year": 2019
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the privacy of granular spatiotemporal trajectory data using differential privacy and anonymization techniques, aligning strongly with the provided facets regarding utility-privacy trade-offs and uncertainty-aware protection.",
+        "authors": [
+          "Liang Yan",
+          "Hao Wang",
+          "Zhaokai Wang",
+          "Tingting Wu",
+          "Wandi Fu",
+          "Xu Zhang"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "Applies k-anonymity alongside differential privacy noise to generate fuzzy, uncertain temporal data grids that protect underlying user trajectories while preserving mining utility. Its approach is narrowly tailored to timestamp obfuscation in spatiotemporal datasets.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "Applies k-anonymity alongside differential privacy noise to generate fuzzy, uncertain temporal data grids that protect underlying user trajectories while preserving mining utility. Its approach is narrowly tailored to timestamp obfuscation in spatiotemporal datasets.",
+        "material_representation": "none",
+        "paper_id": "p_aea38e361b9846a6e0839fc3",
+        "rank": 5,
+        "title": "Differentially Private Timestamps Publishing in Trajectory",
+        "url": "https://doi.org/10.3390/electronics12020361",
+        "venue": "Electronics",
+        "year": 2023
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C008.json",
+    "source_report_sha256": "aacdc0666f41ca0f5e1d9d3e8553cc7e719b3a99eedb480025b9dca4eabe3de2",
+    "expert_output_source_sha256": "3f75cb69203cfb66c86bfd582dfb3f4cf14996982b3b3a790de4f3401e084a49"
+  },
+  {
+    "item_id": "C009",
+    "historical_item_id": "C009_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 471.828,
+    "model_request_attempts": 426,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 251625,
+        "completion_tokens": 79519,
+        "total_tokens": 331144
+      },
+      "complete_total_tokens": null,
+      "token_usage_complete": false,
+      "requests_missing_usage": 113
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 2
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper focuses on Hardware Trojan insertion (the offensive side of F1/F5) rather than defensive logic locking or obfuscation techniques. While it touches on security through obscurity (F3) via blind insertion, it addresses the vulnerability of ICs rather than the implementation of protection mechanisms.",
+        "authors": [
+          "Alexander Hepp",
+          "T. Perez",
+          "S. Pagliarini",
+          "G. Sigl"
+        ],
+        "coverage_level": 2,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper directly investigates how intrinsic design-specific characteristics of finalized layouts, such as routing, placement, and node locations, inherently govern susceptibility to covert hardware Trojan insertion. Its primary focus is assessing natural layout-level resistance to tampering rather than proposing active defensive locking logic.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper directly investigates how intrinsic design-specific characteristics of finalized layouts, such as routing, placement, and node locations, inherently govern susceptibility to covert hardware Trojan insertion. Its primary focus is assessing natural layout-level resistance to tampering rather than proposing active defensive locking logic.",
+        "material_representation": "none",
+        "paper_id": "p_35535774df68e6cf20368863",
+        "rank": 1,
+        "title": "A Pragmatic Methodology for Blind Hardware Trojan Insertion in Finalized Layouts",
+        "url": "https://doi.org/10.1145/3508352.3549452",
+        "venue": "Proceedings of the 41st IEEE/ACM International Conference on Computer-Aided Design",
+        "year": 2022
+      },
+      {
+        "abstract_match_explanation": "The paper focuses on physical-level security (shielding and cell movement) against physical attacks like probing and Trojans, which overlaps with hardware security and circuit-level tamper resistance but diverges from logic locking or obfuscation techniques.",
+        "authors": [
+          "Jhih-Wei Hsu",
+          "Kuan-Cheng Chen",
+          "Yan-Syuan Chen",
+          "Yu-Hsiang Lo",
+          "Yao-Wen Chang"
+        ],
+        "coverage_level": 2,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It analyzes inherent layout vulnerabilities such as empty whitespace and exposed assets that allow hidden Trojan insertion and probing at the physical design stage. While it introduces layout adjustments to eliminate these spaces, it centers on structural physical design properties that govern tampering feasibility.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It analyzes inherent layout vulnerabilities such as empty whitespace and exposed assets that allow hidden Trojan insertion and probing at the physical design stage. While it introduces layout adjustments to eliminate these spaces, it centers on structural physical design properties that govern tampering feasibility.",
+        "material_representation": "none",
+        "paper_id": "p_5c1152112897d62659732b48",
+        "rank": 2,
+        "title": "Security-aware Physical Design against Trojan Insertion, Frontside Probing, and Fault Injection Attacks",
+        "url": "https://doi.org/10.1145/3569052.3571876",
+        "venue": "Proceedings of the 2023 International Symposium on Physical Design",
+        "year": 2023
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses hardware security via logic locking at the layout level to prevent hardware Trojan insertion, aligning closely with most provided facets.",
+        "authors": [
+          "Fangzhou Wang",
+          "Qijing Wang",
+          "Bang-Qi Fu",
+          "Shui Jiang",
+          "Xiaopeng Zhang",
+          "Lilas Alrahis",
+          "O. Sinanoglu",
+          "J. Knechtel",
+          "Tsung-Yi Ho",
+          "Evangeline F. Y. Young"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It examines how post-design layout characteristics impact covert Trojan insertion and physical tampering susceptibility. However, it leans further toward adding proactive locking countermeasures to achieve security closure.",
+        "field_conflicts": {
+          "year": [
+            2022,
+            2023
+          ]
+        },
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It examines how post-design layout characteristics impact covert Trojan insertion and physical tampering susceptibility. However, it leans further toward adding proactive locking countermeasures to achieve security closure.",
+        "material_representation": "none",
+        "paper_id": "p_cb474542df5ca9b609ae6613",
+        "rank": 3,
+        "title": "Security Closure of IC Layouts Against Hardware Trojans",
+        "url": "https://doi.org/10.1145/3569052.3571878",
+        "venue": "Proceedings of the 2023 International Symposium on Physical Design",
+        "year": 2023
+      },
+      {
+        "abstract_match_explanation": "The paper focuses on hardware Trojan insertion to evade detection, which relates to hardware security and security through obscurity, but does not involve logic locking or direct circuit-level tamper resistance.",
+        "authors": [
+          "Chi-Wei Chen",
+          "Pei-Yu Lo",
+          "Wei-Ting Hsu",
+          "Chih-Wei Chen",
+          "Chin-Wei Tien",
+          "Sy-Yen Kuo"
+        ],
+        "coverage_level": 2,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It investigates how intrinsic netlist structural features and SCOAP controllability/observability metrics affect the viability and stealth of hidden Trojan insertion. However, the study approaches this from the attacker's perspective of generating evasive Trojans rather than systematically characterizing defensive circuit resilience.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It investigates how intrinsic netlist structural features and SCOAP controllability/observability metrics affect the viability and stealth of hidden Trojan insertion. However, the study approaches this from the attacker's perspective of generating evasive Trojans rather than systematically characterizing defensive circuit resilience.",
+        "material_representation": "none",
+        "paper_id": "p_6f924615a429afa2668f8591",
+        "rank": 4,
+        "title": "A Hardware Trojan Insertion Framework against Gate-Level Netlist Structural Feature-based and SCOAP-based Detection",
+        "url": "https://doi.org/10.1109/mwscas54063.2022.9859423",
+        "venue": "2022 IEEE 65th International Midwest Symposium on Circuits and Systems (MWSCAS)",
+        "year": 2022
+      },
+      {
+        "abstract_match_explanation": "The paper focuses on hardware security and tamper-resistant logic (F1, F5), but it uses machine learning for Trojan detection rather than hardware obfuscation or logic locking (F2, F4).",
+        "authors": [
+          "R. Jayanth",
+          "M. Devi"
+        ],
+        "coverage_level": 2,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper evaluates circuit netlists to identify how inherent functional node characteristics dictate where covert Trojans can be inserted. Its eventual objective, however, is embedding active runtime checker logic at those vulnerable sites.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper evaluates circuit netlists to identify how inherent functional node characteristics dictate where covert Trojans can be inserted. Its eventual objective, however, is embedding active runtime checker logic at those vulnerable sites.",
+        "material_representation": "none",
+        "paper_id": "p_7944ada028f07b595e741131",
+        "rank": 5,
+        "title": "Design of Tamper Resistant Checker Logic for Run Time Monitoring of Hardware Trojans in Sequential Circuits",
+        "url": "https://doi.org/10.1109/indiscon66021.2025.11251645",
+        "venue": "2025 IEEE 6th India Council International Subsections Conference (INDISCON)",
+        "year": 2025
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C009.json",
+    "source_report_sha256": "aacdc0666f41ca0f5e1d9d3e8553cc7e719b3a99eedb480025b9dca4eabe3de2",
+    "expert_output_source_sha256": "9a7293def48b378223c6cb191601380940659bb500b131664505a32f081c9d05"
+  },
+  {
+    "item_id": "C010",
+    "historical_item_id": "C010_B",
+    "difficulty": "HARD",
+    "status": "PARTIAL",
+    "expert_status": "SUCCEEDED",
+    "duration_seconds": 463.78099999999995,
+    "model_request_attempts": 487,
+    "usage": {
+      "reported_token_subtotal": {
+        "prompt_tokens": 297064,
+        "completion_tokens": 89117,
+        "total_tokens": 386181
+      },
+      "complete_total_tokens": null,
+      "token_usage_complete": false,
+      "requests_missing_usage": 139
+    },
+    "fulltext": {
+      "attempted": 5,
+      "available": 4
+    },
+    "top5": [
+      {
+        "abstract_match_explanation": "The paper directly addresses the problem of search space explosion in deduction games by using constraint propagation to prune impossible states, aligning closely with F1, F2, F3, and F4.",
+        "authors": [
+          "Fan-Di Meng",
+          "Kai-Jie Xu",
+          "S. Lucas"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "The paper directly addresses the idea by applying constraint propagation to prune impossible states from information sets before entropy evaluation, accelerating deductive reasoning without sacrificing optimality.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "The paper directly addresses the idea by applying constraint propagation to prune impossible states from information sets before entropy evaluation, accelerating deductive reasoning without sacrificing optimality.",
+        "material_representation": "none",
+        "paper_id": "p_233c24b78e96cb75a9dd4f77",
+        "rank": 1,
+        "title": "Constraint Propagation for Reasoning in Single-Player Deduction Games",
+        "url": "https://doi.org/10.1109/cog64752.2025.11114136",
+        "venue": "2025 IEEE Conference on Games (CoG)",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly implements state-space pruning using hard constraints (F4) and information-theoretic belief state simplification (F3) to handle the computational complexity of exhaustive role-inference search (F2).",
+        "authors": [
+          "Kai-Jie Xu",
+          "Fan-Di Meng",
+          "C. Verbrugge",
+          "Simon Lucas"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It structures belief spaces in deduction games by using hard constraints to eliminate impossible assignments before scoring, cutting the computational cost of tracking counterfactual possibilities.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It structures belief spaces in deduction games by using hard constraints to eliminate impossible assignments before scoring, cutting the computational cost of tracking counterfactual possibilities.",
+        "material_representation": "none",
+        "paper_id": "p_b128f3b188518075cde76ee4",
+        "rank": 2,
+        "title": "CSP4SDG: Constraint and Information-Theory Based Role Identification in Social Deduction Games with LLM-Enhanced Inference",
+        "url": "https://doi.org/10.48550/arxiv.2511.06175",
+        "venue": "AAAI Conference on Artificial Intelligence",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses search space reduction and computational efficiency in formal logic synthesis through DPLL-inspired search and dynamic node equivalence checking, which aligns closely with the provided idea facets.",
+        "authors": [
+          "Marco Favorito"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "It tackles the intractability of exact LTLf synthesis through DPLL-inspired search and syntactic simplifications that avoid enumerating impossible and irrelevant variable assignments.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It tackles the intractability of exact LTLf synthesis through DPLL-inspired search and syntactic simplifications that avoid enumerating impossible and irrelevant variable assignments.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_3bd26da9119975516464888e",
+        "rank": 3,
+        "title": "Forward LTLf Synthesis: DPLL At Work",
+        "url": "https://doi.org/10.48550/arxiv.2302.13825",
+        "venue": "IPS-RCRA-SPIRIT@AI*IA",
+        "year": 2023
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses state-space explosion in reactive synthesis through compositional on-the-fly pruning and dynamic management of game solving, aligning closely with the goal of reducing exhaustive search overhead.",
+        "authors": [
+          "Yongkang Li",
+          "Shengping Xiao",
+          "Shufang Zhu",
+          "Jian-Wen Li",
+          "G. Pu"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract",
+        "evidence_source": "abstract",
+        "expert_reason": "It mitigates combinatorial state-space explosion in exact reactive synthesis by pruning non-viable intermediate spaces on the fly to detect unrealizability early.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It mitigates combinatorial state-space explosion in exact reactive synthesis by pruning non-viable intermediate spaces on the fly to detect unrealizability early.",
+        "material_representation": "none",
+        "paper_id": "p_5ca4707c579b330b5c8703c7",
+        "rank": 4,
+        "title": "A Compositional Framework for On-the-Fly LTLf Synthesis",
+        "url": "https://doi.org/10.48550/arxiv.2508.04116",
+        "venue": "European Conference on Artificial Intelligence",
+        "year": 2025
+      },
+      {
+        "abstract_match_explanation": "The paper directly addresses the computational burden of Tree-of-Thought reasoning by pruning redundant state branches, which aligns almost perfectly with the provided facets regarding state space reduction and search efficiency.",
+        "authors": [
+          "Joonghoon Kim",
+          "Xirui Huang",
+          "Zarreen Reza",
+          "Gabriel Grand",
+          "Kevin Zhu",
+          "Ryan Lagasse"
+        ],
+        "coverage_level": 3,
+        "evidence_scope": "complete_abstract_and_selected_pdf_snippets",
+        "evidence_source": "abstract_and_fulltext",
+        "expert_reason": "It mitigates reasoning overhead by dynamically identifying and pruning redundant branches during tree search, though it focuses on semantic similarity in heuristic LLM reasoning rather than impossible states in exact deduction.",
+        "field_conflicts": {},
+        "fulltext_complete": false,
+        "identity_adjudication": "PENDING",
+        "match_explanation": "It mitigates reasoning overhead by dynamically identifying and pruning redundant branches during tree search, though it focuses on semantic similarity in heuristic LLM reasoning rather than impossible states in exact deduction.",
+        "material_representation": "selected_snippets",
+        "paper_id": "p_184d5feafd420ee3e14c269f",
+        "rank": 5,
+        "title": "Chopping Trees: Semantic Similarity Based Dynamic Pruning for Tree-of-Thought Reasoning",
+        "url": "https://doi.org/10.48550/arxiv.2511.08595",
+        "venue": "arXiv.org",
+        "year": 2025
+      }
+    ],
+    "expert_output_file": "idea2prior_expert/C010.json",
+    "source_report_sha256": "aacdc0666f41ca0f5e1d9d3e8553cc7e719b3a99eedb480025b9dca4eabe3de2",
+    "expert_output_source_sha256": "1ab5697e003eb9038c5641006309c2c4bc84deb9e136dc5547bee3025b7f4a1c"
+  }
+]

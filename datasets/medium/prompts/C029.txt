@@ -1,0 +1,8 @@
+Search for the research paper that best matches the idea below. The target has a journal, conference or workshop publication dated from 2015 through 2025, inclusive. A verified preprint of the same work is acceptable; its title or date may differ from the published version.
+
+Return up to five distinct candidate works, ranked by the complete idea rather than shared topic words. For each candidate, give its exact title, authors, publication year, venue, DOI or stable paper URL, and one sentence explaining the conceptual match. When a conference paper and an expanded journal article are part of the same work family, identify their relationship and list the versions within one candidate rather than filling multiple ranks with them. Do not merge distinct follow-ups or merely related papers.
+
+Verify identities against authoritative records. Do not invent citations. If several papers fit, state the ambiguity rather than inventing a unique answer. If no plausible candidate can be verified, say so.
+
+Research idea:
+I wonder whether an animal's willingness to face danger changes as its young grow. Perhaps the important thing is not only what it has already invested, but how much protection is still needed.

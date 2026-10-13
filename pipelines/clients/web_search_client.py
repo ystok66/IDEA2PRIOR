@@ -11,11 +11,14 @@ through DuckDuckGo complementary searches.
 
 from __future__ import annotations
 
+from pipelines.clients.http_transport import get as http_get
+
 import os
 import json
 import requests
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextvars import copy_context
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from loguru import logger
 
@@ -76,7 +79,7 @@ def serpapi_search_google(
     
     try:
         logger.debug(f"[SerpAPI] Calling Google search: '{query[:50]}...' (tbs={tbs})")
-        resp = requests.get(
+        resp = http_get(
             "https://serpapi.com/search",
             params=params,
             timeout=timeout
@@ -345,7 +348,7 @@ def discover_web_candidates(
         # Submit SerpAPI task (2 calls)
         if cfg.enable_serpapi:
             futures.append(executor.submit(
-                run_serpapi_for_idea,
+                copy_context().run, run_serpapi_for_idea,
                 serpapi_query,
                 year_start,
                 year_end,
@@ -355,13 +358,13 @@ def discover_web_candidates(
         # Submit DuckDuckGo task (6 calls)
         if cfg.enable_duckduckgo:
             futures.append(executor.submit(
-                run_duckduckgo_for_idea,
+                copy_context().run, run_duckduckgo_for_idea,
                 ddg_queries,
                 cfg,
             ))
         
         # Collect results
-        for future in as_completed(futures):
+        for future in futures:
             try:
                 batch = future.result()
                 all_results.extend(batch)

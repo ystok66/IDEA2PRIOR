@@ -12,9 +12,15 @@
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 
+from importlib import import_module
 
-from .hermes import HermesFunctionFormatter
+_EXPORTS = {'HermesFunctionFormatter': ('.hermes', 'HermesFunctionFormatter')}
+__all__ = list(_EXPORTS)
 
-__all__ = [
-    'HermesFunctionFormatter',
-]
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

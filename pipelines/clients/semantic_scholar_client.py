@@ -1,3 +1,6 @@
+
+from pipelines.clients.http_transport import get as http_get
+from pipelines.clients.s2_ids import paper_id_path
 """
 Thin wrapper around the Semantic Scholar Academic Graph API.
 
@@ -23,6 +26,7 @@ class SemanticScholarClient:
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("Semantic_Scholar_API_key")
+        self.BASE_URL = os.getenv("Semantic_Scholar_URL", self.BASE_URL).rstrip("/")
 
     def _headers(self) -> Dict[str, str]:
         if self.api_key:
@@ -40,14 +44,13 @@ class SemanticScholarClient:
         Returns:
             Paper metadata dict, or None if failed
         """
-        url = f"{self.BASE_URL}/paper/{paper_id}"
+        url = f"{self.BASE_URL}/paper/{paper_id_path(paper_id)}"
         params = {"fields": fields}
         
         try:
             # Per-request rate limiting (sliding window, not batch + sleep)
-            s2_rate_limiter.wait_for_slot()
             
-            response = requests.get(url, params=params, headers=self._headers(), timeout=10)
+            response = http_get(url, params=params, headers=self._headers(), timeout=10)
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -61,7 +64,7 @@ class SemanticScholarClient:
         limit: int = 50
     ) -> List[Dict[str, Any]]:
         """
-        Call /paper/{paper_id}/references and return a list of referenced papers
+        Call /paper/{paper_id_path(paper_id)}/references and return a list of referenced papers
         with the requested fields.
         
         Args:
@@ -72,14 +75,13 @@ class SemanticScholarClient:
         Returns:
             List of reference paper dicts
         """
-        url = f"{self.BASE_URL}/paper/{paper_id}/references"
+        url = f"{self.BASE_URL}/paper/{paper_id_path(paper_id)}/references"
         params = {"fields": fields, "limit": limit}
         
         try:
             # Per-request rate limiting (sliding window, not batch + sleep)
-            s2_rate_limiter.wait_for_slot()
             
-            response = requests.get(url, params=params, headers=self._headers(), timeout=10)
+            response = http_get(url, params=params, headers=self._headers(), timeout=10)
             response.raise_for_status()
             data = response.json()
             
@@ -103,7 +105,7 @@ class SemanticScholarClient:
         limit: int = 50
     ) -> List[Dict[str, Any]]:
         """
-        Call /paper/{paper_id}/citations and return a list of citing papers.
+        Call /paper/{paper_id_path(paper_id)}/citations and return a list of citing papers.
         
         Args:
             paper_id: Paper ID
@@ -113,14 +115,13 @@ class SemanticScholarClient:
         Returns:
             List of citing paper dicts
         """
-        url = f"{self.BASE_URL}/paper/{paper_id}/citations"
+        url = f"{self.BASE_URL}/paper/{paper_id_path(paper_id)}/citations"
         params = {"fields": fields, "limit": limit}
         
         try:
             # Per-request rate limiting (sliding window, not batch + sleep)
-            s2_rate_limiter.wait_for_slot()
             
-            response = requests.get(url, params=params, headers=self._headers(), timeout=10)
+            response = http_get(url, params=params, headers=self._headers(), timeout=10)
             response.raise_for_status()
             data = response.json()
             

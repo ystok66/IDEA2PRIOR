@@ -12,18 +12,15 @@
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 
-from .apify_reader import Apify
-from .base_io import File
-from .chunkr_reader import ChunkrReader
-from .firecrawl_reader import Firecrawl
-from .jina_url_reader import JinaURLReader
-from .unstructured_io import UnstructuredIO
+from importlib import import_module
 
-__all__ = [
-    'File',
-    'UnstructuredIO',
-    'JinaURLReader',
-    'Firecrawl',
-    'Apify',
-    'ChunkrReader',
-]
+_EXPORTS = {'Apify': ('.apify_reader', 'Apify'), 'File': ('.base_io', 'File'), 'ChunkrReader': ('.chunkr_reader', 'ChunkrReader'), 'Firecrawl': ('.firecrawl_reader', 'Firecrawl'), 'JinaURLReader': ('.jina_url_reader', 'JinaURLReader'), 'UnstructuredIO': ('.unstructured_io', 'UnstructuredIO')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

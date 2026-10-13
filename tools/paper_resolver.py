@@ -1,3 +1,5 @@
+
+from pipelines.clients.http_transport import get as http_get
 import os
 import requests
 from typing import Optional, Dict, Any
@@ -73,8 +75,9 @@ class PaperResolverTool(Tool):
         paper = self._lookup_semantic_scholar(doi, s2_id, arxiv_id, title)
         if paper:
             # Check for OA PDF
-            if paper.get("openAccessPdf"):
-                pdf_url = self._normalize_pdf_url(paper["openAccessPdf"]["url"])
+            oa_url = (paper.get("openAccessPdf") or {}).get("url")
+            if isinstance(oa_url, str) and oa_url.strip():
+                pdf_url = self._normalize_pdf_url(oa_url.strip())
                 logger.info(f"[PaperResolver] Selected PDF from S2 OA: {pdf_url[:80]}...")
                 return {
                     "pdf_url": pdf_url,
@@ -96,7 +99,8 @@ class PaperResolverTool(Tool):
                 }
 
         # 3. OpenAlex (Good for OA)
-        if doi or openalex_id or title:
+        from pipelines.clients.http_transport import openalex_enabled
+        if openalex_enabled() and (doi or openalex_id or title):
             logger.debug(f"[PaperResolver] Trying source 3/5: OpenAlex (doi={doi}, openalex_id={openalex_id})")
             work = self._lookup_openalex(doi, openalex_id, title)
             if work:
@@ -127,7 +131,8 @@ class PaperResolverTool(Tool):
 
         # 5. DDG Search (last resort, optional)
         # This is behind a config flag as it can be unreliable and non-deterministic
-        if title:
+        from pipelines.clients.scholarly import replacement_enabled
+        if title and not replacement_enabled():
             logger.debug(f"[PaperResolver] Trying source 5/5: DDG Search (title={title[:40]}...)")
             pdf_url = self._search_ddg_for_pdf(title)
             if pdf_url:
@@ -147,6 +152,15 @@ class PaperResolverTool(Tool):
         }
 
     def _lookup_semantic_scholar(self, doi, s2_id, arxiv_id, title):
+        from pipelines.clients.scholarly import replacement_enabled, batch_metadata, paper_lookup_id, search_s2, title_matches
+        if replacement_enabled():
+            identifier = paper_lookup_id({'s2_id': s2_id, 'doi': doi, 'arxiv_id': arxiv_id})
+            if identifier:
+                result = batch_metadata([identifier])[0]
+                if result['status'] == 'SUCCEEDED' and (not title or title_matches(title, result['data'].get('title'))):
+                    return result['data']
+            # Never bind an unrelated first title-search result to this PDF.
+            return None
         base_url = "https://api.semanticscholar.org/graph/v1/paper"
         params = {"fields": "title,year,venue,externalIds,openAccessPdf,authors,abstract"}
         headers = {"x-api-key": self.s2_api_key} if self.s2_api_key else {}
@@ -163,8 +177,7 @@ class PaperResolverTool(Tool):
                 search_url = f"{base_url}/search"
                 search_params = {**params, "query": title, "limit": 1}
                 # Per-request rate limiting for S2
-                s2_rate_limiter.wait_for_slot()
-                resp = requests.get(search_url, params=search_params, headers=headers)
+                resp = http_get(search_url, params=search_params, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
                 if data.get("data"):
@@ -174,8 +187,7 @@ class PaperResolverTool(Tool):
                 return None
 
             # Per-request rate limiting for S2
-            s2_rate_limiter.wait_for_slot()
-            resp = requests.get(url, params=params, headers=headers)
+            resp = http_get(url, params=params, headers=headers)
             if resp.status_code == 404:
                 return None
             resp.raise_for_status()
@@ -185,6 +197,9 @@ class PaperResolverTool(Tool):
             return None
 
     def _lookup_openalex(self, doi, openalex_id, title):
+        from pipelines.clients.http_transport import openalex_enabled
+        if not openalex_enabled():
+            return None
         base_url = "https://api.openalex.org/works"
         params = {}
         if self.openalex_mailto:
@@ -194,19 +209,16 @@ class PaperResolverTool(Tool):
             if openalex_id:
                 url = f"{base_url}/{openalex_id}"
                 # Per-request rate limiting for OpenAlex
-                openalex_rate_limiter.wait_for_slot()
-                resp = requests.get(url, params=params)
+                resp = http_get(url, params=params)
             elif doi:
                 url = f"{base_url}/doi:{doi}"
                 # Per-request rate limiting for OpenAlex
-                openalex_rate_limiter.wait_for_slot()
-                resp = requests.get(url, params=params)
+                resp = http_get(url, params=params)
             elif title:
                 params["search"] = title
                 params["per_page"] = 1
                 # Per-request rate limiting for OpenAlex
-                openalex_rate_limiter.wait_for_slot()
-                resp = requests.get(base_url, params=params)
+                resp = http_get(base_url, params=params)
                 data = resp.json()
                 if data.get("results"):
                     return data["results"][0]
@@ -227,7 +239,7 @@ class PaperResolverTool(Tool):
             return None
         url = f"https://api.unpaywall.org/v2/{doi}"
         try:
-            resp = requests.get(url, params={"email": self.email})
+            resp = http_get(url, params={"email": self.email})
             if resp.status_code == 404:
                 return None
             resp.raise_for_status()

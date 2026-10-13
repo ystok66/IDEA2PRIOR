@@ -10,18 +10,20 @@ The Agent can autonomously think about which tools to use to achieve the goal.
 """
 
 import json
+import math
+import copy
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
+from pipelines.runtime import invoke_model
 
 from loguru import logger
 from smolagents import CodeAgent, Tool
 from smolagents.models import ChatMessage, MessageRole, Model
 from smolagents.memory import ActionStep, PlanningStep, TaskStep, Timing, TokenUsage
 
-from dotenv import load_dotenv
-load_dotenv()
+# API routes are supplied explicitly; importing this module never loads .env.
 
 
 @dataclass
@@ -31,6 +33,8 @@ class ToolSelection:
     reason: str
     parameters: Dict[str, Any] = field(default_factory=dict)
     order: int = 0
+    step_id: str = ""
+    dependencies: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -42,6 +46,7 @@ class ExecutionPlan:
     steps: List[str]
     expected_output: str
     created_at: float = field(default_factory=time.time)
+    noop: bool = False
 
 
 @dataclass
@@ -119,7 +124,9 @@ Please analyze the task and create a detailed plan. Your response should be a JS
             "tool_name": "name_of_tool",
             "reason": "Why this tool is needed",
             "parameters": {{"param1": "value1"}},
-            "order": 1
+            "order": 1,
+            "step_id": "step_1",
+            "dependencies": []
         }}
     ],
     "steps": [
@@ -133,7 +140,9 @@ Important:
 1. Only select tools that are actually needed for the task
 2. Order the tools logically (what needs to be done first)
 3. Provide clear reasons for each tool selection
-4. Make sure the plan is executable"""
+4. Make sure the plan is executable
+5. Assign stable step_id values and dependencies. Output references use {{"$ref": "step_id.field"}} and must name a declared dependency.
+6. An empty selected_tools list is not success. Use an explicit top-level "noop": true only when the task legitimately requires no tool work."""
     
     def plan(
         self,
@@ -209,9 +218,9 @@ Important:
             ChatMessage(role=MessageRole.USER, content=[{"type": "text", "text": prompt}])
         ]
         
-        start_time = time.time()
-        response = self.model.generate(messages)
-        planning_time = time.time() - start_time
+        start_time = time.monotonic()
+        response = invoke_model(self.model.generate, messages, stage="planner.plan")
+        planning_time = time.monotonic() - start_time
         
         # Parse the response
         plan_text = response.content[0]["text"] if isinstance(response.content, list) else str(response.content)
@@ -227,7 +236,8 @@ Important:
                 ToolSelection(**tool_data) for tool_data in plan_data.get("selected_tools", [])
             ],
             steps=plan_data.get("steps", []),
-            expected_output=plan_data.get("expected_output", "")
+            expected_output=plan_data.get("expected_output", ""),
+            noop=plan_data.get("noop") is True,
         )
         
         logger.info(f"✅ Planner: Generated plan with {len(execution_plan.selected_tools)} tools")
@@ -253,17 +263,22 @@ Important:
                     json_str = response_text
             
             plan_data = json.loads(json_str)
+            if not isinstance(plan_data, dict) or not isinstance(plan_data.get("selected_tools"), list):
+                raise ValueError("INVALID_OUTPUT: plan must contain a selected_tools list")
+            if "noop" in plan_data and not isinstance(plan_data["noop"], bool):
+                raise ValueError("INVALID_OUTPUT: noop must be a JSON boolean")
+            for selection in plan_data["selected_tools"]:
+                if not isinstance(selection, dict) or not isinstance(selection.get("tool_name"), str):
+                    raise ValueError("INVALID_OUTPUT: tool selection must name a tool")
+                if "dependencies" in selection and (not isinstance(selection["dependencies"], list) or not all(isinstance(dep, str) for dep in selection["dependencies"])):
+                    raise ValueError("INVALID_OUTPUT: dependencies must be a string list")
+                if "order" in selection and (isinstance(selection["order"], bool) or not isinstance(selection["order"], int)):
+                    raise ValueError("INVALID_OUTPUT: order must be an integer")
             return plan_data
         except json.JSONDecodeError as e:
             logger.warning(f"⚠️ Failed to parse plan as JSON: {e}")
             logger.warning(f"   Response: {response_text[:500]}")
-            # Return a fallback plan
-            return {
-                "analysis": "Failed to parse plan. Using fallback.",
-                "selected_tools": [],
-                "steps": ["Execute the task using available tools"],
-                "expected_output": "Task completion"
-            }
+            raise ValueError("INVALID_OUTPUT: planner did not return valid JSON") from e
 
 
 class Worker:
@@ -289,6 +304,8 @@ class Worker:
             tools: Dictionary of available tools (name -> Tool)
             max_steps: Maximum number of execution steps
         """
+        if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 0:
+            raise ValueError("max_steps must be a nonnegative integer")
         self.tools = tools
         self.max_steps = max_steps
         self.execution_history: List[Dict[str, Any]] = []
@@ -298,7 +315,8 @@ class Worker:
     def execute_plan(
         self,
         plan: ExecutionPlan,
-        agent: Optional[CodeAgent] = None
+        agent: Optional[CodeAgent] = None,
+        previous_results: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Execute the given execution plan
@@ -310,86 +328,103 @@ class Worker:
         Returns:
             Dict with execution results
         """
-        logger.info("🔧 Worker: Starting plan execution...")
-        logger.info(f"   Plan has {len(plan.selected_tools)} tool selections")
-        
-        results = {
-            "plan": plan,
-            "execution_steps": [],
-            "final_result": None,
-            "success": False,
-            "errors": []
-        }
-        
-        # Sort tools by order
-        sorted_tools = sorted(plan.selected_tools, key=lambda t: t.order)
-        
-        # Execute each tool in order
-        for i, tool_selection in enumerate(sorted_tools, 1):
-            logger.info(f"   Step {i}/{len(sorted_tools)}: Executing {tool_selection.tool_name}")
-            
-            step_result = {
-                "step": i,
-                "tool_name": tool_selection.tool_name,
-                "reason": tool_selection.reason,
-                "parameters": tool_selection.parameters,
-                "result": None,
-                "error": None,
-                "success": False
-            }
-            
+        results = {"plan": plan, "execution_steps": [], "final_result": None,
+                   "success": False, "errors": [], "status": "NOT_RUN", "tool_attempts": 0}
+        ordered = sorted(enumerate(plan.selected_tools), key=lambda pair: (pair[1].order, pair[0]))
+        if not ordered:
+            results.update(success=plan.noop is True, status="NOOP" if plan.noop is True else "INVALID_PLAN")
+            if not results["success"]:
+                results["errors"].append("Empty plan is not an explicit NOOP")
+            return results
+        ids = [selection.step_id or f"step-{original + 1}" for original, selection in ordered]
+        if len(ids) != len(set(ids)):
+            results["errors"].append("Duplicate step IDs")
+            results["status"] = "INVALID_PLAN"
+            return results
+        previous = {row["step_id"]: row for row in (previous_results or {}).get("execution_steps", [])}
+        completed = {}
+        changed = set()
+        for position, ((original, selection), step_id) in enumerate(zip(ordered, ids), 1):
+            row = {"step": position, "step_id": step_id, "tool_name": selection.tool_name,
+                   "reason": selection.reason, "parameters": copy.deepcopy(selection.parameters),
+                   "dependencies": list(selection.dependencies), "result": None, "raw_result": None,
+                   "error": None, "success": False, "status": "NOT_RUN", "attempted": False}
+            results["execution_steps"].append(row)  # All branches keep their denominator.
             try:
-                # Get the tool
-                if tool_selection.tool_name not in self.tools:
-                    error_msg = f"Tool '{tool_selection.tool_name}' not found"
-                    logger.error(f"   ❌ {error_msg}")
-                    step_result["error"] = error_msg
-                    results["errors"].append(error_msg)
+                if not all(dep in completed and completed[dep]["success"] for dep in selection.dependencies):
+                    row.update(status="BLOCKED", error="Missing, forward, or failed dependency")
                     continue
-                
-                tool = self.tools[tool_selection.tool_name]
-                
-                # Execute the tool directly
-                # Tool.forward() expects keyword arguments based on tool.inputs
-                # Convert parameters dict to keyword arguments
-                if isinstance(tool_selection.parameters, dict):
-                    # Validate that all required parameters are present
-                    from smolagents.tools import validate_tool_arguments
-                    try:
-                        validate_tool_arguments(tool, tool_selection.parameters)
-                        result = tool.forward(**tool_selection.parameters)
-                    except Exception as e:
-                        # If validation fails, try with the parameters as-is
-                        logger.warning(f"   ⚠️ Parameter validation failed: {e}, trying direct call")
-                        result = tool.forward(**tool_selection.parameters)
-                else:
-                    # If parameters is not a dict, try to call with it directly
-                    result = tool.forward(tool_selection.parameters)
-                
-                # Save full result (don't truncate)
-                step_result["result"] = str(result)
-                step_result["result_length"] = len(str(result))
-                step_result["success"] = True
-                logger.info(f"   ✅ Tool executed successfully")
-                logger.info(f"   📊 Result length: {len(str(result))} characters")
-                
-            except Exception as e:
-                error_msg = f"Error executing {tool_selection.tool_name}: {str(e)}"
-                logger.error(f"   ❌ {error_msg}")
-                step_result["error"] = error_msg
-                results["errors"].append(error_msg)
-            
-            results["execution_steps"].append(step_result)
-        
-        # Determine overall success
-        results["success"] = len(results["errors"]) == 0
-        
-        if results["success"]:
-            logger.info("✅ Worker: Plan execution completed successfully")
-        else:
-            logger.warning(f"⚠️ Worker: Plan execution completed with {len(results['errors'])} errors")
-        
+                if selection.tool_name not in self.tools:
+                    row.update(status="FAILED", error=f"Unknown tool: {selection.tool_name}")
+                    continue
+                tool = self.tools[selection.tool_name]
+                old = previous.get(step_id)
+                if old and old.get("success") and old["tool_name"] == selection.tool_name and old["parameters"] == selection.parameters and old.get("dependencies", []) == selection.dependencies and not any(dep in changed for dep in selection.dependencies):
+                    row.update(copy.deepcopy(old), recovered=True, attempted=False)
+                    continue
+                if old and old.get("attempted") and getattr(tool, "idempotent", False) is not True:
+                    row.update(status="BLOCKED", error="Prior side-effect outcome cannot be safely replayed")
+                    continue
+                parameters = self._resolve_parameters(selection.parameters, completed, selection.dependencies)
+                row["resolved_parameters"] = copy.deepcopy(parameters)
+                from smolagents.tools import validate_tool_arguments
+                try:
+                    validate_tool_arguments(tool, parameters)
+                except Exception as error:
+                    row.update(status="INVALID_ARGUMENTS", error=str(error))
+                    continue
+                if results["tool_attempts"] >= self.max_steps:
+                    row.update(status="NOT_RUN", error="Tool attempt budget exhausted")
+                    continue
+                results["tool_attempts"] += 1
+                row["attempted"] = True
+                changed.add(step_id)
+                started = time.monotonic()
+                try:
+                    value = tool.forward(**parameters) if isinstance(parameters, dict) else tool.forward(parameters)
+                except Exception as error:
+                    row.update(status="FAILED" if getattr(tool, "idempotent", False) is True else "UNKNOWN", error=f"{type(error).__name__}: {error}")
+                    continue
+                finally:
+                    row["execution_seconds"] = time.monotonic() - started
+                row.update(raw_result=value, result=str(value), result_length=len(str(value)))
+                # Only tools declaring an interpreter can classify normal returns.
+                interpreter = getattr(tool, "interpret_execution_result", None)
+                status = interpreter(value) if callable(interpreter) else "SUCCEEDED"
+                if status not in ("SUCCEEDED", "FAILED", "UNKNOWN", "NOT_APPLICABLE"):
+                    raise ValueError("Tool interpreter returned an invalid status")
+                row.update(status=status, success=status in ("SUCCEEDED", "NOT_APPLICABLE"))
+                if not row["success"]:
+                    row["error"] = f"Tool-declared result status: {status}"
+            except Exception as error:
+                row.update(status="INVALID_ARGUMENTS" if not row["attempted"] else "UNKNOWN", error=str(error))
+            finally:
+                completed[step_id] = row
+                self.execution_history.append(copy.deepcopy(row))
+                if row["error"]:
+                    results["errors"].append(f"{step_id}: {row['error']}")
+        results["success"] = all(row["success"] for row in results["execution_steps"])
+        results["status"] = "SUCCEEDED" if results["success"] else "INCOMPLETE"
+        successful = [row for row in results["execution_steps"] if row["success"]]
+        results["final_result"] = successful[-1]["raw_result"] if successful else None
         return results
+
+    @staticmethod
+    def _resolve_parameters(value, completed, dependencies):
+        """Only exact {'$ref': 'step_id.field.0'} objects are output references."""
+        if isinstance(value, dict) and set(value) == {"$ref"}:
+            parts = value["$ref"].split(".")
+            if parts[0] not in dependencies:
+                raise ValueError("Output reference must name a declared dependency")
+            result = completed[parts[0]]["raw_result"]
+            for part in parts[1:]:
+                result = result[int(part)] if isinstance(result, (list, tuple)) else result[part]
+            return copy.deepcopy(result)
+        if isinstance(value, dict):
+            return {key: Worker._resolve_parameters(item, completed, dependencies) for key, item in value.items()}
+        if isinstance(value, list):
+            return [Worker._resolve_parameters(item, completed, dependencies) for item in value]
+        return value
 
 
 class Critic:
@@ -496,9 +531,9 @@ Important:
             ChatMessage(role=MessageRole.USER, content=[{"type": "text", "text": prompt}])
         ]
         
-        start_time = time.time()
-        response = self.model.generate(messages)
-        evaluation_time = time.time() - start_time
+        start_time = time.monotonic()
+        response = invoke_model(self.model.generate, messages, stage="planner.critic")
+        evaluation_time = time.monotonic() - start_time
         
         # Parse the response
         eval_text = response.content[0]["text"] if isinstance(response.content, list) else str(response.content)
@@ -585,22 +620,24 @@ Important:
                     json_str = response_text
             
             eval_data = json.loads(json_str)
+            if not isinstance(eval_data, dict):
+                raise ValueError("INVALID_OUTPUT: critic response must be an object")
+            for name in ("quality_score", "completeness_score", "correctness_score"):
+                score = eval_data.get(name)
+                if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1:
+                    raise ValueError(f"INVALID_OUTPUT: {name} must be finite within [0,1]")
+            for name in ("meets_requirements", "needs_reexecution"):
+                if not isinstance(eval_data.get(name), bool):
+                    raise ValueError(f"INVALID_OUTPUT: {name} must be a JSON boolean")
+            for name in ("strengths", "weaknesses", "improvements"):
+                value = eval_data.get(name)
+                if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                    raise ValueError(f"INVALID_OUTPUT: {name} must be a string list")
             return eval_data
         except json.JSONDecodeError as e:
             logger.warning(f"⚠️ Failed to parse evaluation as JSON: {e}")
             logger.warning(f"   Response: {response_text[:500]}")
-            # Return a fallback evaluation
-            return {
-                "quality_score": 0.5,
-                "completeness_score": 0.5,
-                "correctness_score": 0.5,
-                "meets_requirements": False,
-                "strengths": [],
-                "weaknesses": ["Failed to parse evaluation response"],
-                "improvements": ["Fix evaluation parsing"],
-                "needs_reexecution": False,
-                "overall_feedback": "Evaluation parsing failed"
-            }
+            raise ValueError("INVALID_OUTPUT: critic did not return valid JSON") from e
 
 
 class PlannerWorkerAgent:
@@ -639,7 +676,12 @@ class PlannerWorkerAgent:
         self.max_steps = max_steps
         self.enable_reflection = enable_reflection
         self.enable_critic = enable_critic
+        if isinstance(max_reexecutions, bool) or not isinstance(max_reexecutions, int) or max_reexecutions < 0:
+            raise ValueError("max_reexecutions must be a nonnegative integer")
         self.max_reexecutions = max_reexecutions
+        # Preserve the pre-existing single conditional retry, including config=2.
+        # A true multi-retry loop needs an explicit changed budget/protocol.
+        self.effective_max_reexecutions = min(max_reexecutions, 1)
         
         # Initialize Planner, Worker, and Critic
         self.planner = Planner(model=model, available_tools=tools)
@@ -664,167 +706,73 @@ class PlannerWorkerAgent:
         logger.info(f"   Critic: {enable_critic}")
         logger.info(f"   Max re-executions: {max_reexecutions}")
     
-    def run(
-        self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Execute a task using planner-worker architecture
-        
-        Args:
-            task: The task to execute
-            context: Optional context information
-            
-        Returns:
-            Dict with execution results
-        """
-        logger.info("=" * 80)
-        logger.info("🚀 PlannerWorkerAgent: Starting task execution")
-        logger.info("=" * 80)
-        logger.info(f"📝 Task: {task}")
-        
-        start_time = time.time()
-        
-        # Step 1: Planning
-        logger.info("\n" + "=" * 80)
-        logger.info("📋 Phase 1: Planning")
-        logger.info("=" * 80)
-        
-        plan = self.planner.plan(task=task, context=context)
-        
-        # Log the plan
-        logger.info("\n📊 Generated Plan:")
-        logger.info(f"   Analysis: {plan.analysis[:200]}...")
-        logger.info(f"   Selected Tools: {len(plan.selected_tools)}")
-        for tool_sel in plan.selected_tools:
-            logger.info(f"     - {tool_sel.tool_name} (order: {tool_sel.order}): {tool_sel.reason}")
-        logger.info(f"   Steps: {len(plan.steps)}")
-        for i, step in enumerate(plan.steps, 1):
-            logger.info(f"     {i}. {step}")
-        
-        # Step 2: Execution
-        logger.info("\n" + "=" * 80)
-        logger.info("🔧 Phase 2: Execution")
-        logger.info("=" * 80)
-        
-        execution_results = self.worker.execute_plan(
-            plan=plan,
-            agent=self.execution_agent
-        )
-        
-        # Store all execution attempts
-        all_executions = [execution_results]
-        
-        # Step 3: Critic Evaluation (if enabled)
+    def run(self, task: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute aligned rounds; no unknown side effect is automatically replayed."""
+        started = time.monotonic()
+        rounds = []
+        all_executions = []
+        plan = None
         evaluation = None
-        reexecution_count = 0
-        
-        if self.enable_critic and self.critic:
-            logger.info("\n" + "=" * 80)
-            logger.info("🔍 Phase 3: Critic Evaluation")
-            logger.info("=" * 80)
-            
-            evaluation = self.critic.evaluate(
-                task=task,
-                plan=plan,
-                execution_results=execution_results
-            )
-            
-            # Log evaluation details
-            logger.info("\n📊 Evaluation Details:")
-            logger.info(f"   Quality Score: {evaluation.quality_score:.2f}/1.0")
-            logger.info(f"   Completeness Score: {evaluation.completeness_score:.2f}/1.0")
-            logger.info(f"   Correctness Score: {evaluation.correctness_score:.2f}/1.0")
-            logger.info(f"   Meets Requirements: {evaluation.meets_requirements}")
-            
-            if evaluation.strengths:
-                logger.info(f"\n✅ Strengths ({len(evaluation.strengths)}):")
-                for strength in evaluation.strengths:
-                    logger.info(f"   - {strength}")
-            
-            if evaluation.weaknesses:
-                logger.info(f"\n⚠️ Weaknesses ({len(evaluation.weaknesses)}):")
-                for weakness in evaluation.weaknesses:
-                    logger.info(f"   - {weakness}")
-            
-            if evaluation.improvements:
-                logger.info(f"\n💡 Improvements ({len(evaluation.improvements)}):")
-                for improvement in evaluation.improvements:
-                    logger.info(f"   - {improvement}")
-            
-            if evaluation.overall_feedback:
-                logger.info(f"\n📝 Overall Feedback:")
-                logger.info(f"   {evaluation.overall_feedback}")
-            
-            # Step 4: Re-execution (if needed and allowed)
-            if evaluation.needs_reexecution and reexecution_count < self.max_reexecutions:
-                logger.info("\n" + "=" * 80)
-                logger.info("🔄 Phase 4: Re-execution")
-                logger.info("=" * 80)
-                logger.info(f"   Reason: {evaluation.reexecution_reason}")
-                logger.info(f"   Re-execution {reexecution_count + 1}/{self.max_reexecutions}")
-                
-                # Update plan based on feedback (simple approach: regenerate plan)
-                # In a more sophisticated implementation, we could refine the plan
-                logger.info("   Regenerating plan with improvements...")
-                improved_plan = self.planner.plan(task=task, context={
-                    "previous_plan": plan,
-                    "evaluation": evaluation,
-                    "improvements": evaluation.improvements
-                })
-                
-                # Re-execute with improved plan
-                reexecution_results = self.worker.execute_plan(
-                    plan=improved_plan,
-                    agent=self.execution_agent
-                )
-                
-                # Store re-execution results
-                all_executions.append(reexecution_results)
-                
-                reexecution_count += 1
-                
-                # Re-evaluate if still enabled
-                if self.enable_critic:
-                    evaluation = self.critic.evaluate(
-                        task=task,
-                        plan=improved_plan,
-                        execution_results=reexecution_results
-                    )
-                    logger.info(f"   Re-evaluation Quality: {evaluation.quality_score:.2f}/1.0")
-                
-                # Update execution_results to the latest
-                execution_results = reexecution_results
-        
-        # Step 5: Reflection (optional, legacy)
-        if self.enable_reflection and not execution_results["success"]:
-            logger.info("\n" + "=" * 80)
-            logger.info("🤔 Phase 5: Reflection (Legacy)")
-            logger.info("=" * 80)
-            logger.info("   Execution had errors, but reflection is not yet implemented")
-        
-        # Build final result
-        total_time = time.time() - start_time
-        
-        result = {
-            "task": task,
-            "plan": plan,
-            "execution": execution_results,  # Latest execution
-            "all_executions": all_executions,  # All execution attempts
-            "evaluation": evaluation,
-            "reexecution_count": reexecution_count,
-            "total_time": total_time,
-            "success": execution_results["success"] and (evaluation.meets_requirements if evaluation else execution_results["success"])
+        execution = {"success": False, "status": "NOT_RUN", "execution_steps": [], "errors": []}
+        errors = []
+        effective_retries = min(self.max_reexecutions, 1)
+        remaining_steps = self.max_steps
+        original_budget = self.worker.max_steps
+        try:
+            for round_index in range(1 + effective_retries):
+                round_record = {"round": round_index, "plan": None, "execution": None,
+                                "evaluation": None, "status": "NOT_RUN"}
+                rounds.append(round_record)
+                try:
+                    round_context = context if round_index == 0 else {
+                        "previous_plan": plan, "evaluation": evaluation,
+                        "improvements": evaluation.improvements,
+                    }
+                    plan = self.planner.plan(task=task, context=round_context)
+                    round_record["plan"] = plan
+                except Exception as error:
+                    round_record.update(status="INVALID_PLAN", error=f"{type(error).__name__}: {error}")
+                    errors.append(round_record["error"])
+                    break
+                self.worker.max_steps = remaining_steps
+                execution = self.worker.execute_plan(plan, self.execution_agent,
+                    previous_results=all_executions[-1] if all_executions else None)
+                remaining_steps -= execution.get("tool_attempts", 0)
+                all_executions.append(execution)
+                round_record["execution"] = execution
+                round_record["status"] = execution.get("status", "UNKNOWN")
+                evaluation = None
+                if self.enable_critic and self.critic:
+                    try:
+                        evaluation = self.critic.evaluate(task=task, plan=plan, execution_results=execution)
+                        round_record["evaluation"] = evaluation
+                    except Exception as error:
+                        round_record.update(status="INVALID_OUTPUT", error=f"{type(error).__name__}: {error}")
+                        errors.append(round_record["error"])
+                        break
+                if not evaluation or not evaluation.needs_reexecution:
+                    break
+                # Unknown side effects cannot be resolved by regenerating a plan.
+                if any(step.get("status") == "UNKNOWN" for step in execution.get("execution_steps", [])):
+                    round_record["reexecution_status"] = "BLOCKED_UNKNOWN_SIDE_EFFECT"
+                    break
+                if round_index >= effective_retries or remaining_steps <= 0:
+                    round_record["reexecution_status"] = "NOT_RUN_BUDGET"
+                    break
+        finally:
+            self.worker.max_steps = original_budget
+        return {
+            "task": task, "plan": plan, "execution": execution,
+            "all_executions": all_executions, "rounds": rounds, "evaluation": evaluation,
+            "reexecution_count": max(0, len(all_executions) - 1),
+            "configured_max_reexecutions": self.max_reexecutions,
+            "effective_max_reexecutions": effective_retries,
+            "budget_policy": "legacy_single_reexecution_v1; total_tool_attempts_bounded",
+            "remaining_tool_attempts": remaining_steps,
+            "total_time": time.monotonic() - started, "errors": errors,
+            "success": bool(execution.get("success") and not errors and
+                            (evaluation.meets_requirements if evaluation else True)),
         }
-        
-        logger.info("\n" + "=" * 80)
-        logger.info("✅ PlannerWorkerAgent: Task execution completed")
-        logger.info("=" * 80)
-        logger.info(f"   Total time: {total_time:.2f}s")
-        logger.info(f"   Success: {result['success']}")
-        
-        return result
     
     def get_plan_summary(self, plan: ExecutionPlan) -> str:
         """Get a human-readable summary of the plan"""

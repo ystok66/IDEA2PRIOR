@@ -11,12 +11,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
-from .amazon_s3 import AmazonS3Storage
-from .azure_blob import AzureBlobStorage
-from .google_cloud import GoogleCloudStorage
 
-__all__ = [
-    "AmazonS3Storage",
-    "AzureBlobStorage",
-    "GoogleCloudStorage",
-]
+from importlib import import_module
+
+_EXPORTS = {'AmazonS3Storage': ('.amazon_s3', 'AmazonS3Storage'), 'AzureBlobStorage': ('.azure_blob', 'AzureBlobStorage'), 'GoogleCloudStorage': ('.google_cloud', 'GoogleCloudStorage')}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    globals()[name] = value
+    return value

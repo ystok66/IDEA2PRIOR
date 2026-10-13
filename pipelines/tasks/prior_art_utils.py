@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
+from urllib.parse import urlparse
 from typing import Optional, List, TypeVar, Callable, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+from contextvars import copy_context
 
 from loguru import logger
 
@@ -221,7 +224,7 @@ def ensure_pdf_url(paper: Paper) -> Optional[str]:
     1. If paper.pdf_url already exists, return it immediately (cached)
     2. If paper.pdf_resolve_failed is True, return None (already tried and failed)
     3. Otherwise, attempt resolution via PaperResolverTool
-       - On success: set paper.pdf_url and pdf_status='downloaded', return it
+       - On success: set paper.pdf_url and pdf_status='resolved', return it
        - On failure: set paper.pdf_resolve_failed = True, pdf_status='not_found' or 'error'
     
     NOTE: Rate limiting is handled internally by PaperResolverTool via
@@ -237,7 +240,7 @@ def ensure_pdf_url(paper: Paper) -> Optional[str]:
     if paper.pdf_url:
         # Ensure pdf_status is consistent
         if hasattr(paper, 'pdf_status') and paper.pdf_status == "not_attempted":
-            paper.pdf_status = "downloaded"
+            paper.pdf_status = "resolved"
         return paper.pdf_url
     
     # Check failure flag: don't retry if already failed
@@ -259,7 +262,7 @@ def ensure_pdf_url(paper: Paper) -> Optional[str]:
         if res_data.get("pdf_url"):
             paper.pdf_url = res_data["pdf_url"]
             if hasattr(paper, 'pdf_status'):
-                paper.pdf_status = "downloaded"
+                paper.pdf_status = "resolved"
             logger.info(f"[ensure_pdf_url] Resolved: {paper.title[:40]}... -> {paper.pdf_url[:60]}...")
             return paper.pdf_url
         else:
@@ -275,6 +278,116 @@ def ensure_pdf_url(paper: Paper) -> Optional[str]:
         if hasattr(paper, 'pdf_status'):
             paper.pdf_status = "error"
         return None
+
+
+def verified_pdf_alternatives(paper: Paper, failed_url: str) -> List[dict]:
+    """Resolve at most one independently verified arXiv source for this work.
+
+    This is a bounded alternate source lookup, not a replacement paper or a
+    retry of the failed URL. Provider aliases alone never authorize a download.
+    The caller records download outcomes and binds new bytes to the returned
+    exact arXiv version, while retaining the original canonical paper ID.
+    """
+    from pipelines.clients.scholarly import search_arxiv, title_matches, s2_id, s2_lookup_id
+    from pipelines.identity import normalize_doi
+
+    requested = s2_id(paper.arxiv_id)
+    if not requested or not requested.startswith('ARXIV:'):
+        return []
+    record = {'source': 'pdf_alternative_identity', 'failed_url': failed_url,
+              'requested_arxiv_id': requested[6:], 'status': 'unavailable'}
+    paper.source_records.append(record)
+    if paper.identity_status == 'conflict':
+        record['reason'] = 'original_identity_conflict'
+        return []
+    failed_host = (urlparse(failed_url or '').hostname or '').casefold()
+    if failed_host in {'arxiv.org', 'www.arxiv.org', 'export.arxiv.org'}:
+        record['reason'] = 'arxiv_source_already_attempted'
+        return []
+    candidates = search_arxiv('', limit=1, id_list=[requested[6:]])
+    if len(candidates) != 1:
+        record['reason'] = 'arxiv_metadata_unavailable_or_ambiguous'
+        return []
+    candidate = candidates[0]
+    resolved = s2_id(candidate.arxiv_id)
+    record['metadata'] = {key: getattr(candidate, key) for key in
+                          ('title', 'authors', 'doi', 'publication_doi', 'external_doi',
+                           'arxiv_id', 'document_version', 'journal_reference')}
+    explicit_version = bool(re.search(r'v\d+$', requested, re.I))
+    if (not resolved or s2_lookup_id(requested) != s2_lookup_id(resolved)
+            or explicit_version and requested != resolved):
+        record['reason'] = 'arxiv_identifier_or_version_conflict'
+        return []
+    if not re.search(r'v\d+$', resolved, re.I):
+        record['reason'] = 'arxiv_version_unverified'
+        return []
+    if not title_matches(paper.title, candidate.title):
+        record['reason'] = 'title_conflict'
+        return []
+
+    def publication_dois(value):
+        dois = {normalize_doi(getattr(value, field, None))
+                for field in ('doi', 'publication_doi', 'external_doi')}
+        return {doi for doi in dois if doi and not doi.startswith('10.48550/arxiv.')}
+
+    original_dois, resolved_dois = publication_dois(paper), publication_dois(candidate)
+    if (len(original_dois) > 1 or len(resolved_dois) > 1
+            or original_dois and resolved_dois and original_dois != resolved_dois):
+        record['reason'] = 'publication_doi_conflict'
+        return []
+
+    def author_keys(authors):
+        # Require a complete normalized name, not a shared surname/initial.
+        keys = {' '.join(re.findall(r'\w+', unicodedata.normalize('NFKC', author).casefold()))
+                for author in authors if isinstance(author, str)}
+        return {key for key in keys if len(key.split()) >= 2}
+
+    shared_doi = bool(original_dois & resolved_dois)
+    shared_authors = sorted(author_keys(paper.authors) & author_keys(candidate.authors))
+    if not shared_doi and not shared_authors:
+        record['reason'] = 'insufficient_independent_identity_evidence'
+        return []
+    # Use the resolved exact version in both the URL and source binding.
+    arxiv_id = resolved[6:]
+    url = 'https://arxiv.org/pdf/' + arxiv_id
+    record.update(status='verified', alternate_url=url,
+                  identity_status='verified_arxiv_metadata',
+                  evidence={'exact_normalized_title': True,
+                            'requested_arxiv_id': requested[6:],
+                            'resolved_arxiv_id': arxiv_id,
+                            'shared_publication_doi': sorted(original_dois & resolved_dois),
+                            'shared_complete_author_names': shared_authors})
+    return [{'url': url, 'arxiv_id': arxiv_id, 'document_version': arxiv_id,
+             'identity_status': record['identity_status'], 'evidence': dict(record['evidence'])}]
+
+
+def ordered_parallel_map(items, process_func, max_workers=4):
+    """Bound submitted work and return every result in frozen input order.
+
+    Unlike completion-order selection, slow items retain their original position.
+    A fresh Context copy per task propagates the run's request ledger safely.
+    Exceptions are raised; callers that permit partial work must return an explicit
+    failure value from their task function.
+    """
+    frozen = tuple(items)
+    if not frozen:
+        return []
+    workers = max(1, int(max_workers))
+    results = [None] * len(frozen)
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        pending = {}
+        next_index = 0
+        while next_index < len(frozen) or pending:
+            while next_index < len(frozen) and len(pending) < workers:
+                ctx = copy_context()
+                future = executor.submit(ctx.run, process_func, frozen[next_index])
+                pending[future] = next_index
+                next_index += 1
+            done, _ = wait(pending, return_when=FIRST_COMPLETED)
+            for future in done:
+                index = pending.pop(future)
+                results[index] = future.result()
+    return results
 
 
 def run_parallel(
@@ -307,34 +420,20 @@ def run_parallel(
         desc: Description for logging
         
     Returns:
-        List of non-None results from process_func (in arbitrary order)
+        List of non-None results in input order. Errors remain logged.
     """
     if not items:
         return []
     
-    results = []
-    total_items = len(items)
-    
-    logger.info(f"[{desc}] Processing {total_items} items with max_workers={max_workers}")
-    
-    # Use a SINGLE ThreadPoolExecutor - no batch grouping, no batch-level sleeps
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_item = {executor.submit(process_func, item): item for item in items}
-        
-        completed = 0
-        for fut in as_completed(future_to_item):
-            item = future_to_item[fut]
-            completed += 1
-            try:
-                result = fut.result()
-                if result is not None:
-                    results.append(result)
-            except Exception as e:
-                logger.warning(f"[{desc}] Error processing item: {e}")
-            
-            # Log progress every 10 items or at the end
-            if completed % 10 == 0 or completed == total_items:
-                logger.info(f"[{desc}] Progress: {completed}/{total_items} complete, {len(results)} results")
+    def attempt(item):
+        try:
+            return process_func(item)
+        except Exception as e:
+            logger.warning(f"[{desc}] Error processing item: {e}")
+            return None
+
+    results = [result for result in ordered_parallel_map(items, attempt, max_workers)
+               if result is not None]
     
     logger.info(f"[{desc}] All tasks complete. Total results: {len(results)}")
     return results
