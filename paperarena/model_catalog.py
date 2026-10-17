@@ -27,7 +27,7 @@ class ModelCatalogError(ValueError):
         self.code = code
 
 
-def _model_rows(payload: dict[str, Any], profile: APIProfile) -> list[dict[str, str]]:
+def _model_rows(payload: dict[str, Any], profile: APIProfile, purpose="generation") -> list[dict[str, str]]:
     source = payload.get("models" if profile.provider == "gemini" else "data")
     if not isinstance(source, list) or len(source) > _MAX_MODELS:
         raise ModelCatalogError("INVALID_CATALOG", "The provider did not return a supported model catalog.")
@@ -37,7 +37,8 @@ def _model_rows(payload: dict[str, Any], profile: APIProfile) -> list[dict[str, 
             continue
         if profile.provider == "gemini":
             methods = row.get("supportedGenerationMethods")
-            if not isinstance(methods, list) or "generateContent" not in methods:
+            required_method = "embedContent" if purpose == "embedding" else "generateContent"
+            if not isinstance(methods, list) or required_method not in methods:
                 continue
             model_id = row.get("name")
             if isinstance(model_id, str):
@@ -60,7 +61,7 @@ def _model_rows(payload: dict[str, Any], profile: APIProfile) -> list[dict[str, 
 
 
 def fetch_models(profile: APIProfile, *, timeout_seconds: float = 15.0,
-                 max_pages: int = 5) -> list[dict[str, str]]:
+                 max_pages: int = 5, purpose="generation") -> list[dict[str, str]]:
     """Return model options from the explicitly chosen provider.
 
     There are at most max_pages GETs, zero automatic retries, zero redirects,
@@ -68,6 +69,8 @@ def fetch_models(profile: APIProfile, *, timeout_seconds: float = 15.0,
     checked between pages; missing keys fail before opening an HTTP session.
     Manual model IDs remain a frontend option when a catalog is unavailable.
     """
+    if purpose not in ("generation", "embedding"):
+        raise ModelCatalogError("INVALID_PURPOSE", "Unsupported model capability.")
     if not isinstance(profile, APIProfile):
         raise ModelCatalogError("INVALID_PROFILE", "Select a valid API profile before fetching models.")
     if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or not math.isfinite(timeout_seconds) or not 0 < timeout_seconds <= 60:
@@ -112,7 +115,7 @@ def fetch_models(profile: APIProfile, *, timeout_seconds: float = 15.0,
                 raise ModelCatalogError("CATALOG_REQUEST_FAILED", "The model catalog request failed. Check connectivity and endpoint compatibility.") from None
             if not isinstance(payload, dict):
                 raise ModelCatalogError("INVALID_CATALOG", "The provider did not return a supported model catalog.")
-            for row in _model_rows(payload, profile):
+            for row in _model_rows(payload, profile, purpose):
                 found.setdefault(row["id"], row)
             if len(found) > _MAX_MODELS:
                 raise ModelCatalogError("CATALOG_TOO_LARGE", "The model catalog exceeded the local item limit.")

@@ -46,6 +46,7 @@ class OpenAIEmbedding(BaseEmbedding[str]):
         ),
         api_key: str | None = None,
         dimensions: int | NotGiven = NOT_GIVEN,
+        base_url: str | None = None,
     ) -> None:
         if not model_type.is_openai:
             raise ValueError("Invalid OpenAI embedding model type.")
@@ -56,12 +57,11 @@ class OpenAIEmbedding(BaseEmbedding[str]):
             assert isinstance(dimensions, int)
             self.output_dim = dimensions
 
-        self._api_key = os.getenv("OPENAI_API_KEY")
-        self._base_url = os.getenv("OPENAI_BASE_URL")
+        self._api_key = api_key or os.getenv("OPENAI_EMBEDDING_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self._base_url = base_url or os.getenv("OPENAI_EMBEDDING_BASE_URL") or "https://api.openai.com/v1"
 
-        self.client = OpenAI(timeout=60, max_retries=3, api_key=self._api_key, base_url=self._base_url)
+        self.client = OpenAI(timeout=60, max_retries=0, api_key=self._api_key, base_url=self._base_url)
 
-    @api_keys_required("OPENAI_API_KEY")
     def embed_list(
         self,
         objs: list[str],

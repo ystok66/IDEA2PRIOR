@@ -1,6 +1,8 @@
 import json
 import threading
 import unittest
+from pathlib import Path
+import tempfile
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -50,11 +52,44 @@ class LocalWebTests(unittest.TestCase):
             return response.code, response.read(), response.headers
 
     def test_assets_and_headers(self):
-        for path in ["/", "/styles.css", "/app.js"]:
+        for path in ["/", "/styles.css", "/app.js", "/extensions.js", "/workspace.js", "/renderer.js"]:
             status, body, headers = self.request(path)
             self.assertEqual(status, 200); self.assertTrue(body)
             self.assertEqual(headers["Cache-Control"], "no-store")
             self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
+
+    def test_registered_artifact_download_and_job_isolation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);report=root/"report.md";report.write_text("# Safe report",encoding="utf-8")
+            self.manager.jobs["attachment-job"]={"job_id":"attachment-job","status":"SUCCEEDED","output_dir":str(root),"report_files":[str(report)]}
+            status,body,_=self.request("/api/jobs/attachment-job")
+            self.assertEqual(status,200)
+            artifact=json.loads(body)["artifacts"][0]
+            status,body,headers=self.request("/api/jobs/attachment-job/artifacts/"+artifact["id"])
+            self.assertEqual(status,200)
+            self.assertEqual(body,b"# Safe report")
+            self.assertIn("attachment",headers["Content-Disposition"])
+            self.assertEqual(self.request("/api/jobs/attachment-job/artifacts/../../.env")[0],404)
+            self.manager.jobs["empty-job"]={"status":"SUCCEEDED","output_dir":str(root),"report_files":[]}
+            self.assertEqual(self.request("/api/jobs/empty-job/artifacts/"+artifact["id"])[0],404)
+        self.manager.jobs.pop("attachment-job",None);self.manager.jobs.pop("empty-job",None)
+
+    def test_posthoc_evaluation_requires_unchanged_finished_benchmark(self):
+        from paperarena.__main__ import dataset_query
+        item=dataset_query("easy","N001")
+        data={"query":item["query"],"dry_run":True,"benchmark":{"difficulty":"easy","item_id":"N001"},
+              "config":{"profiles":{"a":{"provider":"openai","model":"offline"}}}}
+        self.assertEqual(self.request("/api/jobs",data)[0],202)
+        self.assertEqual(self.request("/api/evaluate",{"job_id":"job1"})[0],400)
+        self.manager.jobs["job1"]["status"]="FAILED"
+        status,body,_=self.request("/api/evaluate",{"job_id":"job1"})
+        self.assertEqual(status,200,body)
+        self.assertEqual(json.loads(body)["operational_errors"],1)
+        self.manager.benchmark_selections.pop("job1",None)
+        data["query"]="Edited idea"
+        self.assertEqual(self.request("/api/jobs",data)[0],202)
+        self.manager.jobs["job1"]["status"]="SUCCEEDED"
+        self.assertEqual(self.request("/api/evaluate",{"job_id":"job1"})[0],400)
 
     def test_catalog_has_blind_queries_only(self):
         status, body, _ = self.request("/api/catalog")

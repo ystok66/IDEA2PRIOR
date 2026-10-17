@@ -14,6 +14,17 @@ from .config import RunConfig, worker_environment
 from .diagnostics import safe_error, diagnostic_for_type
 
 
+def result_status(mode, completion, ranked, report_files):
+    """Judge the selected output contract, not an unrelated ranking artifact."""
+    if mode == "full_report":
+        return ("SUCCEEDED" if completion.get("status") == "SUCCEEDED" else "PARTIAL") if report_files else "FAILED"
+    if ranked.get("status") == "NOT_RUN_EMPTY_POOL":
+        return "EMPTY"
+    if ranked.get("status") == "FAILED":
+        return "FAILED"
+    return "SUCCEEDED" if completion.get("status") == "SUCCEEDED" else "PARTIAL" if ranked.get("candidates") else "FAILED"
+
+
 def default_pipeline_settings(config: RunConfig) -> dict:
     """Preserve the published Top-5 profile's retrieval and ranking semantics."""
     settings = {
@@ -192,6 +203,11 @@ def execute(payload, emit) -> int:
     temp_dir.mkdir(exist_ok=True)
     os.environ["TEMP"] = str(temp_dir)
     os.environ["TMP"] = str(temp_dir)
+    # Optional parsers must not write settings into the user's global profile.
+    for variable, child in (("MPLCONFIGDIR", "matplotlib"), ("YOLO_CONFIG_DIR", "yolo")):
+        cache = temp_dir / child
+        cache.mkdir(exist_ok=True)
+        os.environ.setdefault(variable, str(cache))
     import tempfile
     tempfile.tempdir = str(temp_dir)
     if payload.get("extension"):
@@ -200,6 +216,8 @@ def execute(payload, emit) -> int:
         emit({"usage": snapshot()})
         output = execute_extension(payload["extension"], config, directory, Model, emit)
         usage = snapshot()
+        if output.get("details", {}).get("embedding_usage"):
+            usage = output["details"]["embedding_usage"]
         diagnostics = output["diagnostics"] + usage["recent_request_errors"]
         status = output["status"]
         if diagnostics and status == "SUCCEEDED":
@@ -241,11 +259,8 @@ def execute(payload, emit) -> int:
     ranked = json.loads(ranked_path.read_text(encoding="utf-8")) if ranked_path.exists() else {}
     completion = json.loads(completion_path.read_text(encoding="utf-8")) if completion_path.exists() else {}
     top5 = ranked.get("candidates", [])[:5]
-    status = "SUCCEEDED" if completion.get("status") == "SUCCEEDED" else "PARTIAL" if top5 else "FAILED"
-    if config.mode == "retrieval_eval" and ranked.get("status") == "NOT_RUN_EMPTY_POOL":
-        status = "EMPTY"
-    if config.mode == "retrieval_eval" and ranked.get("status") == "FAILED":
-        status = "FAILED"
+    report_files = [str(path) for path in manager.md_reports_dir.glob("*.md")]
+    status = result_status(config.mode, completion, ranked, report_files)
     usage = snapshot()
     diagnostics = []
     outcome = completion.get("business_outcome", {})
@@ -263,16 +278,16 @@ def execute(payload, emit) -> int:
         diagnostics.append(detail)
     error = None
     if status == "FAILED":
-        error = usage["recent_request_errors"][-1] if usage["recent_request_errors"] else diagnostic_for_type(ranked.get("error_type", "NoValidatedRanking"), phase="expert_ranking")
+        error = usage["recent_request_errors"][-1] if usage["recent_request_errors"] else diagnostic_for_type(ranked.get("error_type", "NoValidatedRanking"), phase="report_generation" if config.mode == "full_report" else "expert_ranking")
     elif status == "PARTIAL":
         error = {"type": "IncompleteChecks", "code": "PARTIAL_COMPLETION",
-            "message": "A ranking was produced, but some retrieval, scoring, or full-text checks did not complete. Review the diagnostic details.", "phase": "finished"}
+            "message": "Results were produced, but some checks did not complete. Review the diagnostic details.", "phase": "finished"}
     elif status == "EMPTY":
         error = {"type": "EmptyCandidatePool", "code": "NO_CANDIDATES",
             "message": "Retrieval produced no eligible candidates for Expert ranking.", "phase": "candidate_retrieval"}
     emit({"status": status, "phase": "finished", "top5": top5, "usage": snapshot(),
           "diagnostics": diagnostics, "issue_count": len(outcome.get("issues", [])),
-          "report_files": [str(path) for path in manager.md_reports_dir.glob("*.md")],
+          "report_files": report_files,
           "ranking_rule": ranked.get("ranking_rule"), "error": error})
     return 0 if status in ("SUCCEEDED", "PARTIAL", "EMPTY") else 1
 

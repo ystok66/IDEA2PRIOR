@@ -596,8 +596,8 @@ Important:
             if step.get('result'):
                 result_str = str(step['result'])
                 # Truncate long results for evaluation
-                if len(result_str) > 1000:
-                    result_str = result_str[:1000] + f"... (truncated, total {len(result_str)} chars)"
+                if len(result_str) > 12000:
+                    result_str = result_str[:10000] + "\n[Critic input excerpt omitted the middle; the saved tool output is complete. Do not infer output truncation from this excerpt.]\n" + result_str[-2000:]
                 step_summary += f"    Result: {result_str}\n"
             summary += step_summary + "\n"
         

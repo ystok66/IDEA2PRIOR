@@ -68,12 +68,12 @@ class SimpleVectorRetriever():
 
 
     def _split_text(self, contents: str | List[str]):
-        if type(contents) == str:
+        if isinstance(contents, str):
             chunks=self.text_splitter.split_text(contents)
-        elif type(contents) == List:
-            chunks = [self.text_splitter.split_text(content) for content in contents]
+        elif isinstance(contents, list) and all(isinstance(content, str) for content in contents):
+            chunks = [chunk for content in contents for chunk in self.text_splitter.split_text(content)]
         else:
-            print(f"[Warning] from text_splitter: Input type {type(contents)} error! Expected type to be string or List[string]")
+            raise TypeError("contents must be text or a list of text documents")
         return chunks
     
     def retrieve(

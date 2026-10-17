@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
@@ -25,7 +26,16 @@ def _write_json(path: Path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    # Windows readers / antivirus can briefly hold a destination handle.
+    # Retry only this local atomic write, never the research task or API call.
+    for attempt in range(10):
+        try:
+            os.replace(temporary, path)
+            break
+        except PermissionError:
+            if attempt == 9:
+                raise
+            time.sleep(min(0.02 * 2**attempt, 0.2))
 
 
 def _stop_process(process):
@@ -62,6 +72,10 @@ def _resolve_for_operation(config, extension, dry_run):
     from .extensions import extension_model_roles
     resolved = config.resolved(require_key=False)
     if not dry_run:
+        if extension["name"] == "document_search":
+            if resolved.embedding is None:
+                raise ValueError("Document search requires an explicit embedding profile")
+            resolved.embedding.resolved(require_key=True)
         for role in extension_model_roles(extension):
             resolved.profiles[resolved.roles[role]].resolved(require_key=True)
     return resolved
@@ -106,6 +120,12 @@ def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path |
         if event:
             state.update(event)
         state["duration_seconds"] = round(time.monotonic() - started, 3)
+        if event:
+            record = {key: value for key, value in event.items()
+                      if key in ("status", "phase", "usage", "error", "diagnostics", "report_files")}
+            record["elapsed_seconds"] = state["duration_seconds"]
+            with (directory / "events.jsonl").open("a", encoding="utf-8") as log:
+                log.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
         _write_json(directory / "result.json", state)
         if progress_callback:
             progress_callback(copy.deepcopy(state))
@@ -113,6 +133,8 @@ def run_retrieval(query: str, config: RunConfig | dict, output_dir: str | Path |
     update()
     _write_json(directory / "plan.json", {"query": query, "topic": topic or query.split(". ", 1)[0].rstrip("."),
         "config": config.to_public_dict(), "timeout_seconds": timeout_seconds,
+        "query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+        "config_sha256": hashlib.sha256(json.dumps(config.to_public_dict(), sort_keys=True).encode("utf-8")).hexdigest(),
         "network_execution": "NOT_RUN" if dry_run else "AUTHORIZED_BY_CALL", "retry_policy": "none",
         "benchmark_gold_access": False, "extension": _extension})
     if cancel_event.is_set():
@@ -212,6 +234,28 @@ class JobManager:
         self._executor = ThreadPoolExecutor(max_workers=max_active_jobs, thread_name_prefix="paperarena-job")
         self._jobs: dict[str, dict] = {}
         self._lock = threading.RLock()
+        self.benchmark_selections: dict[str, tuple[str, str]] = {}
+        # Restore saved jobs for inspection only; interrupted work is never resumed.
+        for marker in self.output_root.glob("*/web_job.json"):
+            try:
+                metadata = json.loads(marker.read_text(encoding="utf-8"))
+                job_id = metadata["job_id"]
+                if len(job_id) != 32 or any(c not in "0123456789abcdef" for c in job_id):
+                    continue
+                state = json.loads((marker.parent / "result.json").read_text(encoding="utf-8"))
+                state["job_id"] = job_id
+                if state["status"] in ("QUEUED", "STARTING", "RUNNING"):
+                    state.update(status="FAILED", phase="server_restart",
+                        error={"type": "InterruptedRun", "code": "INTERRUPTED_RUN",
+                               "message": "The previous local process stopped. Saved evidence is retained; no run was resumed."})
+                self._jobs[job_id] = {"state": state, "cancel": threading.Event()}
+                selection = metadata.get("benchmark")
+                if (isinstance(selection, list) and len(selection) == 2
+                        and selection[0] in ("easy", "medium", "hard")
+                        and isinstance(selection[1], str)):
+                    self.benchmark_selections[job_id] = tuple(selection)
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
 
     def submit(self, query: str, config: RunConfig | dict, *, timeout_seconds: float = 1800,
                topic: str | None = None, dry_run: bool = False, extension: dict | None = None) -> str:
@@ -234,6 +278,12 @@ class JobManager:
             state["job_id"] = job_id
             with self._lock:
                 self._jobs[job_id]["state"] = state
+            if state.get("output_dir"):
+                marker = Path(state["output_dir"]) / "web_job.json"
+                if not marker.exists():
+                    with self._lock:
+                        _write_json(marker, {"job_id": job_id,
+                            "benchmark": self.benchmark_selections.get(job_id)})
 
         def run():
             try:
@@ -254,6 +304,17 @@ class JobManager:
                 raise KeyError("Unknown job ID")
             state = copy.deepcopy(self._jobs[job_id]["state"])
         return state
+
+    def register_benchmark(self, job_id: str, tier: str, item: str):
+        """Persist blind item identity for post-run evaluation, never its gold data."""
+        if tier not in ("easy", "medium", "hard") or not isinstance(item, str):
+            raise ValueError("Invalid benchmark identity")
+        with self._lock:
+            state = self._jobs[job_id]["state"]
+            self.benchmark_selections[job_id] = (tier, item)
+            if state.get("output_dir"):
+                _write_json(Path(state["output_dir"]) / "web_job.json",
+                            {"job_id": job_id, "benchmark": [tier, item]})
 
     def cancel(self, job_id: str) -> bool:
         with self._lock:

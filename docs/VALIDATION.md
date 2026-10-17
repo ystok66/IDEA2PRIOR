@@ -1,5 +1,10 @@
 # Public release validation
 
+The 2026-10-17 UI implementation and one-shot real-function acceptance are recorded
+in [UI_FUNCTIONAL_CHECKLIST.md](UI_FUNCTIONAL_CHECKLIST.md). The sections below are
+earlier release-validation history; their no-paid-call statements apply to those
+earlier checks, not to the later acceptance runs.
+
 This record distinguishes source changes and offline checks from real retrieval experiments. Historical run ledgers are preserved privately; selected comparison outputs are included in the datasets. They do not validate this newly packaged release or its migrated Gemini model preset.
 
 ## Completed work

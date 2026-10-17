@@ -14,11 +14,9 @@ def _require_mineru():
     from mineru.data.data_reader_writer import FileBasedDataWriter
     from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
     from mineru.utils.enum_class import MakeMode
-    from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
     from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
     from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
     from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
-    from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
     from mineru.utils.models_download_utils import auto_download_and_get_model_root_path
     globals().update({k: v for k, v in locals().items() if not k.startswith("_")})
 
@@ -39,12 +37,17 @@ def do_parse(
     f_dump_model_output=True,  # Whether to dump model output files
     f_dump_orig_pdf=True,  # Whether to dump original PDF files
     f_dump_content_list=True,  # Whether to dump content list files
-    f_make_md_mode=MakeMode.MM_MD,  # The mode for making markdown content, default is MM_MD
+    f_make_md_mode=None,  # Resolve the optional enum only when parsing.
     start_page_id=0,  # Start page ID for parsing, default is 0
     end_page_id=None,  # End page ID for parsing, default is None (parse all pages until the end of the document)
 ):
 
     _require_mineru()
+    if f_make_md_mode is None:
+        f_make_md_mode = MakeMode.MM_MD
+    if backend != "pipeline":
+        from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
+        from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
     if backend == "pipeline":
         for idx, pdf_bytes in enumerate(pdf_bytes_list):
             new_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(pdf_bytes, start_page_id, end_page_id)

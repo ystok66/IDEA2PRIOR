@@ -15,6 +15,7 @@ from paperarena.diagnostics import safe_error
 from paperarena.resources import benchmark_directory
 from paperarena.__main__ import dataset_query
 from paperarena.extensions import EXTENSIONS, validate_extension
+from paperarena.artifacts import artifact_catalog, read_artifact
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = Path(__file__).parent / "web_assets"
@@ -23,6 +24,8 @@ ASSET_TYPES = {"/": ("index.html", "text/html; charset=utf-8"),
                "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                "/styles.css": ("styles.css", "text/css; charset=utf-8")}
 ASSET_TYPES["/extensions.js"] = ("extensions.js", "text/javascript; charset=utf-8")
+ASSET_TYPES["/workspace.js"] = ("workspace.js", "text/javascript; charset=utf-8")
+ASSET_TYPES["/renderer.js"] = ("renderer.js", "text/javascript; charset=utf-8")
 
 
 def catalog():
@@ -93,8 +96,21 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                     self.wfile.write(payload)
                 elif path == "/api/catalog":
                     self.json_response(200, {"datasets": catalog(), "extensions": EXTENSIONS})
+                elif path.startswith("/api/jobs/") and "/artifacts/" in path:
+                    parts = path.strip("/").split("/")
+                    if len(parts) != 5 or parts[3] != "artifacts":
+                        raise KeyError("Invalid artifact")
+                    name, payload = read_artifact(manager.get(parts[2]), parts[4])
+                    self.send_response(200)
+                    self.headers_for("text/plain; charset=utf-8")
+                    self.send_header("Content-Disposition", 'attachment; filename="' + name.replace('"', '') + '"')
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
                 elif path.startswith("/api/jobs/") and path.count("/") == 3:
                     job = manager.get(path.rsplit("/", 1)[-1])
+                    job["artifacts"] = artifact_catalog(job)
+                    job["benchmark_evaluation_available"] = job.get("job_id", path.rsplit("/", 1)[-1]) in getattr(manager, "benchmark_selections", {})
                     self.json_response(200, job)
                 else:
                     self.json_response(404, {"error": "Not found."})
@@ -104,27 +120,50 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                 self.json_response(500, {"error": "Unable to read local state."})
 
         def do_POST(self):
+            path = urlsplit(self.path).path
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                self.json_response(400, {"error": "Invalid request size."})
+                return
+            if length < 0 or length > (17 * 1024 * 1024 if path == "/api/documents" else MAX_BODY):
+                self.json_response(413, {"error": "Invalid request size."})
+                return
+            # Drain even rejected requests so Windows does not reset the response
+            # while closing a connection with unread POST bytes.
+            body = self.rfile.read(length) if length else b""
             if not self.local_request():
                 return
-            path = urlsplit(self.path).path
             try:
                 if path.startswith("/api/jobs/") and path.endswith("/cancel") and path.count("/") == 4:
                     job_id = path.split("/")[3]
                     self.json_response(200, {"cancelled": manager.cancel(job_id)})
                     return
-                if path not in {"/api/jobs", "/api/models", "/api/documents"}:
+                if path not in {"/api/jobs", "/api/models", "/api/documents", "/api/evaluate"}:
                     self.json_response(404, {"error": "Not found."})
                     return
                 if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
                     self.json_response(415, {"error": "Use application/json."})
                     return
-                length = int(self.headers.get("Content-Length", "0"))
                 if length <= 0 or length > (17 * 1024 * 1024 if path == "/api/documents" else MAX_BODY):
                     self.json_response(413, {"error": "Invalid request size."})
                     return
-                payload = json.loads(self.rfile.read(length))
+                payload = json.loads(body)
                 if not isinstance(payload, dict):
                     raise ValueError("Request must be an object.")
+                if path == "/api/evaluate":
+                    from .evaluation import read_rows, score
+                    job = manager.get(payload.get("job_id"))
+                    if job["status"] not in ("SUCCEEDED", "PARTIAL", "FAILED", "EMPTY", "TIMEOUT", "CANCELLED"):
+                        raise ValueError("Evaluate only a finished retrieval")
+                    selection = getattr(manager, "benchmark_selections", {}).get(payload.get("job_id"))
+                    if not selection or job.get("operation") == "extension":
+                        raise ValueError("This job is not an unchanged benchmark retrieval")
+                    tier, item = selection
+                    gold = {r["item_id"]: r for r in read_rows(benchmark_directory() / tier / "gold.jsonl")}
+                    report = score([{**job, "item_id": item}], gold, [item])
+                    self.json_response(200, report)
+                    return
                 if path == "/api/documents":
                     suffix = Path(payload.get("filename", "")).suffix.lower()
                     if suffix not in (".pdf", ".md", ".txt") or not isinstance(payload.get("base64"), str):
@@ -143,7 +182,8 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                     return
                 if path == "/api/models":
                     profile = APIProfile.from_dict(payload.get("profile", {}))
-                    models = fetch_models(profile, timeout_seconds=15.0, max_pages=5)
+                    model_options = {"purpose": payload["purpose"]} if "purpose" in payload else {}
+                    models = fetch_models(profile, timeout_seconds=15.0, max_pages=5, **model_options)
                     self.json_response(200, {"models": models})
                     return
                 query = payload.get("query", "").strip()
@@ -165,6 +205,8 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                     if query == row["query"].strip():
                         topic = row["query"].split(". ", 1)[0].rstrip(".")
                         query = row["prompt"]
+                    else:
+                        benchmark = None
                 config = RunConfig.from_dict(payload.get("config", {}))
                 timeout = payload.get("timeout_seconds", 1800)
                 if type(timeout) is not int or not 30 <= timeout <= 7200:
@@ -174,6 +216,15 @@ def create_server(host="127.0.0.1", port=7860, *, manager=None, output_root="out
                 options = {"extension": extension} if extension else {}
                 job_id = manager.submit(query, config, timeout_seconds=timeout,
                                         topic=topic, dry_run=payload.get("dry_run", False), **options)
+                if benchmark is not None:
+                    if not hasattr(manager, "benchmark_selections"):
+                        manager.benchmark_selections = {}
+                    tier = benchmark["difficulty"].lower()
+                    selection = ("medium" if tier == "mdeium" else tier, row["item_id"])
+                    if hasattr(manager, "register_benchmark"):
+                        manager.register_benchmark(job_id, *selection)
+                    else:
+                        manager.benchmark_selections[job_id] = selection
                 self.json_response(202, {"job_id": job_id})
             except ModelCatalogError as exc:
                 self.json_response(400, {"error": str(exc), "code": exc.code})

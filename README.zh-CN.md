@@ -10,6 +10,15 @@
 
 Idea2Prior 基于 [PaperArena: An Evaluation Benchmark for Tool-Augmented Agentic Reasoning on Scientific Literature](https://arxiv.org/abs/2510.10909) 及其[官方代码](https://github.com/ustc-ai4science/PaperArena)，在此基础上增加了根据 idea 检索论文、分阶段核验与排序、实现分析、技术演化图及本地网页/Notebook 等功能。
 
+
+![英文工作区](docs/images/workspace-en.jpg)
+
+![真实 API 代码分析结果](docs/images/workspace-results-en.jpg)
+
+界面实拍于 2026-10-17。第二张是小型示例文档的真实 API 分析，代码未执行；
+检索、完整报告和各扩展的通过、部分完成及失败记录见[功能验收清单](docs/UI_FUNCTIONAL_CHECKLIST.md)。
+[中文界面截图](docs/images/workspace-zh.jpg) · [网页使用说明](docs/WEB_WORKSPACE.md)
+
 ## 2026 年 10 月历史评测
 
 以下比较各难度的**前 10 题**。ChatGPT 和 Gemini 使用 **2026 年 10 月网页版 Deep Research** 测试，我们使用 API 流程。Hit@5 表示指定参考论文出现在返回 Top 5 中的题目比例。

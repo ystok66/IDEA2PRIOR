@@ -162,7 +162,8 @@ print('OK')
 """
         result = subprocess.run([sys.executable, "-c", code], cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
-        self.assertEqual(result.stdout.strip(), "OK")
+        # New PyMuPDF releases may emit a deprecation notice for legacy fitz imports.
+        self.assertEqual(result.stdout.strip().splitlines()[-1], "OK")
 
 
 class LocalApiTests(unittest.TestCase):
@@ -259,6 +260,22 @@ class LocalApiTests(unittest.TestCase):
                 self.assertEqual(manager.get(job_id)["status"], "CANCELLED")
             finally:
                 manager.shutdown()
+
+    def test_completed_benchmark_survives_server_restart_without_gold_or_keys(self):
+        with temporary_directory() as temporary:
+            manager = JobManager(temporary)
+            job_id = manager.submit("Blind idea", self.config(), dry_run=True)
+            manager.register_benchmark(job_id, "easy", "N001")
+            manager.shutdown(cancel=False)
+            state = manager.get(job_id)
+            marker = json.loads((Path(state["output_dir"]) / "web_job.json").read_text())
+            self.assertEqual(marker, {"job_id": job_id, "benchmark": ["easy", "N001"]})
+            restored = JobManager(temporary)
+            try:
+                self.assertEqual(restored.benchmark_selections[job_id], ("easy", "N001"))
+                self.assertEqual(restored.get(job_id)["status"], "NOT_RUN")
+            finally:
+                restored.shutdown()
 
     def test_blind_dataset_reader_does_not_touch_gold(self):
         with temporary_directory() as temporary:

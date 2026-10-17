@@ -10,6 +10,17 @@ Idea2Prior provides a local web interface, Python API, command line, and Jupyter
 
 Idea2Prior builds on [PaperArena: An Evaluation Benchmark for Tool-Augmented Agentic Reasoning on Scientific Literature](https://arxiv.org/abs/2510.10909) and its [official implementation](https://github.com/ustc-ai4science/PaperArena). We extend that foundation with idea-driven paper retrieval, staged verification and ranking, implementation analysis, evolution mapping, and local web/Notebook interfaces.
 
+
+![Idea2Prior research workspace](docs/images/workspace-en.jpg)
+
+![Real API implementation-analysis result](docs/images/workspace-results-en.jpg)
+
+Actual interface captures, 2026-10-17. The second view shows a real API analysis
+of a small illustrative document; extracted code was not executed.
+See the [functional checklist](docs/UI_FUNCTIONAL_CHECKLIST.md) for successful,
+partial and failed acceptance runs, and the [workspace guide](docs/WEB_WORKSPACE.md)
+for controls, document search, OCR and report downloads.
+
 ## Benchmark results: October 2026
 
 Historical comparison on the **first 10 queries of each tier**. ChatGPT and Gemini were tested through their **October 2026 web versions of Deep Research**; Idea2Prior used its API pipeline. Hit@5 is the fraction of queries whose designated reference paper appears in the returned Top 5.

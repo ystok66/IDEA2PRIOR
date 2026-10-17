@@ -70,8 +70,11 @@ class RunConfig:
     expert_max_output_tokens: int = 16384
     search: dict[str, Any] = field(default_factory=dict, repr=False)
     pipeline: dict[str, Any] = field(default_factory=dict)
+    embedding: APIProfile | None = None
 
     def __post_init__(self):
+        if self.embedding is not None and not isinstance(self.embedding, APIProfile):
+            raise ValueError("embedding must be an API profile")
         if not self.profiles or any(not isinstance(p, APIProfile) for p in self.profiles.values()):
             raise ValueError("profiles must contain at least one named APIProfile")
         if any(not isinstance(k, str) or not k.strip() for k in self.profiles):
@@ -88,6 +91,8 @@ class RunConfig:
             object.__setattr__(self, "years", tuple(self.years))
         if type(self.max_rounds) is not int or self.max_rounds < 1:
             raise ValueError("max_rounds must be a positive integer")
+        if type(self.use_citation_graph) is not bool:
+            raise ValueError("use_citation_graph must be a boolean")
         if not isinstance(self.request_timeout_seconds, (float, int)) or isinstance(self.request_timeout_seconds, bool) or not math.isfinite(self.request_timeout_seconds) or self.request_timeout_seconds <= 0:
             raise ValueError("request_timeout_seconds must be positive and finite")
         for count in (self.max_output_tokens, self.expert_max_output_tokens):
@@ -108,11 +113,16 @@ class RunConfig:
             raise ValueError("Pipeline mode, gold exclusions, external caches, and resume are controlled by the public API")
         if type(self.pipeline.get("retrieval_eval_fulltext_limit", 5)) is not int or self.pipeline.get("retrieval_eval_fulltext_limit", 5) != 5:
             raise ValueError("retrieval_eval always uses five fixed PDF attempts")
+        concurrency = self.pipeline.get("max_in_flight_requests", 4)
+        if type(concurrency) is not int or not 1 <= concurrency <= 32:
+            raise ValueError("max_in_flight_requests must be between 1 and 32")
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "RunConfig":
         value = dict(value)
         value["profiles"] = {name: p if isinstance(p, APIProfile) else APIProfile.from_dict(p) for name, p in value.get("profiles", {}).items()}
+        if value.get("embedding") is not None and not isinstance(value["embedding"], APIProfile):
+            value["embedding"] = APIProfile.from_dict(value["embedding"])
         return cls(**value)
 
     def resolved(self, *, require_key: bool = True) -> "RunConfig":
@@ -124,6 +134,8 @@ class RunConfig:
             env_name = search.get(key + "_env")
             search[key] = search.get(key) or (os.getenv(env_name, "") if env_name else "")
         value["search"] = search
+        if self.embedding:
+            value["embedding"] = self.embedding.resolved(require_key=False).worker_dict()
         return RunConfig.from_dict(value)
 
     def worker_dict(self) -> dict[str, Any]:
@@ -132,11 +144,13 @@ class RunConfig:
                 "max_rounds": self.max_rounds, "use_citation_graph": self.use_citation_graph,
                 "request_timeout_seconds": self.request_timeout_seconds,
                 "max_output_tokens": self.max_output_tokens, "expert_max_output_tokens": self.expert_max_output_tokens,
-                "search": dict(self.search), "pipeline": dict(self.pipeline)}
+                "search": dict(self.search), "pipeline": dict(self.pipeline),
+                "embedding": self.embedding.worker_dict() if self.embedding else None}
 
     def to_public_dict(self) -> dict[str, Any]:
         result = self.worker_dict()
         result["profiles"] = {name: p.to_public_dict() for name, p in self.profiles.items()}
+        result["embedding"] = self.embedding.to_public_dict() if self.embedding else None
         result["search"] = {k: v for k, v in self.search.items() if "api_key" not in k or k.endswith("_env")}
         for key in ("serpapi_api_key", "semantic_scholar_api_key"):
             result["search"]["has_" + key] = bool(self.search.get(key) or (self.search.get(key + "_env") and os.getenv(self.search[key + "_env"])))
@@ -149,6 +163,8 @@ def worker_environment(config: RunConfig) -> dict[str, str]:
                 "SEMANTIC_SCHOLAR_", "S2_", "SERPAPI_", "OPENALEX_", "CROSSREF_")
     exact = {"SERPAPI_API_KEY", "SEMANTIC_SCHOLAR_API_KEY", "OPENALEX_MAILTO", "CROSSREF_MAILTO"}
     exact.update(p.api_key_env for p in config.profiles.values() if p.api_key_env)
+    if config.embedding and config.embedding.api_key_env:
+        exact.add(config.embedding.api_key_env)
     exact.update(config.search[k] for k in ("serpapi_api_key_env", "semantic_scholar_api_key_env") if config.search.get(k))
     exact = {key.upper() for key in exact}
     env = {key: value for key, value in os.environ.items() if not key.upper().startswith(prefixes) and key.upper() not in exact}

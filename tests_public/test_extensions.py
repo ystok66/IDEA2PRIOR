@@ -142,14 +142,17 @@ class ExtensionTests(unittest.TestCase):
             def generate(self, messages, **kwargs):
                 return SimpleNamespace(content=json.dumps({"relevance_level": 3, "should_cite": True,
                     "suggested_slot": "fixture method", "reason": "Synthetic scorer fixture"}))
-        with patch("pipelines.exploration_loop.run_exploration_loop", return_value=state):
+        with patch("pipelines.exploration_loop.run_exploration_loop", return_value=state) as discovery:
             for name in ("benchmark_landscape", "slot_filling"):
                 with tempfile.TemporaryDirectory() as folder:
                     output = execute_extension(validate_extension(name, {"topic": "fixture topic",
-                        "manuscript_excerpt": "Fixture draft", "known_refs": []}), self.config(),
+                        "manuscript_excerpt": "Fixture draft", "known_refs": [],
+                        "start_year": 2020, "end_year": 2024}), self.config(),
                         Path(folder), FixtureModel, lambda event: None)
                     self.assertEqual(output["status"], "SUCCEEDED", output["diagnostics"])
                     self.assertEqual(output["details"]["paper_count"], 1)
+                    self.assertEqual(tuple(discovery.call_args.args[1].intent.years), (2020, 2024))
+                    self.assertEqual(discovery.call_args.kwargs["cfg"].recent_year_start, 2020)
                     if name == "slot_filling":
                         self.assertEqual(len(output["details"]["matches"]), 1)
 

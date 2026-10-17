@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 from types import SimpleNamespace
@@ -12,6 +13,8 @@ from urllib.parse import urlsplit
 from .diagnostics import diagnostic_for_type, safe_error, PublicInputError
 
 EXTENSIONS = {
+    "document_parse": {"label": "Document parsing / OCR", "label_zh": "文档解析 / OCR", "document": True},
+    "document_search": {"label": "Document vector search", "label_zh": "文档向量检索", "document": True},
     "code_extractor": {"label": "Code & reproducibility analysis", "label_zh": "代码与可复现性分析", "document": True},
     "evolution_mapper": {"label": "Technology evolution map", "label_zh": "技术演化图", "document": False},
     "planner_worker": {"label": "Planner–Worker research assistant", "label_zh": "Planner–Worker 研究助手", "document": False},
@@ -28,7 +31,7 @@ def validate_extension(name, parameters=None):
     params = dict(parameters or {})
     allowed = {"topic", "query", "document_path", "parser", "llm_analysis", "execute_code",
                "max_papers", "start_year", "end_year", "max_steps", "enable_critic",
-               "manuscript_excerpt", "known_refs"}
+               "manuscript_excerpt", "known_refs", "chunk_size", "chunk_overlap", "top_k"}
     if set(params) - allowed:
         raise PublicInputError("Unknown extension parameter")
     for key in ("topic", "query", "document_path", "manuscript_excerpt"):
@@ -48,14 +51,20 @@ def validate_extension(name, parameters=None):
     if params.get("start_year") and params.get("end_year") and params["start_year"] > params["end_year"]:
         raise PublicInputError("Start year exceeds end year")
     params.setdefault("parser", "native")
+    for key, default, low, high in (("chunk_size", 1000, 100, 10000), ("chunk_overlap", 200, 0, 9999), ("top_k", 10, 1, 10)):
+        params.setdefault(key, default)
+        if type(params[key]) is not int or not low <= params[key] <= high:
+            raise PublicInputError(f"{key} must be between {low} and {high}")
+    if params["chunk_overlap"] >= params["chunk_size"]:
+        raise PublicInputError("Chunk overlap must be smaller than chunk size")
     if params["parser"] not in ("native", "mineru"):
         raise PublicInputError("parser must be native or mineru")
     refs = params.setdefault("known_refs", [])
     if not isinstance(refs, list) or len(refs) > 200 or any(not isinstance(ref, str) or len(ref) > 500 for ref in refs):
         raise PublicInputError("known_refs must contain at most 200 short identifiers")
-    if name == "code_extractor" and not params.get("document_path", "").strip():
+    if name in ("code_extractor", "document_parse", "document_search") and not params.get("document_path", "").strip():
         raise PublicInputError("Code analysis requires a PDF, Markdown or text document")
-    if name != "code_extractor" and not (params.get("topic", "").strip() or params.get("query", "").strip()):
+    if name not in ("code_extractor", "document_parse") and not (params.get("topic", "").strip() or params.get("query", "").strip()):
         raise PublicInputError("This extension requires a topic or task")
     if name == "slot_filling" and not params.get("manuscript_excerpt", "").strip():
         raise PublicInputError("Citation gap analysis requires a manuscript excerpt")
@@ -114,13 +123,13 @@ def read_document(parameters, directory):
             raise FileNotFoundError("MinerU did not produce Markdown")
         content = markdown[0].read_text(encoding="utf-8")
         parser = "mineru"
-    if not content.strip():
+    if not re.sub(r"<!-- Page \d+ -->", "", content).strip():
         raise PublicInputError("The supplied document has no extractable text")
     if len(content) > 2_000_000:
         raise PublicInputError("Extracted document exceeds the two-million-character limit")
     (directory / "document.md").write_text(content, encoding="utf-8")
     return content, {"source_sha256": digest, "parser": parser, "characters": len(content),
-                     "source_copy": str(target), "evidence_scope": "supplied document; native extraction omits image-only content"}
+                     "source_copy": str(target), "evidence_scope": "supplied document; OCR and layout recognition may contain errors" if parser == "mineru" else "supplied document; native extraction omits image-only content"}
 
 
 def execute_extension(request, config, directory, Model, emit):
@@ -222,7 +231,18 @@ def _execute_extension(request, config, directory, Model, emit):
     emit({"phase": "extension_" + name})
     details = {}
     status = "SUCCEEDED"
-    if name == "code_extractor":
+    if name == "document_parse":
+        from .documents import document_chunks
+        chunks = document_chunks(content, params["chunk_size"], params["chunk_overlap"])
+        report = content
+        details = {"chunks": chunks, "chunk_count": len(chunks), "characters": len(content)}
+    elif name == "document_search":
+        from .documents import search_document
+        details = search_document(content, params, config, emit)
+        report = "# Relevant document passages\n\n" + "\n\n".join(
+            f"## Passage {i+1} · page {row['page'] or 'n/a'} · score {row['score']:.4f}\n\n{row['text']}"
+            for i, row in enumerate(details["matches"]))
+    elif name == "code_extractor":
         tool = code_tool()
         report = tool.forward("paper", params.get("query") or None)
         status = tool.last_tool_status
@@ -253,6 +273,17 @@ def _execute_extension(request, config, directory, Model, emit):
         steps = output.get("execution", {}).get("execution_steps", [])
         status = "SUCCEEDED" if output.get("success") else "PARTIAL" if any(s.get("success") for s in steps) else "FAILED"
         report = "# Planner–Worker result\n\n" + str(output.get("execution", {}).get("final_result") or "No completed tool result.")
+        evaluation = details.get("evaluation") or {}
+        if evaluation:
+            report += "\n\n## Critic review\n\n" + str(evaluation.get("overall_feedback", ""))
+            for label in ("weaknesses", "improvements"):
+                if evaluation.get(label):
+                    report += "\n\n### " + label.capitalize() + "\n\n"
+                    report += "\n".join("- " + str(item) for item in evaluation[label])
+            if evaluation.get("meets_requirements") is False:
+                diagnostics.append({"type": "CriticReview", "code": "CRITIC_REVIEW_UNSATISFIED",
+                    "message": "Critic identified unresolved quality concerns. Its feedback is included in the report; automatic re-execution is disabled.",
+                    "phase": "planner_critic"})
         for step in steps:
             if not step.get("success"):
                 diagnostics.append({"type": "IncompleteToolStep", "code": "EXTENSION_STEP_INCOMPLETE",
@@ -269,11 +300,12 @@ def _execute_extension(request, config, directory, Model, emit):
         from pipelines.exploration_loop import run_exploration_loop
         from pipelines.tasks.benchmark_landscape import build_benchmark_intent, render_benchmark_report
         from pipelines.tasks.prior_art_types import PriorArtConfig
+        years = tuple(params.get(key) or (config.years or (2015, 2025))[index]
+                      for index, key in enumerate(("start_year", "end_year")))
         cfg = PriorArtConfig(**{"enable_openalex": True, "execution_mode": "full_report", "staged_retrieval": False,
-                                "recent_year_start": params.get("start_year") or 2015,
-                                "recent_year_end": params.get("end_year") or 2025})
+                                "recent_year_start": years[0], "recent_year_end": years[1]})
         # The original shared discovery loop powers both restored tasks.
-        intent = build_benchmark_intent(topic, years=config.years, venues=[])
+        intent = build_benchmark_intent(topic, years=years, venues=[])
         if name == "slot_filling":
             intent.task_type = "slot_filling"
         state = run_exploration_loop(None, PipelineState(intent=intent), max_rounds=config.max_rounds,
@@ -303,7 +335,8 @@ def _execute_extension(request, config, directory, Model, emit):
         status = "PARTIAL"
     # Raw provider errors and credentials never enter saved reports or JSON.
     from pipelines.runtime import redact
-    secrets = tuple(p.api_key for p in config.profiles.values() if p.api_key)
+    secrets = tuple(p.api_key for p in config.profiles.values() if p.api_key) + (
+        (config.embedding.api_key,) if config.embedding and config.embedding.api_key else ())
     details = redact(_jsonable(details), secrets)
     for secret in secrets:
         report = report.replace(secret, "[REDACTED]")

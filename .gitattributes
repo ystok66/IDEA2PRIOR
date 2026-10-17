@@ -5,3 +5,7 @@
 *.ipynb text eol=lf
 *.sh text eol=lf
 *.txt -text
+
+# Generated vendor bundles retain upstream template-string whitespace.
+paperarena/web_assets/renderer.js linguist-generated=true -whitespace
+paperarena/web_assets/THIRD_PARTY_LICENSES.txt text eol=lf
